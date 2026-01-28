@@ -1,8 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use crate::bitboard::Bitboard;
 use crate::types::{Color, PieceType, Move, Square};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Board {
     // Piece bitboards
     pub white_pawns: Bitboard,
@@ -26,7 +26,8 @@ pub struct Board {
 
     // Game state
     pub turn: Color,
-    // (Castling rights, en passant, etc. to be added later)
+    pub castling_rights: u8, // 1=WK, 2=WQ, 4=BK, 8=BQ
+    pub en_passant_target: Option<u8>,
 }
 
 #[derive(Serialize)]
@@ -56,6 +57,8 @@ impl Board {
             black_pieces: Bitboard::EMPTY,
             all_pieces: Bitboard::EMPTY,
             turn: Color::White,
+            castling_rights: 0,
+            en_passant_target: None,
         }
     }
 
@@ -78,6 +81,9 @@ impl Board {
         board.black_bishops = Bitboard(0x2400000000000000);
         board.black_queens = Bitboard(0x0800000000000000);
         board.black_kings = Bitboard(0x1000000000000000);
+
+        board.castling_rights = 1 | 2 | 4 | 8; // All rights
+        board.en_passant_target = None;
 
         board.update_occupancy();
         board
@@ -133,6 +139,19 @@ impl Board {
         pieces
     }
 
+    pub fn get_status(&self) -> crate::types::GameStatus {
+        let legal_moves = self.get_legal_moves();
+        if legal_moves.is_empty() {
+            if self.is_in_check(self.turn) {
+                crate::types::GameStatus::Checkmate
+            } else {
+                crate::types::GameStatus::Stalemate
+            }
+        } else {
+            crate::types::GameStatus::Ongoing
+        }
+    }
+
     // --- Move Generation ---
 
     pub fn get_legal_moves(&self) -> Vec<Move> {
@@ -150,24 +169,8 @@ impl Board {
     // Check if the move is legal (doesn't leave king in check)
     fn is_legal_move(&self, m: &Move) -> bool {
         let mut temp_board = self.clone();
-        
-        // Apply move on temp board
-        // Assuming 'from' piece exists because it came from pseudo-generator
-        let (color, piece_type) = temp_board.get_piece_at(m.from).unwrap();
-        
-        // Remove from source
-        temp_board.clear_square(m.from, color, piece_type);
-        
-        // Handle capture
-        if let Some((dest_color, dest_type)) = temp_board.get_piece_at(m.to) {
-            temp_board.clear_square(m.to, dest_color, dest_type);
-        }
-        
-        // Place at dest
-        temp_board.set_square(m.to, color, piece_type); // TODO: Handle promotion here if implementing it
-        temp_board.update_occupancy();
-
-        !temp_board.is_in_check(color)
+        temp_board.apply_move_unchecked(*m);
+        !temp_board.is_in_check(self.turn)
     }
 
     pub fn is_in_check(&self, color: Color) -> bool {
@@ -335,6 +338,10 @@ impl Board {
                  if dest < 64 && (src_col as i8 - dest_col as i8).abs() == 1 {
                      if enemies.get_bit(dest) {
                          moves.push(Move { from: src, to: dest, promotion: None });
+                     } else if let Some(ep) = self.en_passant_target {
+                         if dest == ep {
+                             moves.push(Move { from: src, to: dest, promotion: None });
+                         }
                      }
                  }
              }
@@ -361,6 +368,59 @@ impl Board {
             let mut dests = valid_moves;
             while let Some(dest) = dests.pop_lsb() {
                 moves.push(Move { from: src, to: dest, promotion: None });
+            }
+
+            // Castling
+            if self.turn == Color::White {
+                // White King Side (Rights: 1)
+                if (self.castling_rights & 1) != 0 {
+                    // Squares F1(5), G1(6) must be empty
+                    if !self.all_pieces.get_bit(5) && !self.all_pieces.get_bit(6) {
+                        // Squares E1(4), F1(5), G1(6) must not be attacked
+                        if !self.is_square_attacked(4, Color::Black) && 
+                           !self.is_square_attacked(5, Color::Black) && 
+                           !self.is_square_attacked(6, Color::Black) {
+                            moves.push(Move { from: src, to: 6, promotion: None });
+                        }
+                    }
+                }
+                // White Queen Side (Rights: 2)
+                if (self.castling_rights & 2) != 0 {
+                    // Squares B1(1), C1(2), D1(3) must be empty
+                    if !self.all_pieces.get_bit(1) && !self.all_pieces.get_bit(2) && !self.all_pieces.get_bit(3) {
+                         // Squares E1(4), D1(3), C1(2) must not be attacked
+                         if !self.is_square_attacked(4, Color::Black) && 
+                            !self.is_square_attacked(3, Color::Black) && 
+                            !self.is_square_attacked(2, Color::Black) {
+                             moves.push(Move { from: src, to: 2, promotion: None });
+                         }
+                    }
+                }
+            } else {
+                // Black King Side (Rights: 4)
+                if (self.castling_rights & 4) != 0 {
+                    // F8(61), G8(62) empty
+                    if !self.all_pieces.get_bit(61) && !self.all_pieces.get_bit(62) {
+                        // E8(60), F8(61), G8(62) safe
+                         if !self.is_square_attacked(60, Color::White) && 
+                            !self.is_square_attacked(61, Color::White) && 
+                            !self.is_square_attacked(62, Color::White) {
+                            moves.push(Move { from: src, to: 62, promotion: None });
+                        }
+                    }
+                }
+                 // Black Queen Side (Rights: 8)
+                if (self.castling_rights & 8) != 0 {
+                    // B8(57), C8(58), D8(59) empty
+                    if !self.all_pieces.get_bit(57) && !self.all_pieces.get_bit(58) && !self.all_pieces.get_bit(59) {
+                        // E8(60), D8(59), C8(58) safe
+                        if !self.is_square_attacked(60, Color::White) && 
+                           !self.is_square_attacked(59, Color::White) && 
+                           !self.is_square_attacked(58, Color::White) {
+                             moves.push(Move { from: src, to: 58, promotion: None });
+                         }
+                    }
+                }
             }
         }
 
@@ -466,28 +526,86 @@ impl Board {
         if !legal_moves.contains(&m) {
             return Err("Illegal move".to_string());
         }
+        self.apply_move_unchecked(m);
+        Ok(())
+    }
 
-        // It's legal, so apply it (we duplicate logic here slightly for now, or just trust it)
-        // Since we already calculated it in is_legal_move... 
-        // For efficiency, we should probably just apply it.
-        // But `is_legal_move` uses a temp board.
+    fn apply_move_unchecked(&mut self, m: Move) {
+        let (color, piece_type) = self.get_piece_at(m.from).expect("Piece not found");
         
-        let (color, piece_type) = self.get_piece_at(m.from).unwrap();
-        
-        // Remove from source
+        let is_en_passant = piece_type == PieceType::Pawn && 
+                            (m.from as i8 - m.to as i8).abs() % 8 != 0 && 
+                            !self.all_pieces.get_bit(m.to);
+                            
+        let is_castling = piece_type == PieceType::King && (m.from as i8 - m.to as i8).abs() == 2;
+
         self.clear_square(m.from, color, piece_type);
         
-        // Handle capture
-        if let Some((dest_color, dest_type)) = self.get_piece_at(m.to) {
+        // Capture
+        if is_en_passant {
+             let capture_sq = if color == Color::White { m.to - 8 } else { m.to + 8 };
+             self.clear_square(capture_sq, color.opposite(), PieceType::Pawn);
+        } else if let Some((dest_color, dest_type)) = self.get_piece_at(m.to) {
              self.clear_square(m.to, dest_color, dest_type);
+             // Rook Capture Rights Update
+             match m.to {
+                 0 => self.castling_rights &= !2, // WQ
+                 7 => self.castling_rights &= !1, // WK
+                 56 => self.castling_rights &= !8, // BQ
+                 63 => self.castling_rights &= !4, // BK
+                 _ => {}
+             }
         }
-
-        // Place at dest
-        self.set_square(m.to, color, piece_type);
+        
+        // Place
+        let final_piece = m.promotion.unwrap_or(piece_type);
+        self.set_square(m.to, color, final_piece);
+        
+        // Castling Rook Move
+        if is_castling {
+            match m.to {
+                6 => { // White Short (G1)
+                     self.clear_square(7, Color::White, PieceType::Rook);
+                     self.set_square(5, Color::White, PieceType::Rook);
+                },
+                2 => { // White Long (C1)
+                     self.clear_square(0, Color::White, PieceType::Rook);
+                     self.set_square(3, Color::White, PieceType::Rook);
+                },
+                62 => { // Black Short (G8)
+                     self.clear_square(63, Color::Black, PieceType::Rook);
+                     self.set_square(61, Color::Black, PieceType::Rook);
+                },
+                58 => { // Black Long (C8)
+                     self.clear_square(56, Color::Black, PieceType::Rook);
+                     self.set_square(59, Color::Black, PieceType::Rook);
+                },
+                _ => {}
+            }
+        }
+        
+        // Update Rights (Moving)
+        if piece_type == PieceType::King {
+             if color == Color::White { self.castling_rights &= !3; }
+             else { self.castling_rights &= !12; }
+        } else if piece_type == PieceType::Rook {
+             match m.from {
+                 0 => self.castling_rights &= !2,
+                 7 => self.castling_rights &= !1,
+                 56 => self.castling_rights &= !8,
+                 63 => self.castling_rights &= !4,
+                 _ => {}
+             }
+        }
+        
+        // Update En Passant
+        self.en_passant_target = None;
+        if piece_type == PieceType::Pawn && (m.from as i8 - m.to as i8).abs() == 16 {
+             self.en_passant_target = Some((m.from + m.to) / 2);
+        }
         
         self.update_occupancy();
         self.turn = self.turn.opposite();
-        Ok(())
     }
     
     // Kept for internal use

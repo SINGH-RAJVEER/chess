@@ -26,6 +26,13 @@ pub enum PieceType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum GameStatus {
+    Ongoing,
+    Checkmate,
+    Stalemate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Move {
     pub from: u8,
     pub to: u8,

@@ -1,5 +1,5 @@
 body {
-  font-family: Gordita, Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  font-family: Roboto, "Open Sans", "Helvetica Neue", sans-serif;
 }
 
 a {
@@ -38,22 +38,34 @@ p {
   }
 }
 
+.text-red-500 {
+  color: #ef4444;
+}
+
+.text-green-500 {
+  color: #22c55e;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  width: 400px;
-  height: 400px;
-  margin: 0 auto;
+  width: 800px;
+  height: 800px;
+  margin: auto;
   border: 2px solid #333;
 }
 
 .square {
-  width: 50px;
-  height: 50px;
+  width: 100px;
+  height: 100px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 4rem;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
 }
 
 .square.white {
@@ -65,16 +77,23 @@ p {
 }
 
 .square.selected {
-  background-color: #7b61ff !important;
+  background-color: #7b61ff;
 }
 
-.valid-move-dot {
-  width: 15px;
-  height: 15px;
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 50%;
+.square.valid-move::after {
+  content: "";
   position: absolute;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 50%;
+  pointer-events: none;
 }
-.square {
-  position: relative;
+
+.square.valid-move.has-piece::after {
+  width: 84px;
+  height: 84px;
+  background-color: transparent;
+  border: 6px solid rgba(0, 0, 0, 0.15);
+  border-radius: 50%;
 }

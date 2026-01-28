@@ -1,8 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr, BitAndAssign, BitOrAssign, BitXorAssign};
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Bitboard(pub u64);
 
 impl Bitboard {

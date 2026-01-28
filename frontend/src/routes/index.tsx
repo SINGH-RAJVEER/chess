@@ -1,23 +1,7 @@
-import { createResource, createSignal, For, Show } from "solid-js";
-
-type Color = "White" | "Black";
-type PieceType = "Pawn" | "Knight" | "Bishop" | "Rook" | "Queen" | "King";
-
-interface PieceInfo {
-  color: Color;
-  piece_type: PieceType;
-  square: number;
-}
-
-interface BoardResponse {
-  pieces: PieceInfo[];
-  turn: Color;
-}
-
-const fetchBoard = async (): Promise<BoardResponse> => {
-  const response = await fetch("http://127.0.0.1:8080/api/board");
-  return response.json();
-};
+import { createSignal, For, Show, createMemo } from "solid-js";
+import { createAsync } from "@solidjs/router";
+import { getBoard, getMoves, makeMove, resetGame } from "../api";
+import type { Color, PieceType } from "../api/types";
 
 const PIECE_SYMBOLS: Record<Color, Record<PieceType, string>> = {
   White: {
@@ -39,116 +23,133 @@ const PIECE_SYMBOLS: Record<Color, Record<PieceType, string>> = {
 };
 
 export default function Home() {
-  const [board, { refetch }] = createResource(fetchBoard);
+  const board = createAsync(() => getBoard());
+  const pieces = createMemo(() => board()?.pieces || []);
+  
   const [selectedSquare, setSelectedSquare] = createSignal<number | null>(null);
   const [validMoves, setValidMoves] = createSignal<number[]>([]);
   const [errorMsg, setErrorMsg] = createSignal<string | null>(null);
+  const [successMsg, setSuccessMsg] = createSignal<string | null>(null);
 
   const getPieceAt = (squareIndex: number) => {
-    return board()?.pieces.find((p) => p.square === squareIndex);
+    return pieces().find((p) => p.square === squareIndex);
   };
 
   const handleSquareClick = async (squareIndex: number) => {
     const currentBoard = board();
     if (!currentBoard) return;
-
-    const clickedPiece = getPieceAt(squareIndex);
+    
+    const currentPieces = pieces();
+    const clickedPiece = currentPieces.find((p) => p.square === squareIndex);
     const selected = selectedSquare();
 
     // Case 1: Select a piece
-    // If nothing selected OR clicked own piece (switch selection)
     if (clickedPiece && clickedPiece.color === currentBoard.turn) {
-      // If clicking same piece, maybe deselect?
       if (selected === squareIndex) {
-          setSelectedSquare(null);
-          setValidMoves([]);
-          return;
+        setSelectedSquare(null);
+        setValidMoves([]);
+        return;
       }
-      
+
       setSelectedSquare(squareIndex);
       setErrorMsg(null);
-      
-      // Fetch legal moves for this piece
+
       try {
-          const res = await fetch(`http://127.0.0.1:8080/api/moves?square=${squareIndex}`);
-          if (res.ok) {
-              const moves = await res.json();
-              setValidMoves(moves);
-          } else {
-              setValidMoves([]);
-          }
+        const moves = await getMoves(squareIndex);
+        setValidMoves(moves);
       } catch (e) {
-          console.error("Failed to fetch moves", e);
-          setValidMoves([]);
+        console.error("Failed to fetch moves", e);
+        setValidMoves([]);
       }
       return;
     }
 
-    // Case 2: Move to empty square or capture enemy
+    // Case 2: Move
     if (selected !== null) {
-        // Check if move is in validMoves
-        if (validMoves().includes(squareIndex)) {
-            try {
-              const response = await fetch("http://127.0.0.1:8080/api/move", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ from: selected, to: squareIndex }),
-              });
-        
-              if (response.ok) {
-                setSelectedSquare(null);
-                setValidMoves([]);
-                setErrorMsg(null);
-                refetch();
-              } else {
-                const text = await response.text();
-                setErrorMsg(`Move failed: ${text}`);
-              }
-            } catch (e) {
-              setErrorMsg("Network error");
-            }
-        } else {
-            // Clicked invalid square -> Deselect
-            setSelectedSquare(null);
-            setValidMoves([]);
+      if (validMoves().includes(squareIndex)) {
+        try {
+          await makeMove({ from: selected, to: squareIndex });
+          setSelectedSquare(null);
+          setValidMoves([]);
+          setErrorMsg(null);
+          setSuccessMsg("Move successful!");
+          setTimeout(() => setSuccessMsg(null), 2000);
+        } catch (e: unknown) {
+          setErrorMsg(`Move failed: ${e instanceof Error ? e.message : String(e)}`);
         }
+      } else {
+        setSelectedSquare(null);
+        setValidMoves([]);
+      }
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      await resetGame();
+      setSelectedSquare(null);
+      setValidMoves([]);
+      setErrorMsg(null);
+    } catch (e: unknown) {
+      console.error("Reset game error:", e);
+      setErrorMsg(`Failed to reset game: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
   return (
     <main class="w-full p-4 space-y-4">
-      <h2 class="font-bold text-3xl">Chess</h2>
-      <Show when={errorMsg()}>
-        <div class="text-red-500 font-bold">{errorMsg()}</div>
+      <div class="flex items-center justify-between">
+        <h2 class="font-bold text-3xl">Chess</h2>
+        <button
+          onClick={handleReset}
+          class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          type="button"
+        >
+          Reset Game
+        </button>
+      </div>
+      <div class="messages-container" style={{ "min-height": "1.5rem" }}>
+        <Show when={errorMsg()}>
+          <div class="text-red-500 font-bold">{errorMsg()}</div>
+        </Show>
+        <Show when={successMsg()}>
+          <div class="text-green-500 font-bold">{successMsg()}</div>
+        </Show>
+      </div>
+      <Show when={board()?.status && board()?.status !== "Ongoing"}>
+        <div class="text-xl font-bold p-4 bg-yellow-100 rounded text-center">
+          Game Over: {board()?.status}
+        </div>
       </Show>
       <div class="board">
         <For each={Array.from({ length: 64 })}>
           {(_, i) => {
             const row = Math.floor(i() / 8);
             const col = i() % 8;
-            
+
             const displayRow = 7 - row;
             const displayCol = col;
             const squareIndex = displayRow * 8 + displayCol;
-            
+
             const isBlack = (row + col) % 2 === 1;
             const piece = getPieceAt(squareIndex);
             const isSelected = selectedSquare() === squareIndex;
             const isValidMove = validMoves().includes(squareIndex);
 
             return (
-              <div 
-                class={`square ${isBlack ? "black" : "white"} ${isSelected ? "selected" : ""}`}
+              <button
+                class={`square ${isBlack ? "black" : "white"} ${isSelected ? "selected" : ""} ${isValidMove ? "valid-move" : ""} ${piece ? "has-piece" : ""}`}
                 onClick={() => handleSquareClick(squareIndex)}
+                type="button"
+                aria-label={`Square ${squareIndex}`}
               >
                 {piece ? PIECE_SYMBOLS[piece.color][piece.piece_type] : ""}
-                {isValidMove && <div class="valid-move-dot"></div>}
-              </div>
+              </button>
             );
           }}
         </For>
       </div>
-      <p>Turn: {board()?.turn}</p>
+      <Show when={board()}>{(b) => <p>Turn: {b().turn}</p>}</Show>
     </main>
   );
 }
