@@ -1,0 +1,1 @@
+import{g as t,t as e}from"./main-B62NIF3a.js";var o=e('<div class="p-4 text-center"><h1 class="text-2xl font-bold">404 - Not Found</h1><p>The page you are looking for does not exist.');function a(){return t(o)}export{a as component};

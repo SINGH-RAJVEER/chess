@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+body {
+  font-family: Roboto, "Open Sans", "Helvetica Neue", sans-serif;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 800px;
+  height: 800px;
+  margin: auto;
+  border: 2px solid #333;
+}
+
+.square {
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+}
+
+.square.white {
+  background-color: #f0d9b5;
+}
+
+.square.black {
+  background-color: #b58863;
+}
+
+.square.selected {
+  background-color: #7b61ff;
+}
+
+.square.valid-move::after {
+  content: "";
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.square.valid-move.has-piece::after {
+  width: 84px;
+  height: 84px;
+  background-color: transparent;
+  border: 6px solid rgba(220, 38, 38, 0.8);
+  border-radius: 50%;
+}
+
+.square.valid-move:not(.has-piece)::after {
+  background-color: rgba(34, 197, 94, 0.5);
+}

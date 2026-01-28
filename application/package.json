@@ -1,0 +1,47 @@
+{
+  "name": "chess",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "format": "biome format",
+    "lint": "biome lint",
+    "check": "biome check",
+    "start": "node .output/server/index.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.0.6",
+    "@tanstack/router-plugin": "^1.133.21",
+    "@tanstack/solid-query": "^5.66.0",
+    "@tanstack/solid-query-devtools": "^5.66.0",
+    "@tanstack/solid-router": "^1.133.20",
+    "@tanstack/solid-router-devtools": "^1.133.20",
+    "@tanstack/solid-router-ssr-query": "^1.132.25",
+    "@tanstack/solid-start": "^1.132.25",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-auth": "^1.4.12",
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1",
+    "lucide-solid": "^0.544.0",
+    "nitro": "npm:nitro-nightly@latest",
+    "solid-js": "^1.9.9",
+    "tailwindcss": "^4.0.6",
+    "vite": "^7.1.7",
+    "vite-plugin-lucide-preprocess": "^1.4.6",
+    "vite-tsconfig-paths": "^5.1.4"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.4",
+    "@tanstack/devtools-vite": "^0.3.11",
+    "drizzle-kit": "^0.31.8",
+    "typescript": "^5.7.2",
+    "vite-plugin-solid": "^2.11.10"
+  }
+}
