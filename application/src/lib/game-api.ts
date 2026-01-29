@@ -37,10 +37,12 @@ export type BoardResponse = {
   whiteTimeRemaining: number;
   blackTimeRemaining: number;
   lastMoveTime: number | null;
+  serverTime: number;
 };
 
 export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
   try {
+    const serverTime = Date.now();
     let currentGame = await db.query.games.findFirst({
       orderBy: desc(schema.games.updatedAt),
     });
@@ -86,6 +88,24 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
     const pieces = await db.query.pieces.findMany({
       where: eq(schema.pieces.gameId, currentGame.id),
     });
+
+    // Check for Timeout
+    if (currentGame.status === "Ongoing" && currentGame.lastMoveTime && currentGame.timeControl !== 0) {
+      const now = Date.now();
+      const elapsed = now - currentGame.lastMoveTime;
+      const isWhiteTurn = currentGame.currentTurn === "White";
+      const timeRemaining = isWhiteTurn 
+        ? currentGame.whiteTimeRemaining 
+        : currentGame.blackTimeRemaining;
+
+      if (timeRemaining - elapsed <= 0) {
+        console.log("Game timed out!");
+        await db.update(schema.games)
+          .set({ status: "Timeout", updatedAt: now })
+          .where(eq(schema.games.id, currentGame.id));
+        currentGame.status = "Timeout";
+      }
+    }
 
     const moveHistory = await db.query.moves.findMany({
       where: eq(schema.moves.gameId, currentGame.id),

@@ -2,7 +2,7 @@ import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 
 export type Color = "White" | "Black";
 export type PieceType = "Pawn" | "Knight" | "Bishop" | "Rook" | "Queen" | "King";
-export type GameStatus = "Ongoing" | "Checkmate" | "Stalemate";
+export type GameStatus = "Ongoing" | "Checkmate" | "Stalemate" | "Timeout";
 
 export const games = sqliteTable("games", {
   id: integer("id").primaryKey(),

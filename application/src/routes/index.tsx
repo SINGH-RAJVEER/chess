@@ -596,10 +596,19 @@ function Home() {
                 <div class="absolute inset-0 bg-stone-900/80 flex items-center justify-center z-50 backdrop-blur-md">
                   <div class="bg-white p-12 rounded-3xl shadow-[0_0_100px_rgba(0,0,0,0.5)] text-center border-b-8 border-indigo-600 animate-in fade-in zoom-in duration-500">
                     <h2 class="text-6xl font-black text-stone-900 mb-4 tracking-tighter">
-                      Checkmate
+                      {boardQuery.data?.status === "Timeout" ? "Time Out!" : boardQuery.data?.status}
                     </h2>
                     <p class="text-2xl font-bold text-indigo-600 mb-10 tracking-wide uppercase">
-                      {boardQuery.data?.status}
+                      {(() => {
+                        const status = boardQuery.data?.status;
+                        const turn = boardQuery.data?.turn;
+                        if (status === "Stalemate") return "Draw";
+                        
+                        // If Checkmate or Timeout, the player whose turn it is LOST.
+                        const winner = turn === "White" ? "Black" : "White";
+                        if (status === "Timeout") return `${winner} Wins by Time`;
+                        return `${winner} Wins`;
+                      })()}
                     </p>
                     <button
                       onClick={() => handleReset()}
