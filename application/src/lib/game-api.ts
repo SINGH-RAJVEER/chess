@@ -166,6 +166,7 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
       whiteTimeRemaining: currentGame.whiteTimeRemaining,
       blackTimeRemaining: currentGame.blackTimeRemaining,
       lastMoveTime: currentGame.lastMoveTime,
+      serverTime,
     } as BoardResponse;
   } catch (error) {
     console.error("Error in getBoard:", error);
