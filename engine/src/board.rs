@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::bitboard::Bitboard;
-use crate::types::{Color, PieceType, Move, Square};
+use crate::types::{Color, PieceType, Move};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Board {
@@ -26,7 +26,7 @@ pub struct Board {
 
     // Game state
     pub turn: Color,
-    pub castling_rights: u8, // 1=WK, 2=WQ, 4=BK, 8=BQ
+    pub castling_rights: u8,
     pub en_passant_target: Option<u8>,
 }
 
@@ -279,7 +279,7 @@ impl Board {
     
     // Helper for sliding attacks
     fn is_attacked_by_slider(&self, square: u8, attackers: Bitboard, orthogonal: bool) -> bool {
-        let directions: &[(i8, i8)] = if orthogonal {
+        let directions: &[(i8, i8); 4] = if orthogonal {
             &[(1,0), (-1,0), (0,1), (0,-1)]
         } else {
             &[(1,1), (1,-1), (-1,1), (-1,-1)]
