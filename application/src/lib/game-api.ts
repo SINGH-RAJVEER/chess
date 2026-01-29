@@ -8,6 +8,7 @@ import {
   getValidMoves,
   initializeGame,
   isLegalMove,
+  piecesToFen,
 } from "./chess/index";
 import { db, schema } from "../db";
 import type { Color, GameStatus, PieceType } from "../db/schema";
@@ -32,17 +33,24 @@ export type BoardResponse = {
   }[];
   turn: Color;
   status: GameStatus;
+  mode: "vs_player" | "vs_computer";
+  timeControl: number;
+  whiteTimeRemaining: number;
+  blackTimeRemaining: number;
+  lastMoveTime: number | null;
+  serverTime: number;
 };
 
 export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
   try {
+    const serverTime = Date.now();
     let currentGame = await db.query.games.findFirst({
       orderBy: desc(schema.games.updatedAt),
     });
 
     if (!currentGame) {
       console.log("No game found, creating new one");
-      
+      // Default creation if accessed directly without reset
       const initialData = initializeGame();
 
       const [newGame] = await db
@@ -50,42 +58,56 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
         .values({
           currentTurn: initialData.turn,
           status: "Ongoing",
+          mode: "vs_player",
+          timeControl: 10,
+          whiteTimeRemaining: 10 * 60 * 1000,
+          blackTimeRemaining: 10 * 60 * 1000,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         })
         .returning();
 
       if (newGame) {
-        console.log(`Created new game with ID ${newGame.id}`);
-        // Insert pieces
-        const piecesToInsert = initialData.pieces.map((piece) => ({
+        // ... insert pieces (same as before)
+         const piecesToInsert = initialData.pieces.map((piece) => ({
           gameId: newGame.id,
           color: piece.color,
           pieceType: piece.pieceType,
           square: piece.square,
           hasMoved: false,
         }));
-
         await db.insert(schema.pieces).values(piecesToInsert);
-        console.log(
-          `Inserted ${piecesToInsert.length} pieces for game ${newGame.id}`,
-        );
-
         currentGame = newGame;
       }
     }
 
     if (!currentGame) {
-      console.error("Failed to create or retrieve game");
-      return { pieces: [], turn: "White", status: "Ongoing", moves: [] } as BoardResponse;
+       return { pieces: [], turn: "White", status: "Ongoing", moves: [], mode: "vs_player", timeControl: 10, whiteTimeRemaining: 600000, blackTimeRemaining: 600000, lastMoveTime: null, capturedPieces: { white: [], black: [] } } as BoardResponse;
     }
 
-    // Get current pieces
+    // Get pieces and moves (same as before)
     const pieces = await db.query.pieces.findMany({
       where: eq(schema.pieces.gameId, currentGame.id),
     });
 
-    // Get captured pieces from move history
+    // Check for Timeout
+    if (currentGame.status === "Ongoing" && currentGame.lastMoveTime && currentGame.timeControl !== 0) {
+      const now = Date.now();
+      const elapsed = now - currentGame.lastMoveTime;
+      const isWhiteTurn = currentGame.currentTurn === "White";
+      const timeRemaining = isWhiteTurn 
+        ? currentGame.whiteTimeRemaining 
+        : currentGame.blackTimeRemaining;
+
+      if (timeRemaining - elapsed <= 0) {
+        console.log("Game timed out!");
+        await db.update(schema.games)
+          .set({ status: "Timeout", updatedAt: now })
+          .where(eq(schema.games.id, currentGame.id));
+        currentGame.status = "Timeout";
+      }
+    }
+
     const moveHistory = await db.query.moves.findMany({
       where: eq(schema.moves.gameId, currentGame.id),
       orderBy: schema.moves.moveNumber,
@@ -97,7 +119,7 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
     };
     
     const formattedMoves = moveHistory.map(move => {
-      // Basic notation generation
+      // ... (notation logic same as before)
       const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
       const fromFile = files[getCol(move.fromSquare)];
       const fromRank = 8 - getRow(move.fromSquare);
@@ -108,7 +130,7 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
       if (move.pieceType !== "Pawn") {
         notation += move.pieceType === "Knight" ? "N" : move.pieceType[0];
       }
-      notation += `${fromFile}${fromRank}-${toFile}${toRank}`; // Long algebraic for simplicity
+      notation += `${fromFile}${fromRank}-${toFile}${toRank}`;
 
       if (move.capturedPieceType) {
         if (move.pieceColor === "White") {
@@ -134,15 +156,18 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
       square: piece.square,
     }));
 
-    console.log(
-      `Retrieved game ${currentGame.id} with ${pieces.length} pieces, turn: ${currentGame.currentTurn}`,
-    );
     return {
       pieces: piecesResponse,
       capturedPieces,
       moves: formattedMoves,
       turn: currentGame.currentTurn,
       status: currentGame.status,
+      mode: currentGame.mode,
+      timeControl: currentGame.timeControl,
+      whiteTimeRemaining: currentGame.whiteTimeRemaining,
+      blackTimeRemaining: currentGame.blackTimeRemaining,
+      lastMoveTime: currentGame.lastMoveTime,
+      serverTime,
     } as BoardResponse;
   } catch (error) {
     console.error("Error in getBoard:", error);
@@ -150,128 +175,13 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
   }
 });
 
-// ... (getMoves and makeMove remain largely the same, maybe simplified log) ...
-
-export const undoMove = createServerFn({ method: "POST" }).handler(async () => {
-  console.log("Undoing last move");
-  try {
-     const currentGame = await db.query.games.findFirst({
-        orderBy: desc(schema.games.updatedAt),
-      });
-
-      if (!currentGame) {
-        throw new Error("No game found");
-      }
-
-      // Get last move
-      const lastMove = await db.query.moves.findFirst({
-        where: eq(schema.moves.gameId, currentGame.id),
-        orderBy: desc(schema.moves.moveNumber),
-      });
-
-      if (!lastMove) {
-        return { success: false, message: "No moves to undo" };
-      }
-
-      // 1. Revert Piece Position
-      // Find the piece currently at 'toSquare'
-      const movedPiece = await db.query.pieces.findFirst({
-        where: and(
-          eq(schema.pieces.gameId, currentGame.id),
-          eq(schema.pieces.square, lastMove.toSquare)
-        )
-      });
-
-      if (movedPiece) {
-        // Move back to 'fromSquare' and restore original type (handling promotion)
-        await db.update(schema.pieces)
-          .set({
-             square: lastMove.fromSquare,
-             pieceType: lastMove.pieceType, // Restore original type (e.g. Pawn instead of Queen)
-             hasMoved: false // Simplified heuristic: assume undoing implies it hasn't moved. 
-             // Ideally we check if it had moved before, but we don't track that history.
-             // For start squares, this is safe. For mid-game, it might grant castling rights back incorrectly if we moved, went back, moved again.
-             // But standard undo usually allows re-try.
-          })
-          .where(eq(schema.pieces.id, movedPiece.id));
-      }
-
-      // 2. Restore Captured Piece
-      if (lastMove.capturedPieceType) {
-        const capturedColor = lastMove.pieceColor === "White" ? "Black" : "White";
-        // Check for En Passant (Capture was not at toSquare)
-        // Heuristic: If Pawn captured Pawn, and rows suggest EP
-        let captureSquare = lastMove.toSquare;
-        if (lastMove.pieceType === "Pawn" && lastMove.capturedPieceType === "Pawn") {
-             const fromRow = getRow(lastMove.fromSquare);
-             const toRow = getRow(lastMove.toSquare);
-             const fromCol = getCol(lastMove.fromSquare);
-             const toCol = getCol(lastMove.toSquare);
-             
-             // If diagonal move to empty square... wait, we don't know it was empty.
-             // But if it was EP, the captured pawn was at [fromRow, toCol]
-             // Regular capture: captured at [toRow, toCol]
-             // We can't know for sure without 'isEnPassant' flag.
-             // We will assume standard capture for now to avoid placing pieces on top of others if we guess wrong.
-             // Or we could check if toSquare is empty? No, we just moved the piece OUT of toSquare. So it IS empty now.
-             // So we insert at toSquare.
-        }
-
-        await db.insert(schema.pieces).values({
-          gameId: currentGame.id,
-          color: capturedColor,
-          pieceType: lastMove.capturedPieceType,
-          square: captureSquare,
-          hasMoved: true // Captured pieces have likely moved, or it doesn't matter much.
-        });
-      }
-
-      // 3. Un-Castle
-      if (lastMove.pieceType === "King" && Math.abs(lastMove.fromSquare - lastMove.toSquare) === 2) {
-        const isKingside = getCol(lastMove.toSquare) === 6;
-        const rookCol = isKingside ? 7 : 0; // Original rook pos
-        const rookLandedCol = isKingside ? 5 : 3; // Where rook is now
-        const row = getRow(lastMove.fromSquare);
-        
-        const rookLandedSquare = getSquareFromRowCol(row, rookLandedCol);
-        const rookOriginalSquare = getSquareFromRowCol(row, rookCol);
-        
-        await db.update(schema.pieces)
-          .set({ square: rookOriginalSquare, hasMoved: false })
-          .where(and(
-             eq(schema.pieces.gameId, currentGame.id),
-             eq(schema.pieces.square, rookLandedSquare),
-             eq(schema.pieces.pieceType, "Rook")
-          ));
-      }
-
-      // 4. Delete Move
-      await db.delete(schema.moves).where(eq(schema.moves.id, lastMove.id));
-
-      // 5. Revert Turn
-      await db.update(schema.games)
-        .set({
-           currentTurn: lastMove.pieceColor,
-           status: "Ongoing",
-           updatedAt: Date.now()
-        })
-        .where(eq(schema.games.id, currentGame.id));
-
-      return { success: true };
-
-  } catch (e) {
-    console.error("Undo failed:", e);
-    throw e;
-  }
-});
-
+// ... getMoves ...
 export const getMoves = createServerFn({ method: "POST" })
   .inputValidator((square: number) => square)
   .handler(async ({ data: square }) => {
-    console.log(`Getting valid moves for square: ${square}`);
-
+     // ... (Keep existing implementation)
+     console.log(`Getting valid moves for square: ${square}`);
     try {
-      // Get current game
       const currentGame = await db.query.games.findFirst({
         orderBy: desc(schema.games.updatedAt),
       });
@@ -281,35 +191,119 @@ export const getMoves = createServerFn({ method: "POST" })
         return [];
       }
 
-      // Get all pieces for this game
       const pieces = await db.query.pieces.findMany({
         where: eq(schema.pieces.gameId, currentGame.id),
       });
 
-      // Get last move for en passant
       const lastMove = await db.query.moves.findFirst({
         where: eq(schema.moves.gameId, currentGame.id),
         orderBy: desc(schema.moves.moveNumber),
       });
 
       const validMoves = getValidMoves(pieces, square, lastMove);
-      console.log(
-        `Found ${validMoves.length} valid moves for square ${square}`,
-      );
       return validMoves;
-    } catch (error) {
-      console.error("Error in getMoves:", error);
-      throw error;
-    }
-  });
-
-export const makeMove = createServerFn({ method: "POST" })
-  .inputValidator((args: { from: number; to: number }) => args)
+        } catch (error) {
+        console.error("Error in getMoves:", error);
+        throw error;
+      }
+    });
+    
+    
+    export const undoMove = createServerFn({ method: "POST" }).handler(async () => {
+      console.log("Undoing last move");
+      try {
+         const currentGame = await db.query.games.findFirst({
+            orderBy: desc(schema.games.updatedAt),
+          });
+    
+          if (!currentGame) {
+            throw new Error("No game found");
+          }
+    
+          // Get last move
+          const lastMove = await db.query.moves.findFirst({
+            where: eq(schema.moves.gameId, currentGame.id),
+            orderBy: desc(schema.moves.moveNumber),
+          });
+    
+          if (!lastMove) {
+            return { success: false, message: "No moves to undo" };
+          }
+    
+          // 1. Revert Piece Position
+          const movedPiece = await db.query.pieces.findFirst({
+            where: and(
+              eq(schema.pieces.gameId, currentGame.id),
+              eq(schema.pieces.square, lastMove.toSquare)
+            )
+          });
+    
+          if (movedPiece) {
+            await db.update(schema.pieces)
+              .set({
+                 square: lastMove.fromSquare,
+                 pieceType: lastMove.pieceType,
+                 hasMoved: false 
+              })
+              .where(eq(schema.pieces.id, movedPiece.id));
+          }
+    
+          // 2. Restore Captured Piece
+          if (lastMove.capturedPieceType) {
+            const capturedColor = lastMove.pieceColor === "White" ? "Black" : "White";
+            await db.insert(schema.pieces).values({
+              gameId: currentGame.id,
+              color: capturedColor,
+              pieceType: lastMove.capturedPieceType,
+              square: lastMove.toSquare,
+              hasMoved: true 
+            });
+          }
+    
+          // 3. Un-Castle
+          if (lastMove.pieceType === "King" && Math.abs(lastMove.fromSquare - lastMove.toSquare) === 2) {
+            const isKingside = getCol(lastMove.toSquare) === 6;
+            const rookCol = isKingside ? 7 : 0;
+            const rookLandedCol = isKingside ? 5 : 3;
+            const row = getRow(lastMove.fromSquare);
+            
+            const rookLandedSquare = getSquareFromRowCol(row, rookLandedCol);
+            const rookOriginalSquare = getSquareFromRowCol(row, rookCol);
+            
+            await db.update(schema.pieces)
+              .set({ square: rookOriginalSquare, hasMoved: false })
+              .where(and(
+                 eq(schema.pieces.gameId, currentGame.id),
+                 eq(schema.pieces.square, rookLandedSquare),
+                 eq(schema.pieces.pieceType, "Rook")
+              ));
+          }
+    
+          // 4. Delete Move
+          await db.delete(schema.moves).where(eq(schema.moves.id, lastMove.id));
+    
+          // 5. Revert Turn
+          await db.update(schema.games)
+            .set({
+               currentTurn: lastMove.pieceColor,
+               status: "Ongoing",
+               updatedAt: Date.now()
+            })
+            .where(eq(schema.games.id, currentGame.id));
+    
+          return { success: true };
+    
+      } catch (e) {
+        console.error("Undo failed:", e);
+        throw e;
+      }
+    });
+    
+    
+    export const makeMove = createServerFn({ method: "POST" })  .inputValidator((args: { from: number; to: number }) => args)
   .handler(async ({ data: { from, to } }) => {
-    console.log(`Making move from ${from} to ${to}`);
-
+    // ... (Keep existing validation logic)
     try {
-      // Get current game
       const currentGame = await db.query.games.findFirst({
         orderBy: desc(schema.games.updatedAt),
       });
@@ -317,78 +311,67 @@ export const makeMove = createServerFn({ method: "POST" })
       if (!currentGame) {
         throw new Error("No game found");
       }
-
+      
       if (currentGame.status !== "Ongoing") {
-        throw new Error("Game is not ongoing");
+         throw new Error("Game is not ongoing");
       }
 
-      // Get all pieces for this Game
       const pieces = await db.query.pieces.findMany({
         where: eq(schema.pieces.gameId, currentGame.id),
       });
 
-      // Get last move for en passant validation
       const lastMove = await db.query.moves.findFirst({
         where: eq(schema.moves.gameId, currentGame.id),
         orderBy: desc(schema.moves.moveNumber),
       });
 
-      // Validate move
       if (!isLegalMove(pieces, from, to, currentGame.currentTurn, lastMove)) {
         throw new Error("Invalid move");
       }
-
-      const movingPiece = pieces.find((p) => p.square === from);
-      if (!movingPiece || movingPiece.color !== currentGame.currentTurn) {
-        throw new Error("No valid piece found at that square");
+      
+      // ... Capture/EnPassant/Castling Logic ...
+      // To save space, I will copy the logic but insert the Time Update here
+      
+      // TIME UPDATE LOGIC
+      const now = Date.now();
+      let whiteTime = currentGame.whiteTimeRemaining;
+      let blackTime = currentGame.blackTimeRemaining;
+      
+      // If this is NOT the very first move of the game (or handling for first move)
+      // We assume if lastMoveTime is set, we deduct.
+      if (currentGame.lastMoveTime && currentGame.timeControl !== 0) {
+          const elapsed = now - currentGame.lastMoveTime;
+          if (currentGame.currentTurn === "White") {
+              whiteTime = Math.max(0, whiteTime - elapsed);
+          } else {
+              blackTime = Math.max(0, blackTime - elapsed);
+          }
       }
 
-      // Check for capture (regular)
+      // ... Proceed with Piece Updates ...
+       const movingPiece = pieces.find((p) => p.square === from);
+      if (!movingPiece) throw new Error("Piece not found");
+
+      // Check for capture
       const capturedPiece = pieces.find((p) => p.square === to);
       let capturedPieceType: PieceType | undefined;
 
       if (capturedPiece) {
         capturedPieceType = capturedPiece.pieceType;
-        // Remove captured piece
-        await db
-          .delete(schema.pieces)
-          .where(
-            and(
-              eq(schema.pieces.gameId, currentGame.id),
-              eq(schema.pieces.square, to),
-            ),
-          );
-      } else if (
-        movingPiece.pieceType === "Pawn" &&
-        getCol(from) !== getCol(to)
-      ) {
-        // En passant capture
-        const capturedPawnSquare = getSquareFromRowCol(
-          getRow(from),
-          getCol(to),
-        );
-        const enPassantPiece = pieces.find(
-          (p) => p.square === capturedPawnSquare,
-        );
-        if (enPassantPiece) {
+        await db.delete(schema.pieces).where(and(eq(schema.pieces.gameId, currentGame.id), eq(schema.pieces.square, to)));
+      } else if (movingPiece.pieceType === "Pawn" && getCol(from) !== getCol(to)) {
+        // En Passant
+        const capturedPawnSquare = getSquareFromRowCol(getRow(from), getCol(to));
+        const enPassantPiece = pieces.find((p) => p.square === capturedPawnSquare);
+         if (enPassantPiece) {
           capturedPieceType = enPassantPiece.pieceType;
-          await db
-            .delete(schema.pieces)
-            .where(
-              and(
-                eq(schema.pieces.gameId, currentGame.id),
-                eq(schema.pieces.square, capturedPawnSquare),
-              ),
-            );
+          await db.delete(schema.pieces).where(and(eq(schema.pieces.gameId, currentGame.id), eq(schema.pieces.square, capturedPawnSquare)));
         }
       }
 
-      // Handle Castling (move the rook)
-      if (
-        movingPiece.pieceType === "King" &&
-        Math.abs(getCol(to) - getCol(from)) === 2
-      ) {
-        const isKingside = getCol(to) === 6;
+      // Castling
+      if (movingPiece.pieceType === "King" && Math.abs(getCol(to) - getCol(from)) === 2) {
+         const isKingside = getCol(to) === 6;
         const rookFromCol = isKingside ? 7 : 0;
         const rookToCol = isKingside ? 5 : 3;
         const rookFromSquare = getSquareFromRowCol(getRow(from), rookFromCol);
@@ -407,10 +390,9 @@ export const makeMove = createServerFn({ method: "POST" })
             ),
           );
       }
-
-      // Update moving piece position
+      
+      // Promotion
       let finalPieceType = movingPiece.pieceType;
-      // Pawn Promotion (default to Queen)
       if (movingPiece.pieceType === "Pawn") {
         const targetRow = movingPiece.color === "White" ? 0 : 7;
         if (getRow(to) === targetRow) {
@@ -418,25 +400,10 @@ export const makeMove = createServerFn({ method: "POST" })
         }
       }
 
-      await db
-        .update(schema.pieces)
-        .set({
-          square: to,
-          hasMoved: true,
-          pieceType: finalPieceType,
-        })
-        .where(
-          and(
-            eq(schema.pieces.gameId, currentGame.id),
-            eq(schema.pieces.square, from),
-          ),
-        );
+      await db.update(schema.pieces).set({ square: to, hasMoved: true, pieceType: finalPieceType }).where(and(eq(schema.pieces.gameId, currentGame.id), eq(schema.pieces.square, from)));
 
-      // Record move
-      const moveCount = await db.query.moves.findMany({
-        where: eq(schema.moves.gameId, currentGame.id),
-      });
-
+      // Record Move
+      const moveCount = await db.query.moves.findMany({ where: eq(schema.moves.gameId, currentGame.id) });
       await db.insert(schema.moves).values({
         gameId: currentGame.id,
         fromSquare: from,
@@ -445,61 +412,179 @@ export const makeMove = createServerFn({ method: "POST" })
         pieceColor: movingPiece.color,
         capturedPieceType: capturedPieceType,
         moveNumber: moveCount.length + 1,
-        createdAt: Date.now(),
+        createdAt: now,
       });
 
-      // Get updated pieces to check for game status
-      const updatedPieces = await db.query.pieces.findMany({
-        where: eq(schema.pieces.gameId, currentGame.id),
-      });
-      const nextTurn: Color =
-        currentGame.currentTurn === "White" ? "Black" : "White";
-
-      // Get last move again (the one we just inserted)
-      const currentMove = await db.query.moves.findFirst({
-        where: eq(schema.moves.gameId, currentGame.id),
-        orderBy: desc(schema.moves.moveNumber),
-      });
-
+      // Status Update
+      const updatedPieces = await db.query.pieces.findMany({ where: eq(schema.pieces.gameId, currentGame.id) });
+      const nextTurn: Color = currentGame.currentTurn === "White" ? "Black" : "White";
+      const currentMove = await db.query.moves.findFirst({ where: eq(schema.moves.gameId, currentGame.id), orderBy: desc(schema.moves.moveNumber) });
       const newStatus = getGameStatus(updatedPieces, nextTurn, currentMove);
 
-      // Switch turn and update status
-      await db
-        .update(schema.games)
-        .set({
+      // Update Game
+      await db.update(schema.games).set({
           currentTurn: nextTurn,
           status: newStatus,
-          updatedAt: Date.now(),
-        })
-        .where(eq(schema.games.id, currentGame.id));
+          updatedAt: now,
+          lastMoveTime: now, // Set the timestamp for the next turn's calculation
+          whiteTimeRemaining: whiteTime,
+          blackTimeRemaining: blackTime
+        }).where(eq(schema.games.id, currentGame.id));
 
-      console.log(
-        `Move completed successfully. Next turn: ${nextTurn}, Status: ${newStatus}`,
-      );
-      return {
-        success: true,
-        nextTurn,
-        status: newStatus,
-        captured: capturedPieceType !== undefined,
-      };
-    } catch (error) {
-      console.error("Error in makeMove:", error);
-      throw error;
+      // IF VS COMPUTER AND IT'S BLACK'S TURN
+      if (currentGame.mode === "vs_computer" && nextTurn === "Black" && newStatus === "Ongoing") {
+        try {
+          const fen = piecesToFen(updatedPieces, nextTurn, currentMove || undefined);
+          const response = await fetch("http://127.0.0.1:8080/api/engine-move", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fen }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.best_move) {
+              const uciMove = data.best_move;
+              const fromFile = uciMove.charCodeAt(0) - 97;
+              const fromRank = 8 - parseInt(uciMove[1]);
+              const toFile = uciMove.charCodeAt(2) - 97;
+              const toRank = 8 - parseInt(uciMove[3]);
+              
+              const fromSquare = getSquareFromRowCol(fromRank, fromFile);
+              const toSquare = getSquareFromRowCol(toRank, toFile);
+              
+              await applyMove(currentGame.id, fromSquare, toSquare);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to get computer move:", e);
+        }
+      }
+
+      return { success: true, nextTurn, status: newStatus, captured: capturedPieceType !== undefined };
+
+    } catch (e) {
+      console.error(e);
+      throw e;
     }
   });
 
-export const resetGame = createServerFn({ method: "POST" }).handler(
-  async () => {
-    console.log("Resetting game in database");
+async function applyMove(gameId: number, from: number, to: number) {
+  const pieces = await db.query.pieces.findMany({
+    where: eq(schema.pieces.gameId, gameId),
+  });
+  
+  const movingPiece = pieces.find((p) => p.square === from);
+  if (!movingPiece) return;
+
+  // Check for capture
+  const capturedPiece = pieces.find((p) => p.square === to);
+  let capturedPieceType: PieceType | undefined;
+
+  if (capturedPiece) {
+    capturedPieceType = capturedPiece.pieceType;
+    await db.delete(schema.pieces).where(and(eq(schema.pieces.gameId, gameId), eq(schema.pieces.square, to)));
+  } else if (movingPiece.pieceType === "Pawn" && getCol(from) !== getCol(to)) {
+    // En Passant
+    const capturedPawnSquare = getSquareFromRowCol(getRow(from), getCol(to));
+    const enPassantPiece = pieces.find((p) => p.square === capturedPawnSquare);
+    if (enPassantPiece) {
+      capturedPieceType = enPassantPiece.pieceType;
+      await db.delete(schema.pieces).where(and(eq(schema.pieces.gameId, gameId), eq(schema.pieces.square, capturedPawnSquare)));
+    }
+  }
+
+  // Castling
+  if (movingPiece.pieceType === "King" && Math.abs(getCol(to) - getCol(from)) === 2) {
+      const isKingside = getCol(to) === 6;
+      const rookFromCol = isKingside ? 7 : 0;
+      const rookToCol = isKingside ? 5 : 3;
+      const rookFromSquare = getSquareFromRowCol(getRow(from), rookFromCol);
+      const rookToSquare = getSquareFromRowCol(getRow(from), rookToCol);
+
+      await db.update(schema.pieces).set({ square: rookToSquare, hasMoved: true })
+        .where(and(eq(schema.pieces.gameId, gameId), eq(schema.pieces.square, rookFromSquare)));
+  }
+
+  // Promotion
+  let finalPieceType = movingPiece.pieceType;
+  if (movingPiece.pieceType === "Pawn") {
+    const targetRow = movingPiece.color === "White" ? 0 : 7;
+    if (getRow(to) === targetRow) {
+      finalPieceType = "Queen";
+    }
+  }
+
+  await db.update(schema.pieces).set({ square: to, hasMoved: true, pieceType: finalPieceType })
+    .where(and(eq(schema.pieces.gameId, gameId), eq(schema.pieces.square, from)));
+
+  // Record Move
+  const moveCount = await db.query.moves.findMany({ where: eq(schema.moves.gameId, gameId) });
+  await db.insert(schema.moves).values({
+    gameId: gameId,
+    fromSquare: from,
+    toSquare: to,
+    pieceType: movingPiece.pieceType,
+    pieceColor: movingPiece.color,
+    capturedPieceType: capturedPieceType,
+    moveNumber: moveCount.length + 1,
+    createdAt: Date.now(),
+  });
+
+  const updatedPieces = await db.query.pieces.findMany({ where: eq(schema.pieces.gameId, gameId) });
+  const nextTurn: Color = movingPiece.color === "White" ? "Black" : "White";
+  const lastMove = await db.query.moves.findFirst({ where: eq(schema.moves.gameId, gameId), orderBy: desc(schema.moves.moveNumber) });
+  const newStatus = getGameStatus(updatedPieces, nextTurn, lastMove);
+
+  await db.update(schema.games).set({
+    currentTurn: nextTurn,
+    status: newStatus,
+    updatedAt: Date.now(),
+    lastMoveTime: Date.now(),
+  }).where(eq(schema.games.id, gameId));
+}
+
+export const resetGame = createServerFn({ method: "POST" })
+  .inputValidator((args: { mode: "vs_player" | "vs_computer"; timeControl: number } | undefined) => args)
+  .handler(async ({ data }) => {
+    const mode = data?.mode || "vs_player";
+    const timeControl = data?.timeControl !== undefined ? data.timeControl : 10;
+    
+    console.log(`Starting new game: ${mode}, ${timeControl} mins`);
 
     try {
-      // Delete all moves, then pieces, then games to avoid FK constraint errors
       await db.delete(schema.moves);
       await db.delete(schema.pieces);
       await db.delete(schema.games);
+      
+      const initialData = initializeGame();
 
-      // Create new game will be handled by getBoard on next request
-      console.log("Game reset successfully");
+      const [newGame] = await db
+        .insert(schema.games)
+        .values({
+          currentTurn: initialData.turn,
+          status: "Ongoing",
+          mode: mode,
+          timeControl: timeControl,
+          whiteTimeRemaining: timeControl === 0 ? Number.MAX_SAFE_INTEGER : timeControl * 60 * 1000,
+          blackTimeRemaining: timeControl === 0 ? Number.MAX_SAFE_INTEGER : timeControl * 60 * 1000,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          lastMoveTime: null // Reset timer
+        })
+        .returning();
+        
+      if (newGame) {
+         const piecesToInsert = initialData.pieces.map((piece) => ({
+          gameId: newGame.id,
+          color: piece.color,
+          pieceType: piece.pieceType,
+          square: piece.square,
+          hasMoved: false,
+        }));
+        await db.insert(schema.pieces).values(piecesToInsert);
+      }
+
       return { success: true };
     } catch (error) {
       console.error("Error in resetGame:", error);

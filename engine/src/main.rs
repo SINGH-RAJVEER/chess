@@ -1,138 +1,160 @@
 use actix_cors::Cors;
-use actix_web::{
-	get, 
-	post, 
-	web, 
-	App, 
-	HttpResponse, 
-	HttpServer, 
-	Responder
-};
+use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
+use shakmaty::{CastlingMode, Chess, Position, Move, Piece, Role, Color};
+use shakmaty::fen::Fen;
+use shakmaty::uci::Uci;
 
-mod bitboard;
-mod types;
-mod board;
-mod db;
-
-use board::Board;
-
-struct AppState {
-    db_pool: SqlitePool,
+#[derive(Deserialize, Serialize)]
+struct EngineRequest {
+    fen: String,
 }
 
-#[derive(Serialize)]
-struct BoardResponse {
-    pieces: Vec<board::PieceInfo>,
-    turn: types::Color,
-    status: types::GameStatus,
+#[derive(Serialize, Deserialize)]
+struct EngineResponse {
+    best_move: Option<String>,
+    error: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct MoveRequest {
-    from: u8,
-    to: u8,
+fn evaluate(pos: &Chess) -> i32 {
+    let mut score = 0;
+    let board = pos.board();
+
+    for (square, piece) in board.clone() {
+        let piece_val = match piece.role {
+            Role::Pawn => 100,
+            Role::Knight => 320,
+            Role::Bishop => 330,
+            Role::Rook => 500,
+            Role::Queen => 900,
+            Role::King => 20000,
+        };
+
+        if piece.color == Color::White {
+            score += piece_val;
+        } else {
+            score -= piece_val;
+        }
+    }
+    score
 }
 
-#[derive(Deserialize)]
-struct LegalMovesRequest {
-    square: u8,
-}
+fn minimax(pos: &Chess, depth: i32, mut alpha: i32, mut beta: i32, maximizing: bool) -> i32 {
+    if depth == 0 || pos.is_game_over() {
+        return evaluate(pos);
+    }
 
-// Helper to load board from DB (or default if not found)
-async fn load_board(pool: &SqlitePool) -> Board {
-    // We assume game ID 1 for this single-session app
-    let row: Option<(String,)> = sqlx::query_as("SELECT board_json FROM game_state WHERE id = 1")
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None);
+    let legals = pos.legal_moves();
 
-    if let Some((json,)) = row {
-        serde_json::from_str(&json).unwrap_or_else(|_| Board::default())
+    if maximizing {
+        let mut max_eval = i32::MIN;
+        for m in legals {
+            let mut new_pos = pos.clone();
+            new_pos.play_unchecked(&m);
+            let eval = minimax(&new_pos, depth - 1, alpha, beta, false);
+            max_eval = max_eval.max(eval);
+            alpha = alpha.max(eval);
+            if beta <= alpha {
+                break;
+            }
+        }
+        max_eval
     } else {
-        let board = Board::default();
-        save_board(pool, &board).await;
-        board
+        let mut min_eval = i32::MAX;
+        for m in legals {
+            let mut new_pos = pos.clone();
+            new_pos.play_unchecked(&m);
+            let eval = minimax(&new_pos, depth - 1, alpha, beta, true);
+            min_eval = min_eval.min(eval);
+            beta = beta.min(eval);
+            if beta <= alpha {
+                break;
+            }
+        }
+        min_eval
     }
 }
 
-// Helper to save board to DB
-async fn save_board(pool: &SqlitePool, board: &Board) {
-    let json = serde_json::to_string(board).unwrap();
-    sqlx::query("INSERT OR REPLACE INTO game_state (id, board_json) VALUES (1, ?)")
-        .bind(json)
-        .execute(pool)
-        .await
-        .expect("Failed to save board");
-}
-
-#[get("/api/board")]
-async fn get_board(data: web::Data<AppState>) -> impl Responder {
-    let board = load_board(&data.db_pool).await;
-    let response = BoardResponse {
-        pieces: board.to_piece_list(),
-        turn: board.turn,
-        status: board.get_status(),
-    };
-    HttpResponse::Ok().json(response)
-}
-
-#[get("/api/moves")]
-async fn get_legal_moves(data: web::Data<AppState>, query: web::Query<LegalMovesRequest>) -> impl Responder {
-    let board = load_board(&data.db_pool).await;
-    let moves = board.get_moves_for_square(query.square);
-    HttpResponse::Ok().json(moves)
-}
-
-#[post("/api/move")]
-async fn make_move(data: web::Data<AppState>, move_req: web::Json<MoveRequest>) -> impl Responder {
-    let mut board = load_board(&data.db_pool).await;
-    
-    let mv = types::Move {
-        from: move_req.from,
-        to: move_req.to,
-        promotion: None, 
-    };
-    
-    println!("Attempting move: {} -> {}", mv.from, mv.to);
-    
-    match board.apply_move(mv) {
-        Ok(_) => {
-            save_board(&data.db_pool, &board).await;
-            println!("Move Success");
-            HttpResponse::Ok().json("Move accepted")
-        },
-        Err(e) => {
-            println!("Move Failed: {}", e);
-            HttpResponse::BadRequest().body(e)
-        },
+fn find_best_move(pos: &Chess, depth: i32) -> Option<Move> {
+    let legals = pos.legal_moves();
+    if legals.is_empty() {
+        return None;
     }
+
+    let mut best_move = None;
+    let maximizing = pos.turn() == Color::White;
+
+    if maximizing {
+        let mut max_eval = i32::MIN;
+        for m in legals {
+            let mut new_pos = pos.clone();
+            new_pos.play_unchecked(&m);
+            let eval = minimax(&new_pos, depth - 1, i32::MIN, i32::MAX, false);
+            if eval > max_eval {
+                max_eval = eval;
+                best_move = Some(m);
+            }
+        }
+    } else {
+        let mut min_eval = i32::MAX;
+        for m in legals {
+            let mut new_pos = pos.clone();
+            new_pos.play_unchecked(&m);
+            let eval = minimax(&new_pos, depth - 1, i32::MIN, i32::MAX, true);
+            if eval < min_eval {
+                min_eval = eval;
+                best_move = Some(m);
+            }
+        }
+    }
+
+    best_move
 }
 
-#[post("/api/reset")]
-async fn reset_game(data: web::Data<AppState>) -> impl Responder {
-    println!("Resetting game...");
-    let board = Board::default();
-    save_board(&data.db_pool, &board).await;
-    println!("Game reset successful");
-    HttpResponse::Ok().json("Game reset")
+#[post("/api/engine-move")]
+async fn get_engine_move(req: web::Json<EngineRequest>) -> impl Responder {
+    let fen_str = &req.fen;
+    let setup: Fen = match fen_str.parse() {
+        Ok(f) => f,
+        Err(_) => return HttpResponse::BadRequest().json(EngineResponse {
+            best_move: None,
+            error: Some("Invalid FEN".to_string()),
+        }),
+    };
+
+    let position: Chess = match setup.into_position(CastlingMode::Standard) {
+        Ok(p) => p,
+        Err(_) => return HttpResponse::BadRequest().json(EngineResponse {
+            best_move: None,
+            error: Some("Invalid Position".to_string()),
+        }),
+    };
+
+    // Use a depth of 3 for a reasonable response time
+    let best_move = find_best_move(&position, 3);
+
+    match best_move {
+        Some(m) => {
+            let uci = Uci::from_move(&m, CastlingMode::Standard);
+            HttpResponse::Ok().json(EngineResponse {
+                best_move: Some(uci.to_string()),
+                error: None,
+            })
+        }
+        None => HttpResponse::Ok().json(EngineResponse {
+            best_move: None,
+            error: Some("No legal moves".to_string()),
+        }),
+    }
 }
 
 async fn greet() -> impl Responder {
-    HttpResponse::Ok().body("Chess Backend Running")
+    HttpResponse::Ok().body("Chess Engine Running")
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!("Initializing Database...");
-    let pool = db::init_pool().await.expect("Failed to initialize database");
-    
-    let app_state = web::Data::new(AppState {
-        db_pool: pool,
-    });
-    
-    println!("Starting server at http://127.0.0.1:8080");
+    println!("Starting engine server at http://127.0.0.1:8080");
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -142,13 +164,9 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
 
         App::new()
-            .app_data(app_state.clone())
             .wrap(cors)
             .route("/", web::get().to(greet))
-            .service(get_board)
-            .service(get_legal_moves)
-            .service(make_move)
-            .service(reset_game)
+            .service(get_engine_move)
     })
     .bind("127.0.0.1:8080")?
     .run()

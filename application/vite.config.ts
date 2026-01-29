@@ -1,5 +1,4 @@
 import { defineConfig } from "vite";
-import { devtools } from "@tanstack/devtools-vite";
 import viteTsConfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
 
