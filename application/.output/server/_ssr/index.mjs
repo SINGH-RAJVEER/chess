@@ -1037,7 +1037,7 @@ function getResponse() {
   return event.res;
 }
 async function getStartManifest(matchedRoutes) {
-  const { tsrStartManifest } = await import("./_tanstack-start-manifest_v-DxCyoxPD.mjs");
+  const { tsrStartManifest } = await import("./_tanstack-start-manifest_v-C6elx2PU.mjs");
   const startManifest = tsrStartManifest();
   const rootRoute = startManifest.routes[rootRouteId] = startManifest.routes[rootRouteId] || {};
   rootRoute.assets = rootRoute.assets || [];
@@ -1197,16 +1197,16 @@ function createMultiplexedStream(jsonStream, rawStreams) {
 }
 const manifest = { "075bb97a5df53025c3a5cac3463aa1757848b60aac35966d56b3f5f04c96a880": {
   functionName: "getBoard_createServerFn_handler",
-  importer: () => import("./game-api-B1XlK6DW.mjs")
+  importer: () => import("./game-api-BeUw7OPL.mjs")
 }, "7f22913cc8d51a01984f7bf48fae2f2d31d571b490a9d584529e84f9899ea385": {
   functionName: "getMoves_createServerFn_handler",
-  importer: () => import("./game-api-B1XlK6DW.mjs")
+  importer: () => import("./game-api-BeUw7OPL.mjs")
 }, "972086331ae1ccaf15884371b3d836c8b8cb9863f2467b06d69aa6f6555bec6c": {
   functionName: "makeMove_createServerFn_handler",
-  importer: () => import("./game-api-B1XlK6DW.mjs")
+  importer: () => import("./game-api-BeUw7OPL.mjs")
 }, "614b8f455b0bec4996eb16fc2e9a0377d9b5aca3671eb868a2af8c02e22f2c72": {
   functionName: "resetGame_createServerFn_handler",
-  importer: () => import("./game-api-B1XlK6DW.mjs")
+  importer: () => import("./game-api-BeUw7OPL.mjs")
 } };
 async function getServerFnById(id) {
   const serverFnInfo = manifest[id];
@@ -1521,7 +1521,7 @@ function getStartResponseHeaders(opts) {
 let entriesPromise;
 let manifestPromise;
 async function loadEntries() {
-  const routerEntry = await import("./router-DcnGiUVs.mjs").then((n) => n.b);
+  const routerEntry = await import("./router-Bu3YeYE1.mjs");
   const startEntry = await import("./start-HYkvq4Ni.mjs");
   return { startEntry, routerEntry };
 }

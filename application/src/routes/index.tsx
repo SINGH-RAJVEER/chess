@@ -8,13 +8,6 @@ import {
 import { getBoard, getMoves, makeMove, resetGame } from "../lib/api";
 import type { Color, PieceType } from "../lib/api";
 
-// Test: Direct import to see if functions work
-console.log("API functions loaded:", {
-  getBoard: !!getBoard,
-  getMoves: !!getMoves,
-  makeMove: !!makeMove,
-});
-
 const PIECE_SYMBOLS: Record<Color, Record<PieceType, string>> = {
   White: {
     Pawn: "♙",
@@ -44,10 +37,8 @@ function Home() {
   const boardQuery = createQuery(() => ({
     queryKey: ["board"],
     queryFn: async () => {
-      console.log("Fetching board...");
       try {
         const result = await getBoard();
-        console.log("✓ Board fetched successfully:", result);
         return result;
       } catch (e) {
         console.error("✗ Failed to fetch board:", e);
@@ -62,7 +53,7 @@ function Home() {
     mutationFn: (args: { data: { from: number; to: number } }) =>
       makeMove(args),
     onSuccess: async () => {
-      await boardQuery.refetch();
+      await queryClient.invalidateQueries({ queryKey: ["board"] });
       setSuccessMsg("Move successful!");
       setTimeout(() => setSuccessMsg(null), 2000);
     },
@@ -102,26 +93,17 @@ function Home() {
   };
 
   const handleSquareClick = async (squareIndex: number | undefined) => {
-    console.log(`\n=== CLICK DEBUG ===`);
-    console.log(`Clicked square:`, squareIndex);
     if (
       typeof squareIndex !== "number" ||
       isNaN(squareIndex) ||
       squareIndex < 0 ||
       squareIndex > 63
     ) {
-      console.warn(
-        "Invalid squareIndex passed to handleSquareClick:",
-        squareIndex,
-      );
       setErrorMsg("Invalid square selected.");
       return;
     }
-    console.log(`Board data exists: ${!!boardQuery.data}`);
-    console.log(`Pieces length: ${pieces().length}`);
 
     if (!boardQuery.data) {
-      console.log("No board data - returning");
       return;
     }
 
@@ -129,23 +111,14 @@ function Home() {
     const clickedPiece = currentPieces.find((p) => p.square === squareIndex);
     const selected = selectedSquare();
 
-    console.log(`Current turn: ${boardQuery.data.turn}`);
-    console.log(`Clicked piece:`, clickedPiece);
-    console.log(`Selected square: ${selected}`);
-
     // Case 1: Select a piece
     if (clickedPiece && clickedPiece.color === boardQuery.data.turn) {
-      console.log(
-        `✓ Should select piece - matching turn (${clickedPiece.color})`,
-      );
       if (selected === squareIndex) {
-        console.log("Deselecting same square");
         setSelectedSquare(null);
         setValidMoves([]);
         return;
       }
 
-      console.log(`Setting selected square to: ${squareIndex}`);
       setSelectedSquare(squareIndex);
       setErrorMsg(null);
 
@@ -156,41 +129,24 @@ function Home() {
           squareIndex >= 0 &&
           squareIndex <= 63
         ) {
-          console.log(`Calling getMoves for square: ${squareIndex}`);
-          // Patch: call getMoves with correct input shape
+          // call getMoves with correct input shape
           const moves = await getMoves({ data: squareIndex });
-          console.log(`✓ Got moves from API:`, moves);
           setValidMoves(Array.isArray(moves) ? moves : []);
-          console.log(
-            `Set valid moves, length: ${Array.isArray(moves) ? moves.length : "N/A"}`,
-          );
         } else {
-          console.warn(
-            "Attempted to call getMoves with invalid squareIndex:",
-            squareIndex,
-          );
           setValidMoves([]);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("✗ Failed to fetch moves:", e);
         setErrorMsg(`API Error: ${e?.message || "Unknown error"}`);
         setValidMoves([]);
       }
       return;
     } else if (clickedPiece) {
-      console.log(
-        `✗ Cannot select piece - wrong turn. Piece: ${clickedPiece.color}, Turn: ${boardQuery.data.turn}`,
-      );
       setErrorMsg("Not your turn!");
-    } else {
-      console.log("✗ No piece clicked");
     }
 
     // Case 2: Move
     if (selected !== null) {
-      console.log(`Checking move from ${selected} to ${squareIndex}`);
-      console.log(`Current valid moves:`, validMoves());
-
       if (
         validMoves().includes(squareIndex) &&
         typeof selected === "number" &&
@@ -198,20 +154,14 @@ function Home() {
         typeof squareIndex === "number" &&
         !isNaN(squareIndex)
       ) {
-        console.log("✓ Valid move - executing");
         moveMutation.mutate({ data: { from: selected, to: squareIndex } });
         setSelectedSquare(null);
         setValidMoves([]);
       } else {
-        console.log("✗ Invalid move or different target");
         setSelectedSquare(null);
         setValidMoves([]);
       }
-    } else {
-      console.log("No piece selected - cannot move");
     }
-
-    console.log(`=== END CLICK DEBUG ===\n`);
   };
 
   const handleReset = () => {
@@ -282,51 +232,33 @@ function Home() {
         </div>
       </Show>
       <div class="board">
-        {/* Debug info */}
-        <div style="position: absolute; top: -150px; left: 820px; font-size: 10px; background: white; padding: 10px; border: 1px solid black;">
-          <h4>Debug Info:</h4>
-          <div>Total pieces: {pieces().length}</div>
-          <div>Turn: {boardQuery.data?.turn}</div>
-          <div>Selected: {selectedSquare()}</div>
-          <div>Valid moves: {validMoves().length}</div>
-          <div>Board loaded: {boardQuery.isLoading ? "Loading" : "Loaded"}</div>
-          <div>
-            First 5 pieces:{" "}
-            {pieces()
-              .slice(0, 5)
-              .map((p) => `${p.color[0]}${p.piece_type[0]}@${p.square}`)
-              .join(", ")}
-          </div>
-          <div>Error: {errorMsg()}</div>
-        </div>
         <For each={Array.from({ length: 64 })}>
           {(_, index) => {
             const squareIndex = index();
             const row = Math.floor(squareIndex / 8);
             const col = squareIndex % 8;
-
             const isBlack = (row + col) % 2 === 1;
-            const piece = getPieceAt(squareIndex);
-            const isSelected = selectedSquare() === squareIndex;
-            const isValidMove = validMoves().includes(squareIndex);
-
-            // Debug styling - only show first few squares
-            const debugClass =
-              squareIndex >= 56 && squareIndex <= 63 ? "debug-square" : "";
 
             return (
               <button
-                class={`square ${isBlack ? "black" : "white"} ${isSelected ? "selected" : ""} ${isValidMove ? "valid-move" : ""} ${piece ? "has-piece" : ""} ${debugClass}`}
+                class={`square ${isBlack ? "black" : "white"}`}
+                classList={{
+                  selected: selectedSquare() === squareIndex,
+                  "valid-move": validMoves().includes(squareIndex),
+                  "has-piece": !!getPieceAt(squareIndex),
+                }}
                 onClick={() => {
-                  console.log(
-                    `Clicking square ${squareIndex} (row ${row}, col ${col})`,
-                  );
                   handleSquareClick(squareIndex);
                 }}
                 type="button"
                 aria-label={`Square ${squareIndex}`}
               >
-                {piece ? PIECE_SYMBOLS[piece.color][piece.piece_type] : ""}
+                {(() => {
+                  const piece = getPieceAt(squareIndex);
+                  return piece
+                    ? PIECE_SYMBOLS[piece.color][piece.piece_type]
+                    : "";
+                })()}
               </button>
             );
           }}

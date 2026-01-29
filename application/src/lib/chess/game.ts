@@ -1,165 +1,49 @@
-import type { Color, Move, Piece } from "../db/schema";
+import type { Color, Move, Piece } from "../../db/schema";
+import {
+  getCol,
+  getPieceAt,
+  getRow,
+  getSquareFromRowCol,
+  isSquareOccupied,
+  isSquareOccupiedByColor,
+} from "./board";
+import {
+  isValidBishopMove,
+  isValidKnightMove,
+  isValidPawnMove,
+  isValidQueenMove,
+  isValidRookMove,
+} from "./moves";
 
-export type ChessBoard = {
-  pieces: Piece[];
-  turn: Color;
-  status: "Ongoing" | "Checkmate" | "Stalemate";
-};
-
-// Helper functions
-export function getRow(square: number): number {
-  return Math.floor(square / 8);
-}
-
-export function getCol(square: number): number {
-  return square % 8;
-}
-
-export function getSquareFromRowCol(row: number, col: number): number {
-  if (row < 0 || row > 7 || col < 0 || col > 7) return -1;
-  return row * 8 + col;
-}
-
-export function getPieceAt(pieces: Piece[], square: number): Piece | undefined {
-  return pieces.find((p) => p.square === square);
-}
-
-export function isSquareOccupied(pieces: Piece[], square: number): boolean {
-  return getPieceAt(pieces, square) !== undefined;
-}
-
-export function isSquareOccupiedByColor(
+export function isSquareAttacked(
   pieces: Piece[],
   square: number,
-  color: Color,
+  attackerColor: Color,
 ): boolean {
-  const piece = getPieceAt(pieces, square);
-  return piece !== undefined && piece.color === color;
-}
+  for (const piece of pieces) {
+    if (piece.color !== attackerColor) continue;
 
-export function isSquareOccupiedByOpponent(
-  pieces: Piece[],
-  square: number,
-  color: Color,
-): boolean {
-  const piece = getPieceAt(pieces, square);
-  return piece !== undefined && piece.color !== color;
-}
+    const from = piece.square;
+    const to = square;
 
-// Pseudo-legal move validation (ignores check)
-export function isValidPawnMove(
-  pieces: Piece[],
-  from: number,
-  to: number,
-  color: Color,
-  lastMove?: Move,
-): boolean {
-  const direction = color === "White" ? -1 : 1;
-  const startRow = color === "White" ? 6 : 1;
-  const fromRow = getRow(from);
-  const fromCol = getCol(from);
-  const toRow = getRow(to);
-  const toCol = getCol(to);
-
-  const rowDiff = toRow - fromRow;
-  const colDiff = toCol - fromCol;
-
-  // Forward move
-  if (colDiff === 0) {
-    if (rowDiff === direction && !isSquareOccupied(pieces, to)) {
-      return true;
-    }
-    // Two-square move from starting position
-    if (fromRow === startRow && rowDiff === 2 * direction) {
-      const oneSquareForward = from + direction * 8;
-      return (
-        !isSquareOccupied(pieces, oneSquareForward) &&
-        !isSquareOccupied(pieces, to)
-      );
-    }
-  }
-
-  // Normal capture
-  if (Math.abs(colDiff) === 1 && rowDiff === direction) {
-    if (isSquareOccupiedByOpponent(pieces, to, color)) {
-      return true;
-    }
-
-    // En passant
-    if (lastMove && lastMove.pieceType === "Pawn") {
-      const lastFromRow = getRow(lastMove.fromSquare);
-      const lastToRow = getRow(lastMove.toSquare);
-      const lastToCol = getCol(lastMove.toSquare);
-
-      const isTwoSquareMove = Math.abs(lastToRow - lastFromRow) === 2;
-      const isBeside = lastToRow === fromRow && lastToCol === toCol;
-
-      if (isTwoSquareMove && isBeside) {
+    // For pawns, only diagonal attacks count
+    if (piece.pieceType === "Pawn") {
+      const direction = piece.color === "White" ? -1 : 1;
+      const fromRow = getRow(from);
+      const fromCol = getCol(from);
+      const toRow = getRow(to);
+      const toCol = getCol(to);
+      if (toRow === fromRow + direction && Math.abs(toCol - fromCol) === 1) {
         return true;
       }
+      continue;
+    }
+
+    if (isPseudoLegalMove(pieces, from, to, piece.color)) {
+      return true;
     }
   }
-
   return false;
-}
-
-export function isValidKnightMove(
-  _pieces: Piece[],
-  from: number,
-  to: number,
-): boolean {
-  const fromRow = getRow(from);
-  const fromCol = getCol(from);
-  const toRow = getRow(to);
-  const toCol = getCol(to);
-
-  const rowDiff = Math.abs(toRow - fromRow);
-  const colDiff = Math.abs(toCol - fromCol);
-
-  return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2);
-}
-
-export function isValidBishopMove(
-  pieces: Piece[],
-  from: number,
-  to: number,
-): boolean {
-  const fromRow = getRow(from);
-  const fromCol = getCol(from);
-  const toRow = getRow(to);
-  const toCol = getCol(to);
-
-  const rowDiff = Math.abs(toRow - fromRow);
-  const colDiff = Math.abs(toCol - fromCol);
-
-  if (rowDiff !== colDiff) return false;
-
-  return isDiagonalPathClear(pieces, from, to);
-}
-
-export function isValidRookMove(
-  pieces: Piece[],
-  from: number,
-  to: number,
-): boolean {
-  const fromRow = getRow(from);
-  const fromCol = getCol(from);
-  const toRow = getRow(to);
-  const toCol = getCol(to);
-
-  if (fromRow !== toRow && fromCol !== toCol) return false;
-
-  return isStraightPathClear(pieces, from, to);
-}
-
-export function isValidQueenMove(
-  pieces: Piece[],
-  from: number,
-  to: number,
-): boolean {
-  return (
-    isValidBishopMove(pieces, from, to) || isValidRookMove(pieces, from, to)
-  );
 }
 
 export function isValidKingMove(
@@ -219,104 +103,10 @@ export function isValidKingMove(
       )
     )
       return false;
-    // (Target square attack will be checked by isLegalMove)
 
     return true;
   }
 
-  return false;
-}
-
-// Path checking helpers
-function isDiagonalPathClear(
-  pieces: Piece[],
-  from: number,
-  to: number,
-): boolean {
-  const fromRow = getRow(from);
-  const fromCol = getCol(from);
-  const toRow = getRow(to);
-  const toCol = getCol(to);
-
-  const rowStep = toRow > fromRow ? 1 : -1;
-  const colStep = toCol > fromCol ? 1 : -1;
-
-  let currentRow = fromRow + rowStep;
-  let currentCol = fromCol + colStep;
-
-  while (currentRow !== toRow && currentCol !== toCol) {
-    const currentSquare = getSquareFromRowCol(currentRow, currentCol);
-    if (isSquareOccupied(pieces, currentSquare)) return false;
-    currentRow += rowStep;
-    currentCol += colStep;
-  }
-
-  return true;
-}
-
-function isStraightPathClear(
-  pieces: Piece[],
-  from: number,
-  to: number,
-): boolean {
-  const fromRow = getRow(from);
-  const fromCol = getCol(from);
-  const toRow = getRow(to);
-  const toCol = getCol(to);
-
-  // Horizontal move
-  if (fromRow === toRow) {
-    const start = Math.min(fromCol, toCol) + 1;
-    const end = Math.max(fromCol, toCol);
-    for (let col = start; col < end; col++) {
-      if (isSquareOccupied(pieces, getSquareFromRowCol(fromRow, col)))
-        return false;
-    }
-    return true;
-  }
-
-  // Vertical move
-  if (fromCol === toCol) {
-    const start = Math.min(fromRow, toRow) + 1;
-    const end = Math.max(fromRow, toRow);
-    for (let row = start; row < end; row++) {
-      if (isSquareOccupied(pieces, getSquareFromRowCol(row, fromCol)))
-        return false;
-    }
-    return true;
-  }
-
-  return false;
-}
-
-export function isSquareAttacked(
-  pieces: Piece[],
-  square: number,
-  attackerColor: Color,
-): boolean {
-  for (const piece of pieces) {
-    if (piece.color !== attackerColor) continue;
-
-    const from = piece.square;
-    const to = square;
-
-    // For pawns, only diagonal attacks count
-    if (piece.pieceType === "Pawn") {
-      const direction = piece.color === "White" ? -1 : 1;
-      const fromRow = getRow(from);
-      const fromCol = getCol(from);
-      const toRow = getRow(to);
-      const toCol = getCol(to);
-      if (toRow === fromRow + direction && Math.abs(toCol - fromCol) === 1) {
-        return true;
-      }
-      continue;
-    }
-
-    if (isPseudoLegalMove(pieces, from, to, piece.color)) {
-      return true;
-    }
-  }
   return false;
 }
 

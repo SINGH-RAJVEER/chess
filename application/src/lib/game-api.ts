@@ -8,7 +8,7 @@ import {
   getValidMoves,
   initializeGame,
   isLegalMove,
-} from "./chess";
+} from "./chess/index";
 import { db, schema } from "../db";
 import type { Color, GameStatus, PieceType } from "../db/schema";
 
@@ -26,7 +26,7 @@ export type BoardResponse = {
   status: GameStatus;
 };
 
-export const getBoard = createServerFn({ method: "GET" }).handler(async () => {
+export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
   try {
     let currentGame = await db.query.games.findFirst({
       orderBy: desc(schema.games.updatedAt),
@@ -118,7 +118,7 @@ export const getBoard = createServerFn({ method: "GET" }).handler(async () => {
   }
 });
 
-export const getMoves = createServerFn({ method: "GET" })
+export const getMoves = createServerFn({ method: "POST" })
   .inputValidator((square: number) => square)
   .handler(async ({ data: square }) => {
     console.log(`Getting valid moves for square: ${square}`);
