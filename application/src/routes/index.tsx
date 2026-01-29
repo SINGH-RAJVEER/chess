@@ -395,6 +395,7 @@ function Home() {
       <Header
         onRestart={handleReset}
         isRestarting={resetMutation.isPending}
+        activeMode="vs_player"
       />
 
       {/* Main Game Area */}
@@ -496,19 +497,6 @@ function Home() {
             </div>
 
             <div class="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-stone-300 rounded-xl shadow-2xl overflow-hidden border-[16px] border-stone-800 relative select-none">
-              <Show when={boardQuery.data?.mode === "vs_computer"}>
-                <div class="absolute inset-0 bg-stone-900/90 flex flex-col items-center justify-center z-[60] backdrop-blur-sm text-center p-8">
-                  <div class="text-6xl mb-4">🏗️</div>
-                  <h2 class="text-4xl font-black text-white mb-2 uppercase tracking-tighter">Under Construction</h2>
-                  <p class="text-stone-400 max-w-md">The Chess Engine is currently being calibrated. Please play against a friend in <span class="text-indigo-400 font-bold">Vs Player</span> mode for now.</p>
-                  <button 
-                    onClick={() => handleReset({ mode: "vs_player", timeControl: 10 })}
-                    class="mt-8 px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all"
-                  >
-                    Switch to Vs Player
-                  </button>
-                </div>
-              </Show>
               <div
                 class="grid grid-cols-8 grid-rows-[repeat(8,1fr)] w-full h-full transition-transform duration-1000 cubic-bezier(0.4, 0, 0.2, 1)"
                 style={{ transform: `rotate(${rotation()}deg)` }}

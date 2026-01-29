@@ -1,4 +1,5 @@
 import { type Component, createSignal } from "solid-js";
+import { Link } from "@tanstack/solid-router";
 
 interface HeaderProps {
   onRestart?: (options: {
@@ -6,49 +7,49 @@ interface HeaderProps {
     timeControl: number;
   }) => void;
   isRestarting?: boolean;
+  activeMode?: "vs_player" | "vs_computer";
 }
 
 const Header: Component<HeaderProps> = (props) => {
-  const [mode, setMode] = createSignal<"vs_player" | "vs_computer">(
-    "vs_player",
-  );
   const [timeControl, setTimeControl] = createSignal<number>(10);
-
   const timeOptions = [1, 3, 5, 10, 30, 0];
+  
+  // Use activeMode prop or default to vs_player
+  const currentMode = () => props.activeMode || "vs_player";
 
   return (
     <header class="bg-stone-900 text-white shadow-md px-6 py-3 sticky top-0 z-50 flex items-center justify-between">
       {/* Logo */}
-      <div class="flex items-center gap-3 w-1/4">
+      <Link to="/" class="flex items-center gap-3 w-1/4 hover:opacity-90 transition-opacity">
         <span class="text-3xl">♛</span>
         <h1 class="text-2xl font-black tracking-tighter uppercase hidden sm:block">
           Chess<span class="text-indigo-500">Master</span>
         </h1>
-      </div>
+      </Link>
 
       {/* Mode Tabs */}
       <div class="flex items-center justify-center flex-1">
         <div class="bg-stone-800 p-1 rounded-lg flex items-center shadow-inner">
-          <button
-            onClick={() => setMode("vs_computer")}
+          <Link
+            to="/computer"
             class={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
-              mode() === "vs_computer"
+              currentMode() === "vs_computer"
                 ? "bg-indigo-600 text-white shadow-md"
                 : "text-stone-400 hover:text-stone-200"
             }`}
           >
             Vs Computer
-          </button>
-          <button
-            onClick={() => setMode("vs_player")}
+          </Link>
+          <Link
+            to="/"
             class={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
-              mode() === "vs_player"
+              currentMode() === "vs_player"
                 ? "bg-indigo-600 text-white shadow-md"
                 : "text-stone-400 hover:text-stone-200"
             }`}
           >
             Vs Player
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -84,7 +85,7 @@ const Header: Component<HeaderProps> = (props) => {
         <button
           type="button"
           onClick={() =>
-            props.onRestart?.({ mode: mode(), timeControl: timeControl() })
+            props.onRestart?.({ mode: currentMode(), timeControl: timeControl() })
           }
           disabled={props.isRestarting}
           class="bg-stone-100 hover:bg-white text-stone-900 font-bold py-2 px-4 rounded-lg transition-all uppercase tracking-wider text-xs border border-stone-200 shadow-lg disabled:opacity-50 hover:scale-105 active:scale-95"
