@@ -124,33 +124,19 @@ function Home() {
 
 
   const resetMutation = useMutation(() => ({
-
     mutationFn: () => resetGame(),
-
     onSuccess: async () => {
-
       await boardQuery.refetch();
-
       setSelectedSquare(null);
-
       setValidMoves([]);
-
       setPendingMove(null);
-
       setErrorMsg(null);
-
     },
-
     onError: (e: any) => {
-
       setErrorMsg(
-
         `Failed to reset game: ${e instanceof Error ? e.message : String(e)}`,
-
       );
-
     },
-
   }));
 
 
@@ -198,27 +184,18 @@ function Home() {
   // Rotation logic - depends on server turn (rotates after submit)
 
   createEffect(() => {
-
     if (turn() === "Black") {
-
       setRotation(180);
-
     } else {
-
       setRotation(0);
-
     }
-
   });
 
 
 
   const [selectedSquare, setSelectedSquare] = createSignal<number | null>(null);
-
   const [validMoves, setValidMoves] = createSignal<number[]>([]);
-
   const [errorMsg, setErrorMsg] = createSignal<string | null>(null);
-
   const [successMsg, setSuccessMsg] = createSignal<string | null>(null);
 
 
@@ -367,19 +344,7 @@ function Home() {
 
 
 
-  const handleTakeback = () => {
 
-     if (pendingMove()) {
-
-        setPendingMove(null);
-
-     } else {
-
-        undoMutation.mutate();
-
-     }
-
-  }
 
 
 
@@ -391,7 +356,10 @@ function Home() {
 
   return (
     <div class="min-h-screen bg-stone-100 font-sans text-stone-800 flex flex-col">
-      <Header />
+      <Header
+        onRestart={handleReset}
+        isRestarting={resetMutation.isPending}
+      />
 
       {/* Main Game Area */}
       <div class="flex-1 flex flex-col items-center justify-center p-4 lg:p-8 overflow-hidden relative">
@@ -431,14 +399,45 @@ function Home() {
                 </Show>
               </div>
 
-              {/* Controls for this side (Restart) */}
-              <button
-                onClick={handleReset}
-                disabled={resetMutation.isPending}
-                class="w-full mt-4 bg-stone-100 hover:bg-stone-200 text-stone-600 font-bold py-3 px-6 rounded-xl transition-all uppercase tracking-wider text-sm border-2 border-stone-200 hover:border-stone-300"
-              >
-                Restart Game
-              </button>
+              {/* Controls for this side (Takeback / Submit) */}
+              <Show when={(turn() === "White" && (boardQuery.data?.moves?.length || 0) > 0) || (turn() === "Black" && pendingMove())}>
+                <Show when={turn() === "White"}>
+                  <button
+                    onClick={() => undoMutation.mutate()}
+                    disabled={
+                      undoMutation.isPending ||
+                      (boardQuery.data?.moves?.length || 0) === 0
+                    }
+                    class="w-full mt-4 bg-stone-700 hover:bg-stone-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-stone-300 transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-2"
+                  >
+                    <span>↺</span> Takeback
+                  </button>
+                </Show>
+
+                <Show when={turn() === "Black" && pendingMove()}>
+                  <div class="flex gap-2 w-full mt-4">
+                    <button
+                      onClick={handleConfirmMove}
+                      disabled={moveMutation.isPending}
+                      class="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
+                    >
+                      <Show
+                        when={moveMutation.isPending}
+                        fallback={<span>✓ Submit</span>}
+                      >
+                        <span>...</span>
+                      </Show>
+                    </button>
+                    <button
+                      onClick={handleCancelMove}
+                      disabled={moveMutation.isPending}
+                      class="flex-1 bg-stone-400 hover:bg-stone-500 disabled:opacity-50 text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
+                    >
+                      <span>✕</span> Cancel
+                    </button>
+                  </div>
+                </Show>
+              </Show>
             </div>
           </div>
 
@@ -610,105 +609,45 @@ function Home() {
                 </Show>
               </div>
 
-                            {/* Controls for this side (Takeback / Submit) */}
+              {/* Controls for this side (Takeback / Submit) */}
+              <Show when={(turn() === "Black") || (turn() === "White" && pendingMove())}>
+                <Show when={turn() === "Black"}>
+                  <button
+                    onClick={() => undoMutation.mutate()}
+                    disabled={
+                      undoMutation.isPending ||
+                      (boardQuery.data?.moves?.length || 0) === 0
+                    }
+                    class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-indigo-200 transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-2"
+                  >
+                    <span>↺</span> Takeback
+                  </button>
+                </Show>
 
-                            <Show when={!pendingMove()}>
-
-                              <button
-
-                                onClick={() => undoMutation.mutate()}
-
-                                disabled={undoMutation.isPending || (boardQuery.data?.moves?.length || 0) === 0}
-
-                                class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-indigo-200 transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-2"
-
-                              >
-
-                                <span>↺</span> Takeback
-
-                              </button>
-
-                            </Show>
-
-              
-
-                                          <Show when={pendingMove()}>
-
-              
-
-                                             <div class="flex gap-2 w-full mt-4">
-
-              
-
-                                                <button
-
-              
-
-                                                  onClick={handleConfirmMove}
-
-              
-
-                                                  disabled={moveMutation.isPending}
-
-              
-
-                                                  class="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
-
-              
-
-                                                >
-
-              
-
-                                                  <Show when={moveMutation.isPending} fallback={<span>✓ Submit</span>}>
-
-              
-
-                                                    <span>...</span>
-
-              
-
-                                                  </Show>
-
-              
-
-                                                </button>
-
-              
-
-                                                <button
-
-              
-
-                                                  onClick={handleCancelMove}
-
-              
-
-                                                  disabled={moveMutation.isPending}
-
-              
-
-                                                  class="flex-1 bg-stone-400 hover:bg-stone-500 disabled:opacity-50 text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
-
-              
-
-                                                >
-
-              
-
-                                                  <span>✕</span> Cancel
-
-              
-
-                                                </button>
-
-              
-
-                                             </div>
-
-              
-
-                                          </Show>
+                <Show when={turn() === "White" && pendingMove()}>
+                  <div class="flex gap-2 w-full mt-4">
+                    <button
+                      onClick={handleConfirmMove}
+                      disabled={moveMutation.isPending}
+                      class="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
+                    >
+                      <Show
+                        when={moveMutation.isPending}
+                        fallback={<span>✓ Submit</span>}
+                      >
+                        <span>...</span>
+                      </Show>
+                    </button>
+                    <button
+                      onClick={handleCancelMove}
+                      disabled={moveMutation.isPending}
+                      class="flex-1 bg-stone-400 hover:bg-stone-500 disabled:opacity-50 text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
+                    >
+                      <span>✕</span> Cancel
+                    </button>
+                  </div>
+                </Show>
+              </Show>
             </div>
           </div>
         </div>
