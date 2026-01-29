@@ -393,3 +393,114 @@ export function initializeGame(): {
 
   return { pieces, turn: "White" };
 }
+
+export function piecesToFen(
+  pieces: Piece[],
+  turn: Color,
+  lastMove?: Move,
+): string {
+  let fen = "";
+
+  // 1. Piece placement
+  for (let row = 0; row < 8; row++) {
+    let emptyCount = 0;
+    for (let col = 0; col < 8; col++) {
+      const square = getSquareFromRowCol(row, col);
+      const piece = getPieceAt(pieces, square);
+
+      if (piece) {
+        if (emptyCount > 0) {
+          fen += emptyCount;
+          emptyCount = 0;
+        }
+        let char = "";
+        switch (piece.pieceType) {
+          case "Pawn":
+            char = "p";
+            break;
+          case "Knight":
+            char = "n";
+            break;
+          case "Bishop":
+            char = "b";
+            break;
+          case "Rook":
+            char = "r";
+            break;
+          case "Queen":
+            char = "q";
+            break;
+          case "King":
+            char = "k";
+            break;
+        }
+        fen += piece.color === "White" ? char.toUpperCase() : char;
+      } else {
+        emptyCount++;
+      }
+    }
+    if (emptyCount > 0) {
+      fen += emptyCount;
+    }
+    if (row < 7) {
+      fen += "/";
+    }
+  }
+
+  // 2. Active color
+  fen += ` ${turn === "White" ? "w" : "b"}`;
+
+  // 3. Castling rights
+  let castling = "";
+  const whiteKing = pieces.find(
+    (p) => p.pieceType === "King" && p.color === "White",
+  );
+  if (whiteKing && !whiteKing.hasMoved) {
+    const whiteRookK = pieces.find(
+      (p) =>
+        p.pieceType === "Rook" && p.color === "White" && p.square === 63,
+    );
+    if (whiteRookK && !whiteRookK.hasMoved) castling += "K";
+    const whiteRookQ = pieces.find(
+      (p) =>
+        p.pieceType === "Rook" && p.color === "White" && p.square === 56,
+    );
+    if (whiteRookQ && !whiteRookQ.hasMoved) castling += "Q";
+  }
+
+  const blackKing = pieces.find(
+    (p) => p.pieceType === "King" && p.color === "Black",
+  );
+  if (blackKing && !blackKing.hasMoved) {
+    const blackRookK = pieces.find(
+      (p) =>
+        p.pieceType === "Rook" && p.color === "Black" && p.square === 7,
+    );
+    if (blackRookK && !blackRookK.hasMoved) castling += "k";
+    const blackRookQ = pieces.find(
+      (p) =>
+        p.pieceType === "Rook" && p.color === "Black" && p.square === 0,
+    );
+    if (blackRookQ && !blackRookQ.hasMoved) castling += "q";
+  }
+  fen += ` ${castling || "-"}`;
+
+  // 4. En passant target square
+  let epSquare = "-";
+  if (lastMove && lastMove.pieceType === "Pawn") {
+    const fromRow = getRow(lastMove.fromSquare);
+    const toRow = getRow(lastMove.toSquare);
+    if (Math.abs(fromRow - toRow) === 2) {
+      const epRow = (fromRow + toRow) / 2;
+      const epCol = getCol(lastMove.fromSquare);
+      const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+      epSquare = `${files[epCol]}${8 - epRow}`;
+    }
+  }
+  fen += ` ${epSquare}`;
+
+  // 5. Halfmove clock and fullmove number (simplified)
+  fen += " 0 1";
+
+  return fen;
+}

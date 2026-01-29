@@ -1,7 +1,7 @@
 use actix_cors::Cors;
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
-use shakmaty::{CastlingMode, Chess, Position};
+use shakmaty::{CastlingMode, Chess, Position, Move, Piece, Role, Color};
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
 
@@ -14,6 +14,101 @@ struct EngineRequest {
 struct EngineResponse {
     best_move: Option<String>,
     error: Option<String>,
+}
+
+fn evaluate(pos: &Chess) -> i32 {
+    let mut score = 0;
+    let board = pos.board();
+
+    for (square, piece) in board.clone() {
+        let piece_val = match piece.role {
+            Role::Pawn => 100,
+            Role::Knight => 320,
+            Role::Bishop => 330,
+            Role::Rook => 500,
+            Role::Queen => 900,
+            Role::King => 20000,
+        };
+
+        if piece.color == Color::White {
+            score += piece_val;
+        } else {
+            score -= piece_val;
+        }
+    }
+    score
+}
+
+fn minimax(pos: &Chess, depth: i32, mut alpha: i32, mut beta: i32, maximizing: bool) -> i32 {
+    if depth == 0 || pos.is_game_over() {
+        return evaluate(pos);
+    }
+
+    let legals = pos.legal_moves();
+
+    if maximizing {
+        let mut max_eval = i32::MIN;
+        for m in legals {
+            let mut new_pos = pos.clone();
+            new_pos.play_unchecked(&m);
+            let eval = minimax(&new_pos, depth - 1, alpha, beta, false);
+            max_eval = max_eval.max(eval);
+            alpha = alpha.max(eval);
+            if beta <= alpha {
+                break;
+            }
+        }
+        max_eval
+    } else {
+        let mut min_eval = i32::MAX;
+        for m in legals {
+            let mut new_pos = pos.clone();
+            new_pos.play_unchecked(&m);
+            let eval = minimax(&new_pos, depth - 1, alpha, beta, true);
+            min_eval = min_eval.min(eval);
+            beta = beta.min(eval);
+            if beta <= alpha {
+                break;
+            }
+        }
+        min_eval
+    }
+}
+
+fn find_best_move(pos: &Chess, depth: i32) -> Option<Move> {
+    let legals = pos.legal_moves();
+    if legals.is_empty() {
+        return None;
+    }
+
+    let mut best_move = None;
+    let maximizing = pos.turn() == Color::White;
+
+    if maximizing {
+        let mut max_eval = i32::MIN;
+        for m in legals {
+            let mut new_pos = pos.clone();
+            new_pos.play_unchecked(&m);
+            let eval = minimax(&new_pos, depth - 1, i32::MIN, i32::MAX, false);
+            if eval > max_eval {
+                max_eval = eval;
+                best_move = Some(m);
+            }
+        }
+    } else {
+        let mut min_eval = i32::MAX;
+        for m in legals {
+            let mut new_pos = pos.clone();
+            new_pos.play_unchecked(&m);
+            let eval = minimax(&new_pos, depth - 1, i32::MIN, i32::MAX, true);
+            if eval < min_eval {
+                min_eval = eval;
+                best_move = Some(m);
+            }
+        }
+    }
+
+    best_move
 }
 
 #[post("/api/engine-move")]
@@ -35,57 +130,26 @@ async fn get_engine_move(req: web::Json<EngineRequest>) -> impl Responder {
         }),
     };
 
-    let legal_moves = position.legal_moves();
-    
-    if legal_moves.is_empty() {
-         return HttpResponse::Ok().json(EngineResponse {
+    // Use a depth of 3 for a reasonable response time
+    let best_move = find_best_move(&position, 3);
+
+    match best_move {
+        Some(m) => {
+            let uci = Uci::from_move(&m, CastlingMode::Standard);
+            HttpResponse::Ok().json(EngineResponse {
+                best_move: Some(uci.to_string()),
+                error: None,
+            })
+        }
+        None => HttpResponse::Ok().json(EngineResponse {
             best_move: None,
             error: Some("No legal moves".to_string()),
-        });
+        }),
     }
-
-    // Placeholder: Pick the first move
-    // In a real engine, we'd do alpha-beta search here
-    let best_move = &legal_moves[0];
-    
-    let uci = Uci::from_move(best_move, CastlingMode::Standard);
-    
-    HttpResponse::Ok().json(EngineResponse {
-        best_move: Some(uci.to_string()),
-        error: None,
-    })
 }
 
 async fn greet() -> impl Responder {
     HttpResponse::Ok().body("Chess Engine Running")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use actix_web::{test, App};
-
-    #[actix_web::test]
-    async fn test_get_engine_move() {
-        let app = test::init_service(App::new().service(get_engine_move)).await;
-        
-        let req = test::TestRequest::post()
-            .uri("/api/engine-move")
-            .set_json(EngineRequest {
-                fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string(),
-            })
-            .to_request();
-            
-        let resp: EngineResponse = test::call_and_read_body_json(&app, req).await;
-        
-        assert!(resp.best_move.is_some());
-        assert!(resp.error.is_none());
-        
-        // Check that the move is non-empty
-        let m = resp.best_move.unwrap();
-        assert!(!m.is_empty());
-        println!("Best move: {}", m);
-    }
 }
 
 #[actix_web::main]

@@ -8,6 +8,7 @@ import {
   getValidMoves,
   initializeGame,
   isLegalMove,
+  piecesToFen,
 } from "./chess/index";
 import { db, schema } from "../db";
 import type { Color, GameStatus, PieceType } from "../db/schema";
@@ -430,6 +431,36 @@ export const getMoves = createServerFn({ method: "POST" })
           blackTimeRemaining: blackTime
         }).where(eq(schema.games.id, currentGame.id));
 
+      // IF VS COMPUTER AND IT'S BLACK'S TURN
+      if (currentGame.mode === "vs_computer" && nextTurn === "Black" && newStatus === "Ongoing") {
+        try {
+          const fen = piecesToFen(updatedPieces, nextTurn, currentMove || undefined);
+          const response = await fetch("http://127.0.0.1:8080/api/engine-move", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fen }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.best_move) {
+              const uciMove = data.best_move;
+              const fromFile = uciMove.charCodeAt(0) - 97;
+              const fromRank = 8 - parseInt(uciMove[1]);
+              const toFile = uciMove.charCodeAt(2) - 97;
+              const toRank = 8 - parseInt(uciMove[3]);
+              
+              const fromSquare = getSquareFromRowCol(fromRank, fromFile);
+              const toSquare = getSquareFromRowCol(toRank, toFile);
+              
+              await applyMove(currentGame.id, fromSquare, toSquare);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to get computer move:", e);
+        }
+      }
+
       return { success: true, nextTurn, status: newStatus, captured: capturedPieceType !== undefined };
 
     } catch (e) {
@@ -437,6 +468,81 @@ export const getMoves = createServerFn({ method: "POST" })
       throw e;
     }
   });
+
+async function applyMove(gameId: number, from: number, to: number) {
+  const pieces = await db.query.pieces.findMany({
+    where: eq(schema.pieces.gameId, gameId),
+  });
+  
+  const movingPiece = pieces.find((p) => p.square === from);
+  if (!movingPiece) return;
+
+  // Check for capture
+  const capturedPiece = pieces.find((p) => p.square === to);
+  let capturedPieceType: PieceType | undefined;
+
+  if (capturedPiece) {
+    capturedPieceType = capturedPiece.pieceType;
+    await db.delete(schema.pieces).where(and(eq(schema.pieces.gameId, gameId), eq(schema.pieces.square, to)));
+  } else if (movingPiece.pieceType === "Pawn" && getCol(from) !== getCol(to)) {
+    // En Passant
+    const capturedPawnSquare = getSquareFromRowCol(getRow(from), getCol(to));
+    const enPassantPiece = pieces.find((p) => p.square === capturedPawnSquare);
+    if (enPassantPiece) {
+      capturedPieceType = enPassantPiece.pieceType;
+      await db.delete(schema.pieces).where(and(eq(schema.pieces.gameId, gameId), eq(schema.pieces.square, capturedPawnSquare)));
+    }
+  }
+
+  // Castling
+  if (movingPiece.pieceType === "King" && Math.abs(getCol(to) - getCol(from)) === 2) {
+      const isKingside = getCol(to) === 6;
+      const rookFromCol = isKingside ? 7 : 0;
+      const rookToCol = isKingside ? 5 : 3;
+      const rookFromSquare = getSquareFromRowCol(getRow(from), rookFromCol);
+      const rookToSquare = getSquareFromRowCol(getRow(from), rookToCol);
+
+      await db.update(schema.pieces).set({ square: rookToSquare, hasMoved: true })
+        .where(and(eq(schema.pieces.gameId, gameId), eq(schema.pieces.square, rookFromSquare)));
+  }
+
+  // Promotion
+  let finalPieceType = movingPiece.pieceType;
+  if (movingPiece.pieceType === "Pawn") {
+    const targetRow = movingPiece.color === "White" ? 0 : 7;
+    if (getRow(to) === targetRow) {
+      finalPieceType = "Queen";
+    }
+  }
+
+  await db.update(schema.pieces).set({ square: to, hasMoved: true, pieceType: finalPieceType })
+    .where(and(eq(schema.pieces.gameId, gameId), eq(schema.pieces.square, from)));
+
+  // Record Move
+  const moveCount = await db.query.moves.findMany({ where: eq(schema.moves.gameId, gameId) });
+  await db.insert(schema.moves).values({
+    gameId: gameId,
+    fromSquare: from,
+    toSquare: to,
+    pieceType: movingPiece.pieceType,
+    pieceColor: movingPiece.color,
+    capturedPieceType: capturedPieceType,
+    moveNumber: moveCount.length + 1,
+    createdAt: Date.now(),
+  });
+
+  const updatedPieces = await db.query.pieces.findMany({ where: eq(schema.pieces.gameId, gameId) });
+  const nextTurn: Color = movingPiece.color === "White" ? "Black" : "White";
+  const lastMove = await db.query.moves.findFirst({ where: eq(schema.moves.gameId, gameId), orderBy: desc(schema.moves.moveNumber) });
+  const newStatus = getGameStatus(updatedPieces, nextTurn, lastMove);
+
+  await db.update(schema.games).set({
+    currentTurn: nextTurn,
+    status: newStatus,
+    updatedAt: Date.now(),
+    lastMoveTime: Date.now(),
+  }).where(eq(schema.games.id, gameId));
+}
 
 export const resetGame = createServerFn({ method: "POST" })
   .inputValidator((args: { mode: "vs_player" | "vs_computer"; timeControl: number } | undefined) => args)
