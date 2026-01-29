@@ -8,6 +8,11 @@ export const games = sqliteTable("games", {
   id: integer("id").primaryKey(),
   currentTurn: text("current_turn").notNull().$type<Color>(),
   status: text("status").notNull().$type<GameStatus>(),
+  mode: text("mode").notNull().default("vs_player").$type<"vs_player" | "vs_computer">(),
+  timeControl: integer("time_control").notNull().default(10), // in minutes
+  whiteTimeRemaining: integer("white_time_remaining").notNull().default(600000), // ms (10 mins)
+  blackTimeRemaining: integer("black_time_remaining").notNull().default(600000), // ms
+  lastMoveTime: integer("last_move_time"), // timestamp
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });

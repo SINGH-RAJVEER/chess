@@ -124,7 +124,7 @@ function Home() {
 
 
   const resetMutation = useMutation(() => ({
-    mutationFn: () => resetGame(),
+    mutationFn: (opts?: { mode: "vs_player" | "vs_computer"; timeControl: number }) => resetGame({ data: opts }),
     onSuccess: async () => {
       await boardQuery.refetch();
       setSelectedSquare(null);
@@ -139,7 +139,45 @@ function Home() {
     },
   }));
 
+  // Timer Logic
+  const [now, setNow] = createSignal(Date.now());
+  
+  createEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 100);
+    return () => clearInterval(interval);
+  });
 
+  const formatTime = (ms: number) => {
+    if (boardQuery.data?.timeControl === 0) return "∞";
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
+  const whiteTime = createMemo(() => {
+    if (!boardQuery.data) return 0;
+    const { turn, status, whiteTimeRemaining, lastMoveTime, timeControl } = boardQuery.data;
+    if (timeControl === 0) return Number.MAX_SAFE_INTEGER;
+    if (turn === "White" && status === "Ongoing" && lastMoveTime) {
+      const elapsed = now() - lastMoveTime;
+      return Math.max(0, whiteTimeRemaining - elapsed);
+    }
+    return whiteTimeRemaining;
+  });
+
+  const blackTime = createMemo(() => {
+    if (!boardQuery.data) return 0;
+    const { turn, status, blackTimeRemaining, lastMoveTime, timeControl } = boardQuery.data;
+    if (timeControl === 0) return Number.MAX_SAFE_INTEGER;
+    if (turn === "Black" && status === "Ongoing" && lastMoveTime) {
+      const elapsed = now() - lastMoveTime;
+      return Math.max(0, blackTimeRemaining - elapsed);
+    }
+    return blackTimeRemaining;
+  });
 
   // Derived pieces with pending move applied
 
@@ -348,10 +386,8 @@ function Home() {
 
 
 
-  const handleReset = () => {
-
-    resetMutation.mutate();
-
+  const handleReset = (opts?: { mode: "vs_player" | "vs_computer"; timeControl: number }) => {
+    resetMutation.mutate(opts || { mode: "vs_player", timeControl: 10 });
   };
 
   return (
@@ -366,8 +402,7 @@ function Home() {
         <div class="flex flex-col xl:flex-row items-center justify-center gap-8 w-full max-w-[1800px]">
           {/* Left Panel: Black Player */}
           <div class="flex flex-col gap-6 w-full max-w-[300px] xl:h-[800px] xl:justify-center order-2 xl:order-1">
-            <div class="bg-white p-6 rounded-2xl shadow-xl border border-stone-200 flex flex-col gap-4 items-center text-center relative overflow-hidden group">
-              <div class="absolute inset-0 bg-stone-800/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            <div class="bg-white p-6 rounded-2xl shadow-xl border border-stone-200 flex flex-col gap-4 items-center text-center relative overflow-hidden">
               <div class="w-20 h-20 bg-stone-800 rounded-2xl shadow-inner flex items-center justify-center text-stone-200 font-bold border-4 border-stone-600 text-3xl mb-2">
                 B
               </div>
@@ -375,8 +410,11 @@ function Home() {
                 <div class="font-extrabold text-2xl leading-tight text-stone-900">
                   Black
                 </div>
-                <div class="text-xs text-stone-500 font-bold uppercase tracking-wider">
-                  Grandmaster
+                <div class={`text-xs font-bold uppercase tracking-wider ${turn() === "Black" ? "text-emerald-600" : "text-stone-400"}`}>
+                  {turn() === "Black" ? "Your Turn" : "Waiting"}
+                </div>
+                <div class={`text-4xl font-mono font-bold mt-2 ${turn() === "Black" ? "text-stone-800" : "text-stone-300"}`}>
+                  {formatTime(blackTime())}
                 </div>
               </div>
 
@@ -458,6 +496,19 @@ function Home() {
             </div>
 
             <div class="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-stone-300 rounded-xl shadow-2xl overflow-hidden border-[16px] border-stone-800 relative select-none">
+              <Show when={boardQuery.data?.mode === "vs_computer"}>
+                <div class="absolute inset-0 bg-stone-900/90 flex flex-col items-center justify-center z-[60] backdrop-blur-sm text-center p-8">
+                  <div class="text-6xl mb-4">🏗️</div>
+                  <h2 class="text-4xl font-black text-white mb-2 uppercase tracking-tighter">Under Construction</h2>
+                  <p class="text-stone-400 max-w-md">The Chess Engine is currently being calibrated. Please play against a friend in <span class="text-indigo-400 font-bold">Vs Player</span> mode for now.</p>
+                  <button 
+                    onClick={() => handleReset({ mode: "vs_player", timeControl: 10 })}
+                    class="mt-8 px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all"
+                  >
+                    Switch to Vs Player
+                  </button>
+                </div>
+              </Show>
               <div
                 class="grid grid-cols-8 grid-rows-[repeat(8,1fr)] w-full h-full transition-transform duration-1000 cubic-bezier(0.4, 0, 0.2, 1)"
                 style={{ transform: `rotate(${rotation()}deg)` }}
@@ -563,7 +614,7 @@ function Home() {
                       {boardQuery.data?.status}
                     </p>
                     <button
-                      onClick={handleReset}
+                      onClick={() => handleReset()}
                       class="px-10 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xl shadow-2xl transition-all transform hover:-translate-y-2 active:translate-y-0"
                     >
                       New Challenge
@@ -576,8 +627,7 @@ function Home() {
 
           {/* Right Panel: White Player */}
           <div class="flex flex-col gap-6 w-full max-w-[300px] xl:h-[800px] xl:justify-center order-3">
-            <div class="bg-white p-6 rounded-2xl shadow-xl border-2 border-indigo-100 flex flex-col gap-4 items-center text-center relative overflow-hidden group ring-4 ring-indigo-500/10">
-              <div class="absolute inset-0 bg-indigo-50/50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            <div class="bg-white p-6 rounded-2xl shadow-xl border border-stone-200 flex flex-col gap-4 items-center text-center relative overflow-hidden">
               <div class="w-20 h-20 bg-white border-4 border-stone-200 rounded-2xl shadow-md flex items-center justify-center text-stone-900 font-bold text-3xl mb-2">
                 W
               </div>
@@ -585,8 +635,11 @@ function Home() {
                 <div class="font-extrabold text-2xl leading-tight text-stone-900">
                   White
                 </div>
-                <div class="text-xs text-indigo-600 font-bold uppercase tracking-wider">
-                  Your Turn
+                <div class={`text-xs font-bold uppercase tracking-wider ${turn() === "White" ? "text-emerald-600" : "text-stone-400"}`}>
+                  {turn() === "White" ? "Your Turn" : "Waiting"}
+                </div>
+                <div class={`text-4xl font-mono font-bold mt-2 ${turn() === "White" ? "text-stone-800" : "text-stone-300"}`}>
+                  {formatTime(whiteTime())}
                 </div>
               </div>
 
