@@ -307,12 +307,10 @@ var QueryClient = class extends QueryClient$1 {
     super(config);
   }
 };
-var createQuery = useQuery;
-var createMutation = useMutation;
 export {
   QueryClient as Q,
   QueryClientProvider as a,
-  createMutation as b,
-  createQuery as c,
+  useQuery as b,
+  useMutation as c,
   useQueryClient as u
 };

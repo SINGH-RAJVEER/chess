@@ -2,6 +2,7 @@ export {
   getBoard,
   getMoves,
   makeMove,
+  undoMove,
   resetGame,
   type BoardResponse,
 } from "./game-api";
