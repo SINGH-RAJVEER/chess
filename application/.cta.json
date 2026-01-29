@@ -1,0 +1,18 @@
+{
+  "projectName": "chess",
+  "mode": "file-router",
+  "typescript": true,
+  "packageManager": "bun",
+  "tailwind": true,
+  "addOnOptions": {},
+  "git": true,
+  "version": 1,
+  "framework": "solid",
+  "chosenAddOns": [
+    "biome",
+    "nitro",
+    "start",
+    "better-auth",
+    "tanstack-query"
+  ]
+}
