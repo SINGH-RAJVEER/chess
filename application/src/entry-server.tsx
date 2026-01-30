@@ -1,7 +1,6 @@
-import { StartServer, createHandler } from '@tanstack/solid-start/server'
-import { createRouter } from './router'
+import {
+  createStartHandler,
+  defaultStreamHandler,
+} from "@tanstack/solid-start/server";
 
-export default createHandler(() => {
-  const router = createRouter()
-  return <StartServer router={router} />
-})
+export default createStartHandler(defaultStreamHandler);

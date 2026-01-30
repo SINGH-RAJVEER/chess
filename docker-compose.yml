@@ -1,0 +1,12 @@
+services:
+  application:
+    build:
+      context: ./application
+    network_mode: host
+    restart: always
+
+  engine:
+    build:
+      context: ./engine
+    network_mode: host
+    restart: always

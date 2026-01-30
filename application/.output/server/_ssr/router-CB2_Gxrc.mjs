@@ -1,5 +1,6 @@
-import { a as createComponent, n as mergeProps, u as useContext, d as createMemo, y as splitProps, s as ssr, z as ssrElement, t as escape, p as ssrHydrationKey, D as Dynamic, j as createResource, h as createSignal, l as Suspense, H as HydrationScript, N as NoHydration, q as ssrStyleProperty, F as For, A as useAssets, b as createContext, B as createUniqueId, c as createRenderEffect, o as onCleanup } from "../_libs/solid-js.mjs";
-import { Q as QueryClient, a as QueryClientProvider } from "../_chunks/_libs/@tanstack/solid-query.mjs";
+import { b as createComponent, n as mergeProps, u as useContext, d as createMemo, y as splitProps, s as ssr, z as ssrElement, t as escape, p as ssrHydrationKey, D as Dynamic, j as createResource, h as createSignal, l as Suspense, H as HydrationScript, N as NoHydration, q as ssrStyleProperty, F as For, A as useAssets, c as createContext, B as createUniqueId, a as createRenderEffect, o as onCleanup } from "../_libs/solid-js.mjs";
+import { Q as QueryClientProvider } from "../_chunks/_libs/@tanstack/solid-query.mjs";
+import { q as queryClient } from "./query-BCHCwASR.mjs";
 import { R as RouterCore, B as BaseRootRoute, w as isModuleNotFoundError, x as isDangerousProtocol, y as exactPathTest, z as removeTrailingSlash, A as deepEqual, C as functionalUpdate, D as BaseRoute, E as preloadWarning, f as escapeHtml } from "../_chunks/_libs/@tanstack/router-core.mjs";
 import { m as mergeRefs } from "../_chunks/_libs/@solid-primitives/refs.mjs";
 import { d as dummyMatchContext, m as matchContext, a as useRouterState, u as useRouter, b as useIntersectionObserver, O as Outlet } from "./index.mjs";
@@ -16,14 +17,10 @@ import "node:async_hooks";
 import "../_libs/h3-v2.mjs";
 import "../_libs/rou3.mjs";
 import "../_libs/srvx.mjs";
-import "node:http";
-import "node:stream";
-import "node:https";
-import "node:http2";
 import "../_libs/isbot.mjs";
 var _tmpl$$1 = ["<svg", ">", "</svg>"];
 function useLinkProps(options) {
-  const router = useRouter();
+  const router2 = useRouter();
   const [isTransitioning, setIsTransitioning] = createSignal(false);
   const [local, rest] = splitProps(mergeProps({
     activeProps: () => ({
@@ -44,7 +41,7 @@ function useLinkProps(options) {
   };
   const next = createMemo(() => {
     currentSearch();
-    return router.buildLocation(_options());
+    return router2.buildLocation(_options());
   });
   const hrefOption = createMemo(() => {
     if (_options().disabled) return void 0;
@@ -58,7 +55,7 @@ function useLinkProps(options) {
       };
     }
     return {
-      href: router.history.createHref(publicHref) || "/",
+      href: router2.history.createHref(publicHref) || "/",
       external: false
     };
   });
@@ -89,20 +86,20 @@ function useLinkProps(options) {
     if (_options().reloadDocument || externalLink()) {
       return false;
     }
-    return local.preload ?? router.options.defaultPreload;
+    return local.preload ?? router2.options.defaultPreload;
   });
-  const preloadDelay = () => local.preloadDelay ?? router.options.defaultPreloadDelay ?? 0;
+  const preloadDelay = () => local.preloadDelay ?? router2.options.defaultPreloadDelay ?? 0;
   const isActive = useRouterState({
     select: (s) => {
       if (externalLink()) return false;
       if (local.activeOptions?.exact) {
-        const testExact = exactPathTest(s.location.pathname, next().pathname, router.basepath);
+        const testExact = exactPathTest(s.location.pathname, next().pathname, router2.basepath);
         if (!testExact) {
           return false;
         }
       } else {
-        const currentPathSplit = removeTrailingSlash(s.location.pathname, router.basepath).split("/");
-        const nextPathSplit = removeTrailingSlash(next()?.pathname, router.basepath)?.split("/");
+        const currentPathSplit = removeTrailingSlash(s.location.pathname, router2.basepath).split("/");
+        const nextPathSplit = removeTrailingSlash(next()?.pathname, router2.basepath)?.split("/");
         const pathIsFuzzyEqual = nextPathSplit?.every((d, i) => d === currentPathSplit[i]);
         if (!pathIsFuzzyEqual) {
           return false;
@@ -123,7 +120,7 @@ function useLinkProps(options) {
       return true;
     }
   });
-  const doPreload = () => router.preloadRoute(_options()).catch((err) => {
+  const doPreload = () => router2.preloadRoute(_options()).catch((err) => {
     console.warn(err);
     console.warn(preloadWarning);
   });
@@ -148,11 +145,11 @@ function useLinkProps(options) {
     if (!local.disabled && !isCtrlEvent(e) && !e.defaultPrevented && (!effectiveTarget || effectiveTarget === "_self") && e.button === 0) {
       e.preventDefault();
       setIsTransitioning(true);
-      const unsub = router.subscribe("onResolved", () => {
+      const unsub = router2.subscribe("onResolved", () => {
         unsub();
         setIsTransitioning(false);
       });
-      router.navigate({
+      router2.navigate({
         ..._options(),
         replace: local.replace,
         resetScroll: local.resetScroll,
@@ -353,15 +350,15 @@ function useSearch(opts) {
   });
 }
 function useNavigate(_defaultOpts) {
-  const router = useRouter();
+  const router2 = useRouter();
   return (options) => {
-    return router.navigate({
+    return router2.navigate({
       ...options,
       from: options.from ?? _defaultOpts?.from
     });
   };
 }
-let Route$3 = class Route extends BaseRoute {
+let Route$4 = class Route extends BaseRoute {
   /**
    * @deprecated Use the `createRoute` function instead.
    */
@@ -420,7 +417,7 @@ let Route$3 = class Route extends BaseRoute {
   }
 };
 function createRoute(options) {
-  return new Route$3(options);
+  return new Route$4(options);
 }
 class RootRoute extends BaseRootRoute {
   /**
@@ -538,8 +535,8 @@ class LazyRoute {
       return useLoaderData({ ...opts2, from: this.options.id });
     };
     this.useNavigate = () => {
-      const router = useRouter();
-      return useNavigate({ from: router.routesById[this.options.id].fullPath });
+      const router2 = useRouter();
+      return useNavigate({ from: router2.routesById[this.options.id].fullPath });
     };
     this.options = opts;
   }
@@ -747,8 +744,8 @@ function Script({
   return null;
 }
 const useTags = () => {
-  const router = useRouter();
-  const nonce = router.options.ssr?.nonce;
+  const router2 = useRouter();
+  const nonce = router2.options.ssr?.nonce;
   const routeMeta = useRouterState({
     select: (state) => {
       return state.matches.map((match) => match.meta).filter(Boolean);
@@ -805,12 +802,12 @@ const useTags = () => {
     if (title) {
       resultMeta.push(title);
     }
-    if (router.options.ssr?.nonce) {
+    if (router2.options.ssr?.nonce) {
       resultMeta.push({
         tag: "meta",
         attrs: {
           property: "csp-nonce",
-          content: router.options.ssr.nonce
+          content: router2.options.ssr.nonce
         }
       });
     }
@@ -826,7 +823,7 @@ const useTags = () => {
           nonce
         }
       }));
-      const manifest = router.ssr?.manifest;
+      const manifest = router2.ssr?.manifest;
       const assets = state.matches.map((match) => manifest?.routes[match.routeId]?.assets ?? []).filter(Boolean).flat(1).filter((asset) => asset.tag === "link").map((asset) => ({
         tag: "link",
         attrs: {
@@ -840,7 +837,7 @@ const useTags = () => {
   const preloadLinks = useRouterState({
     select: (state) => {
       const preloadLinks2 = [];
-      state.matches.map((match) => router.looseRoutesById[match.routeId]).forEach((route) => router.ssr?.manifest?.routes[route.id]?.preloads?.filter(Boolean).forEach((preload) => {
+      state.matches.map((match) => router2.looseRoutesById[match.routeId]).forEach((route) => router2.ssr?.manifest?.routes[route.id]?.preloads?.filter(Boolean).forEach((preload) => {
         preloadLinks2.push({
           tag: "link",
           attrs: {
@@ -908,16 +905,16 @@ function HeadContent() {
   });
 }
 const Scripts = () => {
-  const router = useRouter();
-  const nonce = router.options.ssr?.nonce;
+  const router2 = useRouter();
+  const nonce = router2.options.ssr?.nonce;
   const assetScripts = useRouterState({
     select: (state) => {
       const assetScripts2 = [];
-      const manifest = router.ssr?.manifest;
+      const manifest = router2.ssr?.manifest;
       if (!manifest) {
         return [];
       }
-      state.matches.map((match) => router.looseRoutesById[match.routeId]).forEach((route) => manifest.routes[route.id]?.assets?.filter((d) => d.tag === "script").forEach((asset) => {
+      state.matches.map((match) => router2.looseRoutesById[match.routeId]).forEach((route) => manifest.routes[route.id]?.assets?.filter((d) => d.tag === "script").forEach((asset) => {
         assetScripts2.push({
           tag: "script",
           attrs: {
@@ -946,8 +943,8 @@ const Scripts = () => {
     })
   });
   let serverBufferedScript = void 0;
-  if (router.serverSsr) {
-    serverBufferedScript = router.serverSsr.takeBufferedScripts();
+  if (router2.serverSsr) {
+    serverBufferedScript = router2.serverSsr.takeBufferedScripts();
   }
   const allScripts = [...scripts().scripts, ...assetScripts()];
   if (serverBufferedScript) {
@@ -955,20 +952,13 @@ const Scripts = () => {
   }
   return allScripts.map((asset, i) => createComponent(Asset, asset));
 };
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1e3 * 60
-    }
-  }
-});
 var _tmpl$ = ["<div", ' style="', '"><h2>Something went wrong!</h2><p>', '</p><pre style="', '">', "</pre></div>"], _tmpl$2 = ["<head>", "", "</head>"], _tmpl$3 = ["<html", ' lang="en">', "<body><!--$-->", "<!--/--><!--$-->", "<!--/--></body></html>"];
 function ErrorComponent({
   error
 }) {
   return ssr(_tmpl$, ssrHydrationKey(), ssrStyleProperty("padding:", "2rem") + ssrStyleProperty(";text-align:", "center"), escape(error.message), ssrStyleProperty("text-align:", "left") + ssrStyleProperty(";background:", "#f5f5f5") + ssrStyleProperty(";padding:", "1rem") + ssrStyleProperty(";border-radius:", "4px") + ssrStyleProperty(";overflow:", "auto"), escape(error.stack));
 }
-const Route$2 = createRootRoute({
+const Route$3 = createRootRoute({
   head: () => ({
     meta: [{
       charset: "utf-8"
@@ -998,37 +988,52 @@ function RootComponent() {
     }
   })), escape(createComponent(Scripts, {})));
 }
+const $$splitComponentImporter$2 = () => import("./computer-DW9mXP59.mjs");
+const Route$2 = createFileRoute("/computer")({
+  component: lazyRouteComponent($$splitComponentImporter$2, "component")
+});
 const $$splitComponentImporter$1 = () => import("./_-F7W2RJJQ.mjs");
 const Route$1 = createFileRoute("/$")({
   component: lazyRouteComponent($$splitComponentImporter$1, "component")
 });
-const $$splitComponentImporter = () => import("./index-dvptBZa4.mjs");
+const $$splitComponentImporter = () => import("./index-D73XY3Ux.mjs");
 const Route2 = createFileRoute("/")({
   component: lazyRouteComponent($$splitComponentImporter, "component")
+});
+const ComputerRoute = Route$2.update({
+  id: "/computer",
+  path: "/computer",
+  getParentRoute: () => Route$3
 });
 const SplatRoute = Route$1.update({
   id: "/$",
   path: "/$",
-  getParentRoute: () => Route$2
+  getParentRoute: () => Route$3
 });
 const IndexRoute = Route2.update({
   id: "/",
   path: "/",
-  getParentRoute: () => Route$2
+  getParentRoute: () => Route$3
 });
 const rootRouteChildren = {
   IndexRoute,
-  SplatRoute
+  SplatRoute,
+  ComputerRoute
 };
-const routeTree = Route$2._addFileChildren(rootRouteChildren)._addFileTypes();
+const routeTree = Route$3._addFileChildren(rootRouteChildren)._addFileTypes();
 function createRouter() {
-  const router = createRouter$1({
+  const router2 = createRouter$1({
     routeTree
   });
-  return router;
+  return router2;
 }
 const getRouter = createRouter;
-export {
+const router = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+  __proto__: null,
   createRouter,
   getRouter
+}, Symbol.toStringTag, { value: "Module" }));
+export {
+  Link$1 as L,
+  router as r
 };

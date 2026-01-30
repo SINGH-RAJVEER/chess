@@ -4,7 +4,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { H as H3Event, t as toResponse } from "../_libs/h3-v2.mjs";
 import { i as invariant } from "../_libs/tiny-invariant.mjs";
 import { a as au, I as Iu, o as ou } from "../_libs/seroval.mjs";
-import { u as useContext, a as createComponent, b as createContext, d as createMemo, S as Show, l as Suspense, D as Dynamic, m as Switch, M as Match$1, n as mergeProps, j as createResource, s as ssr, p as ssrHydrationKey, q as ssrStyleProperty, t as escape, v as createEffect, g as on, h as createSignal, E as ErrorBoundary, w as ssrAttribute, x as renderToStream } from "../_libs/solid-js.mjs";
+import { u as useContext, b as createComponent, c as createContext, d as createMemo, S as Show, l as Suspense, D as Dynamic, m as Switch, M as Match$1, n as mergeProps, j as createResource, s as ssr, p as ssrHydrationKey, q as ssrStyleProperty, t as escape, v as createEffect, g as on, h as createSignal, E as ErrorBoundary, w as ssrAttribute, x as renderToStream } from "../_libs/solid-js.mjs";
 import { w as warning } from "../_libs/tiny-warning.mjs";
 import { i as isbot } from "../_libs/isbot.mjs";
 import "../_libs/cookie-es.mjs";
@@ -12,10 +12,6 @@ import "../_libs/seroval-plugins.mjs";
 import "node:stream/web";
 import "../_libs/rou3.mjs";
 import "../_libs/srvx.mjs";
-import "node:http";
-import "node:stream";
-import "node:https";
-import "node:http2";
 var _tmpl$$2 = ["<div", ' style="', '"><div style="', '"><strong style="', '">Something went wrong!</strong><button style="', '">', '</button></div><div style="', '"></div><!--$-->', "<!--/--></div>"], _tmpl$2 = ["<div", '><pre style="', '">', "</pre></div>"], _tmpl$3 = ["<code", ">", "</code>"];
 function CatchBoundary(props) {
   return createComponent(ErrorBoundary, {
@@ -1037,7 +1033,7 @@ function getResponse() {
   return event.res;
 }
 async function getStartManifest(matchedRoutes) {
-  const { tsrStartManifest } = await import("./_tanstack-start-manifest_v-DwEth6x4.mjs");
+  const { tsrStartManifest } = await import("./_tanstack-start-manifest_v-C5CG5BIT.mjs");
   const startManifest = tsrStartManifest();
   const rootRoute = startManifest.routes[rootRouteId] = startManifest.routes[rootRouteId] || {};
   rootRoute.assets = rootRoute.assets || [];
@@ -1195,21 +1191,21 @@ function createMultiplexedStream(jsonStream, rawStreams) {
     }
   });
 }
-const manifest = { "075bb97a5df53025c3a5cac3463aa1757848b60aac35966d56b3f5f04c96a880": {
+const manifest = { "95e928ba95487362d6afff6ca4d515806e7e351fbe6afa5f24801262b3067845": {
   functionName: "getBoard_createServerFn_handler",
-  importer: () => import("./game-api-DmYTmJ6r.mjs")
-}, "794ae25fdbad27267eddca374cd262923ce3a47f4b66b732f323ab20dcc22590": {
-  functionName: "undoMove_createServerFn_handler",
-  importer: () => import("./game-api-DmYTmJ6r.mjs")
-}, "7f22913cc8d51a01984f7bf48fae2f2d31d571b490a9d584529e84f9899ea385": {
+  importer: () => import("./index-D7a4okZ8.mjs")
+}, "129631420af401c96c262730d653c85520c7f45abbe9f9f1a0c226afe377ba96": {
   functionName: "getMoves_createServerFn_handler",
-  importer: () => import("./game-api-DmYTmJ6r.mjs")
-}, "972086331ae1ccaf15884371b3d836c8b8cb9863f2467b06d69aa6f6555bec6c": {
+  importer: () => import("./index-D7a4okZ8.mjs")
+}, "5cf45770ffbf97d3683ac5adc5168882f2e630c097070095eaae54df0a1c213d": {
+  functionName: "undoMove_createServerFn_handler",
+  importer: () => import("./index-D7a4okZ8.mjs")
+}, "1108d962036347ce5bf840bba29e0af741ec3c05516bd6276164d3217127b51f": {
   functionName: "makeMove_createServerFn_handler",
-  importer: () => import("./game-api-DmYTmJ6r.mjs")
-}, "614b8f455b0bec4996eb16fc2e9a0377d9b5aca3671eb868a2af8c02e22f2c72": {
+  importer: () => import("./index-D7a4okZ8.mjs")
+}, "4180547286fb2de3eb3b3ca5e12fd7958423f6106b062ea5571396a6374ce00d": {
   functionName: "resetGame_createServerFn_handler",
-  importer: () => import("./game-api-DmYTmJ6r.mjs")
+  importer: () => import("./index-D7a4okZ8.mjs")
 } };
 async function getServerFnById(id) {
   const serverFnInfo = manifest[id];
@@ -1524,7 +1520,7 @@ function getStartResponseHeaders(opts) {
 let entriesPromise;
 let manifestPromise;
 async function loadEntries() {
-  const routerEntry = await import("./router-BSwt6jgJ.mjs");
+  const routerEntry = await import("./router-CB2_Gxrc.mjs").then((n) => n.r);
   const startEntry = await import("./start-HYkvq4Ni.mjs");
   return { startEntry, routerEntry };
 }

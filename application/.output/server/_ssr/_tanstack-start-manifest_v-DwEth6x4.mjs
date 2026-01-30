@@ -1,4 +1,0 @@
-const tsrStartManifest = () => ({ "routes": { "__root__": { "filePath": "/home/rajveer/Code/projects/chess/application/src/routes/__root.tsx", "children": ["/", "/$"], "preloads": ["/assets/main-DDTxMDnH.js"], "assets": [{ "tag": "link", "attrs": { "rel": "stylesheet", "href": "/assets/main-CgUdaIwE.css", "type": "text/css" } }] }, "/": { "filePath": "/home/rajveer/Code/projects/chess/application/src/routes/index.tsx", "assets": [{ "tag": "link", "attrs": { "rel": "stylesheet", "href": "/assets/main-CgUdaIwE.css", "type": "text/css" } }], "preloads": ["/assets/index-D8u8-zlO.js"] }, "/$": { "filePath": "/home/rajveer/Code/projects/chess/application/src/routes/$.tsx", "assets": [{ "tag": "link", "attrs": { "rel": "stylesheet", "href": "/assets/main-CgUdaIwE.css", "type": "text/css" } }], "preloads": ["/assets/_-CP0jnJwe.js"] } }, "clientEntry": "/assets/main-DDTxMDnH.js" });
-export {
-  tsrStartManifest
-};
