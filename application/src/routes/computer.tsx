@@ -78,12 +78,24 @@ function ComputerGame() {
 		},
 		staleTime: 0,
 		refetchOnWindowFocus: true,
+		refetchInterval: (query) => {
+			const data = query.state.data;
+			if (
+				data &&
+				data.mode === "vs_computer" &&
+				data.turn === "Black" &&
+				data.status === "Ongoing"
+			) {
+				return 1000;
+			}
+			return false;
+		},
 	}));
 
 	// Auto-start vs_computer if not in that mode
 	createEffect(() => {
 		if (boardQuery.data && boardQuery.data.mode !== "vs_computer") {
-			handleReset({ mode: "vs_computer", timeControl: 10 });
+			handleReset({ mode: "vs_computer", timeControl: 0 });
 		}
 	});
 
@@ -258,11 +270,17 @@ function ComputerGame() {
 		mode: "vs_player" | "vs_computer";
 		timeControl: number;
 	}) => {
-		resetMutation.mutate(opts || { mode: "vs_computer", timeControl: 10 });
+		// Force timeControl to 0 (unlimited) if the mode is vs_computer
+		const finalOpts =
+			opts?.mode === "vs_computer"
+				? { ...opts, timeControl: 0 }
+				: opts || { mode: "vs_computer", timeControl: 0 };
+
+		resetMutation.mutate(finalOpts);
 	};
 
 	return (
-		<div class="min-h-screen bg-stone-100 font-sans text-stone-800 flex flex-col">
+		<div class="min-h-screen bg-gradient-to-br from-stone-900 via-stone-900 to-black font-sans text-stone-200 flex flex-col">
 			<Header
 				onRestart={handleReset}
 				isRestarting={resetMutation.isPending}
@@ -270,44 +288,71 @@ function ComputerGame() {
 				currentTimeControl={boardQuery.data?.timeControl}
 			/>
 
+			{/* Main Game Area */}
 			<div class="flex-1 flex flex-col items-center justify-center p-4 lg:p-8 overflow-hidden relative">
 				<div class="flex flex-col xl:flex-row items-center justify-center gap-8 w-full max-w-[1800px]">
-					{/* Black Panel (Computer) */}
+					{/* Left Panel: Black Player (Computer) */}
 					<div class="flex flex-col gap-6 w-full max-w-[300px] xl:h-[800px] xl:justify-center order-2 xl:order-1">
-						<div class="bg-white p-6 rounded-2xl shadow-xl border border-stone-200 flex flex-col gap-4 items-center text-center relative overflow-hidden">
-							<div class="w-20 h-20 bg-stone-800 rounded-2xl shadow-inner flex items-center justify-center text-stone-200 font-bold border-4 border-stone-600 text-3xl mb-2">
+						<div class="bg-stone-800 p-6 rounded-2xl shadow-xl border border-stone-700 flex flex-col gap-4 items-center text-center relative overflow-hidden">
+							<div class="w-20 h-20 bg-stone-950 rounded-2xl shadow-inner flex items-center justify-center text-stone-200 font-bold border-4 border-stone-700 text-5xl mb-2">
 								🤖
 							</div>
 							<div>
-								<div class="font-extrabold text-2xl leading-tight text-stone-900">
+								<div class="font-extrabold text-2xl leading-tight text-stone-100">
 									Engine
 								</div>
-								<div class={`text-xs font-bold uppercase tracking-wider ${turn() === "Black" ? "text-emerald-600" : "text-stone-400"}`}>
+								<div
+									class={`text-xs font-bold uppercase tracking-wider ${turn() === "Black" ? "text-emerald-400" : "text-stone-500"}`}
+								>
 									{turn() === "Black" ? "Thinking..." : "Waiting"}
 								</div>
-								<div class={`text-4xl font-mono font-bold mt-2 ${turn() === "Black" ? "text-stone-800" : "text-stone-300"}`}>
-									{formatTime(blackTime())}
-								</div>
+								<Show when={boardQuery.data?.timeControl !== 0}>
+									<div
+										class={`text-4xl font-mono font-bold mt-2 ${turn() === "Black" ? "text-white" : "text-stone-600"}`}
+									>
+										{formatTime(blackTime())}
+									</div>
+								</Show>
 							</div>
-							<div class="flex flex-wrap justify-center gap-1 min-h-[40px] w-full bg-stone-50 rounded-lg p-2 border border-stone-100">
+
+							{/* Captured Pieces (White pieces captured by Engine) */}
+							<div class="flex flex-wrap justify-center gap-1 min-h-[40px] w-full bg-stone-900/50 rounded-lg p-2 border border-stone-700">
 								<For each={boardQuery.data?.capturedPieces?.white}>
-									{(p) => <span class="text-3xl filter drop-shadow-sm text-stone-800">{PIECE_SYMBOLS.White[p]}</span>}
+									{(p) => (
+										<span
+											class="text-3xl filter drop-shadow-sm text-stone-400"
+											title={`Captured ${p}`}
+										>
+											{PIECE_SYMBOLS.White[p]}
+										</span>
+									)}
 								</For>
+								<Show when={!boardQuery.data?.capturedPieces?.white?.length}>
+									<span class="text-xs text-stone-600 italic self-center">
+										No captures
+									</span>
+								</Show>
 							</div>
 						</div>
 					</div>
 
 					{/* Center: Board */}
 					<div class="relative group order-1 xl:order-2">
+						{/* Status Messages */}
 						<div class="absolute -top-16 left-0 w-full flex justify-center h-12 pointer-events-none z-30">
 							<Show when={errorMsg()}>
-								<div class="bg-red-600 text-white px-8 py-3 rounded-full shadow-2xl text-base font-bold animate-bounce flex items-center gap-2 border-4 border-white/20">
+								<div class="bg-red-600 text-white px-8 py-3 rounded-full shadow-2xl text-base font-bold animate-bounce flex items-center gap-2 border-4 border-stone-900">
 									<span>⚠️</span> {errorMsg()}
+								</div>
+							</Show>
+							<Show when={successMsg()}>
+								<div class="bg-emerald-600 text-white px-8 py-3 rounded-full shadow-2xl text-base font-bold flex items-center gap-2 border-4 border-stone-900">
+									<span>✨</span> {successMsg()}
 								</div>
 							</Show>
 						</div>
 
-						<div class="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-stone-300 rounded-xl shadow-2xl overflow-hidden border-[16px] border-stone-800 relative select-none">
+						<div class="w-[80vw] h-[80vw] max-w-[800px] max-h-[800px] bg-stone-700 rounded-xl shadow-2xl overflow-hidden border-[16px] border-stone-950 relative select-none">
 							<div class="grid grid-cols-8 grid-rows-[repeat(8,1fr)] w-full h-full">
 								<For each={Array.from({ length: 64 })}>
 									{(_, index) => {
@@ -316,17 +361,64 @@ function ComputerGame() {
 										const col = squareIndex % 8;
 										const isBlack = (row + col) % 2 === 1;
 
+										const lightSquareColor = "bg-[#f0d9b5]";
+										const darkSquareColor = "bg-[#b58863]";
+
+										// Highlight Logic
+										const isLastMove = () => {
+											const lastMove = boardQuery.data?.lastMove;
+											return (
+												lastMove &&
+												(lastMove.from === squareIndex || lastMove.to === squareIndex)
+											);
+										};
+
 										return (
 											<button
-												class={`relative w-full h-full flex items-center justify-center focus:outline-none transition-colors duration-200 ${isBlack ? "bg-[#b58863]" : "bg-[#f0d9b5]"}`}
+												class={`relative w-full h-full flex items-center justify-center focus:outline-none transition-colors duration-200 ${isBlack ? darkSquareColor : lightSquareColor}`}
 												classList={{
-													"ring-inset ring-[6px] ring-indigo-500/60 z-10": selectedSquare() === squareIndex,
+													"ring-inset ring-[6px] ring-indigo-500/60 z-10":
+														selectedSquare() === squareIndex,
+													"hover:brightness-105":
+														!selectedSquare() ||
+														selectedSquare() !== squareIndex,
 												}}
 												onClick={() => handleSquareClick(squareIndex)}
 											>
-												<Show when={validMoves().includes(squareIndex)}>
-													<div class={getPieceAt(squareIndex) ? "absolute inset-0 border-[6px] border-rose-500/50 rounded-full m-1" : "w-4 h-4 bg-stone-900/20 rounded-full"} />
+												{/* Rank/File Labels */}
+												<Show when={col === 0}>
+													<span
+														class={`absolute left-1 top-1 text-[10px] sm:text-xs font-black ${isBlack ? "text-[#f0d9b5]" : "text-[#b58863]"} opacity-60`}
+													>
+														{8 - row}
+													</span>
 												</Show>
+												<Show when={row === 7}>
+													<span
+														class={`absolute right-1 bottom-0.5 text-[10px] sm:text-xs font-black ${isBlack ? "text-[#f0d9b5]" : "text-[#b58863]"} opacity-60`}
+													>
+														{String.fromCharCode(97 + col)}
+													</span>
+												</Show>
+
+												{/* Last Move Highlight */}
+												<Show when={isLastMove()}>
+													<div class="absolute inset-0 bg-yellow-500/60 pointer-events-none mix-blend-hard-light" />
+												</Show>
+
+												{/* Valid Move Indicator */}
+												<Show when={validMoves().includes(squareIndex)}>
+													{(() => {
+														const hasPiece = !!getPieceAt(squareIndex);
+														return hasPiece ? (
+															<div class="absolute inset-0 border-[6px] sm:border-[8px] border-rose-500/50 rounded-full m-1 sm:m-2 pointer-events-none animate-pulse" />
+														) : (
+															<div class="w-4 h-4 sm:w-6 sm:h-6 bg-stone-900/40 rounded-full pointer-events-none" />
+														);
+													})()}
+												</Show>
+
+												{/* Piece */}
 												{(() => {
 													const piece = getPieceAt(squareIndex);
 													return (
@@ -334,8 +426,14 @@ function ComputerGame() {
 															<span
 																class="text-4xl sm:text-5xl md:text-7xl drop-shadow-2xl transition-all duration-700 ease-in-out cursor-pointer hover:scale-110 active:scale-90 transform-gpu z-20"
 																style={{
-																	color: piece!.color === "White" ? "#ffffff" : "#1a1a1a",
-																	"text-shadow": piece!.color === "White" ? "0 2px 4px rgba(0,0,0,0.4)" : "0 2px 4px rgba(255,255,255,0.1)",
+																	color:
+																		piece!.color === "White"
+																			? "#ffffff"
+																			: "#1a1a1a",
+																	"text-shadow":
+																		piece!.color === "White"
+																			? "0 2px 4px rgba(0,0,0,0.4)"
+																			: "0 2px 4px rgba(255,255,255,0.1)",
 																}}
 															>
 																{PIECE_SYMBOLS[piece!.color][piece!.piece_type]}
@@ -349,41 +447,106 @@ function ComputerGame() {
 								</For>
 							</div>
 
-							<Show when={boardQuery.data?.status && boardQuery.data?.status !== "Ongoing"}>
+							<Show
+								when={
+									boardQuery.data?.status &&
+									boardQuery.data?.status !== "Ongoing"
+								}
+							>
 								<div class="absolute inset-0 bg-stone-900/80 flex items-center justify-center z-50 backdrop-blur-md">
-									<div class="bg-white p-12 rounded-3xl shadow-2xl text-center">
-										<h2 class="text-6xl font-black text-stone-900 mb-4">{boardQuery.data?.status}</h2>
-										<button onClick={() => handleReset()} class="px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black text-xl">New Game</button>
+									<div class="bg-stone-800 p-12 rounded-3xl shadow-[0_0_100px_rgba(0,0,0,0.5)] text-center border-b-8 border-indigo-600 animate-in fade-in zoom-in duration-500">
+										<h2 class="text-6xl font-black text-stone-100 mb-4 tracking-tighter">
+											{boardQuery.data?.status === "Timeout"
+												? "Time Out!"
+												: boardQuery.data?.status}
+										</h2>
+										<p class="text-2xl font-bold text-indigo-400 mb-10 tracking-wide uppercase">
+											{(() => {
+												const status = boardQuery.data?.status;
+												const turn = boardQuery.data?.turn;
+												if (status === "Stalemate") return "Draw";
+												const winner = turn === "White" ? "Engine" : "You";
+												if (status === "Timeout")
+													return `${winner} Wins by Time`;
+												return `${winner} Wins`;
+											})()}
+										</p>
+										<button
+											onClick={() => handleReset()}
+											class="px-10 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xl shadow-2xl transition-all transform hover:-translate-y-2 active:translate-y-0"
+										>
+											New Challenge
+										</button>
 									</div>
 								</div>
 							</Show>
 						</div>
 					</div>
 
-					{/* White Panel (Player) */}
+					{/* Right Panel: White Player (Human) */}
 					<div class="flex flex-col gap-6 w-full max-w-[300px] xl:h-[800px] xl:justify-center order-3">
-						<div class="bg-white p-6 rounded-2xl shadow-xl border border-stone-200 flex flex-col gap-4 items-center text-center relative overflow-hidden">
-							<div class="w-20 h-20 bg-white border-4 border-stone-200 rounded-2xl shadow-md flex items-center justify-center text-stone-900 font-bold text-3xl mb-2">
+						<div class="bg-stone-800 p-6 rounded-2xl shadow-xl border border-stone-700 flex flex-col gap-4 items-center text-center relative overflow-hidden">
+							<div class="w-20 h-20 bg-stone-200 border-4 border-stone-500 rounded-2xl shadow-md flex items-center justify-center text-stone-900 font-bold text-3xl mb-2">
 								W
 							</div>
 							<div>
-								<div class="font-extrabold text-2xl leading-tight text-stone-900">You</div>
-								<div class={`text-xs font-bold uppercase tracking-wider ${turn() === "White" ? "text-emerald-600" : "text-stone-400"}`}>
+								<div class="font-extrabold text-2xl leading-tight text-stone-100">
+									You
+								</div>
+								<div
+									class={`text-xs font-bold uppercase tracking-wider ${turn() === "White" ? "text-emerald-400" : "text-stone-500"}`}
+								>
 									{turn() === "White" ? "Your Turn" : "Waiting"}
 								</div>
-								<div class={`text-4xl font-mono font-bold mt-2 ${turn() === "White" ? "text-stone-800" : "text-stone-300"}`}>
-									{formatTime(whiteTime())}
-								</div>
+								<Show when={boardQuery.data?.timeControl !== 0}>
+									<div
+										class={`text-4xl font-mono font-bold mt-2 ${turn() === "White" ? "text-white" : "text-stone-600"}`}
+									>
+										{formatTime(whiteTime())}
+									</div>
+								</Show>
 							</div>
-							<div class="flex flex-wrap justify-center gap-1 min-h-[40px] w-full bg-stone-50 rounded-lg p-2 border border-stone-100">
+
+							{/* Captured Pieces (Black pieces captured by Human) */}
+							<div class="flex flex-wrap justify-center gap-1 min-h-[40px] w-full bg-stone-900/50 rounded-lg p-2 border border-stone-700">
 								<For each={boardQuery.data?.capturedPieces?.black}>
-									{(p) => <span class="text-3xl filter drop-shadow-sm text-stone-800">{PIECE_SYMBOLS.Black[p]}</span>}
+									{(p) => (
+										<span
+											class="text-3xl filter drop-shadow-sm text-stone-400"
+											title={`Captured ${p}`}
+										>
+											{PIECE_SYMBOLS.Black[p]}
+										</span>
+									)}
 								</For>
+								<Show when={!boardQuery.data?.capturedPieces?.black?.length}>
+									<span class="text-xs text-stone-600 italic self-center">
+										No captures
+									</span>
+								</Show>
 							</div>
+
 							<Show when={turn() === "White" && pendingMove()}>
 								<div class="flex gap-2 w-full mt-4">
-									<button onClick={handleConfirmMove} class="flex-1 bg-emerald-500 text-white font-bold py-3 rounded-xl">Submit</button>
-									<button onClick={handleCancelMove} class="flex-1 bg-stone-400 text-white font-bold py-3 rounded-xl">Cancel</button>
+									<button
+										onClick={handleConfirmMove}
+										disabled={moveMutation.isPending}
+										class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
+									>
+										<Show
+											when={moveMutation.isPending}
+											fallback={<span>✓ Submit</span>}
+										>
+											<span>...</span>
+										</Show>
+									</button>
+									<button
+										onClick={handleCancelMove}
+										disabled={moveMutation.isPending}
+										class="flex-1 bg-stone-600 hover:bg-stone-500 disabled:opacity-50 text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
+									>
+										<span>✕</span> Cancel
+									</button>
 								</div>
 							</Show>
 						</div>

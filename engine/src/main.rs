@@ -20,7 +20,7 @@ fn evaluate(pos: &Chess) -> i32 {
     let mut score = 0;
     let board = pos.board();
 
-    for (square, piece) in board.clone() {
+    for (_square, piece) in board.clone() {
         let piece_val = match piece.role {
             Role::Pawn => 100,
             Role::Knight => 320,
@@ -130,8 +130,7 @@ async fn get_engine_move(req: web::Json<EngineRequest>) -> impl Responder {
         }),
     };
 
-    // Use a depth of 3 for a reasonable response time
-    let best_move = find_best_move(&position, 3);
+    let best_move = find_best_move(&position, 6);
 
     match best_move {
         Some(m) => {
@@ -141,15 +140,11 @@ async fn get_engine_move(req: web::Json<EngineRequest>) -> impl Responder {
                 error: None,
             })
         }
-        None => HttpResponse::Ok().json(EngineResponse {
+        _none => HttpResponse::Ok().json(EngineResponse {
             best_move: None,
             error: Some("No legal moves".to_string()),
         }),
     }
-}
-
-async fn greet() -> impl Responder {
-    HttpResponse::Ok().body("Chess Engine Running")
 }
 
 #[actix_web::main]
@@ -165,7 +160,6 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .wrap(cors)
-            .route("/", web::get().to(greet))
             .service(get_engine_move)
     })
     .bind("127.0.0.1:8080")?

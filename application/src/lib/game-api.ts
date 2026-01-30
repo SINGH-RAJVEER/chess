@@ -38,6 +38,10 @@ export type BoardResponse = {
   whiteTimeRemaining: number;
   blackTimeRemaining: number;
   lastMoveTime: number | null;
+  lastMove: {
+    from: number;
+    to: number;
+  } | null;
   serverTime: number;
 };
 
@@ -82,7 +86,7 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
     }
 
     if (!currentGame) {
-       return { pieces: [], turn: "White", status: "Ongoing", moves: [], mode: "vs_player", timeControl: 10, whiteTimeRemaining: 600000, blackTimeRemaining: 600000, lastMoveTime: null, capturedPieces: { white: [], black: [] } } as BoardResponse;
+       return { pieces: [], turn: "White", status: "Ongoing", moves: [], mode: "vs_player", timeControl: 10, whiteTimeRemaining: 600000, blackTimeRemaining: 600000, lastMoveTime: null, lastMove: null, capturedPieces: { white: [], black: [] } } as BoardResponse;
     }
 
     // Get pieces and moves (same as before)
@@ -156,6 +160,10 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
       square: piece.square,
     }));
 
+    const lastMove = formattedMoves.length > 0 
+      ? { from: formattedMoves[formattedMoves.length - 1].from, to: formattedMoves[formattedMoves.length - 1].to }
+      : null;
+
     return {
       pieces: piecesResponse,
       capturedPieces,
@@ -167,6 +175,7 @@ export const getBoard = createServerFn({ method: "POST" }).handler(async () => {
       whiteTimeRemaining: currentGame.whiteTimeRemaining,
       blackTimeRemaining: currentGame.blackTimeRemaining,
       lastMoveTime: currentGame.lastMoveTime,
+      lastMove,
       serverTime,
     } as BoardResponse;
   } catch (error) {
@@ -433,32 +442,32 @@ export const getMoves = createServerFn({ method: "POST" })
 
       // IF VS COMPUTER AND IT'S BLACK'S TURN
       if (currentGame.mode === "vs_computer" && nextTurn === "Black" && newStatus === "Ongoing") {
-        try {
-          const fen = piecesToFen(updatedPieces, nextTurn, currentMove || undefined);
-          const response = await fetch("http://127.0.0.1:8080/api/engine-move", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ fen }),
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.best_move) {
-              const uciMove = data.best_move;
-              const fromFile = uciMove.charCodeAt(0) - 97;
-              const fromRank = 8 - parseInt(uciMove[1]);
-              const toFile = uciMove.charCodeAt(2) - 97;
-              const toRank = 8 - parseInt(uciMove[3]);
-              
-              const fromSquare = getSquareFromRowCol(fromRank, fromFile);
-              const toSquare = getSquareFromRowCol(toRank, toFile);
-              
-              await applyMove(currentGame.id, fromSquare, toSquare);
+        const fen = piecesToFen(updatedPieces, nextTurn, currentMove || undefined);
+        fetch("http://127.0.0.1:8080/api/engine-move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fen }),
+        })
+          .then(async (response) => {
+            if (response.ok) {
+              const data = await response.json();
+              if (data.best_move) {
+                const uciMove = data.best_move;
+                const fromFile = uciMove.charCodeAt(0) - 97;
+                const fromRank = 8 - parseInt(uciMove[1]);
+                const toFile = uciMove.charCodeAt(2) - 97;
+                const toRank = 8 - parseInt(uciMove[3]);
+
+                const fromSquare = getSquareFromRowCol(fromRank, fromFile);
+                const toSquare = getSquareFromRowCol(toRank, toFile);
+
+                await applyMove(currentGame.id, fromSquare, toSquare);
+              }
             }
-          }
-        } catch (e) {
-          console.error("Failed to get computer move:", e);
-        }
+          })
+          .catch((e) => {
+            console.error("Failed to get computer move:", e);
+          });
       }
 
       return { success: true, nextTurn, status: newStatus, captured: capturedPieceType !== undefined };

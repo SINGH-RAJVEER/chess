@@ -89,84 +89,86 @@ const Header: Component<HeaderProps> = (props) => {
 			{/* Controls */}
 			<div class="flex items-center gap-3 justify-end w-1/4">
 				{/* Custom Time Control Dropdown */}
-				<div class="relative">
-					<button
-						onClick={toggleDropdown}
-						class="flex items-center gap-2 bg-stone-800 hover:bg-stone-700 text-stone-200 text-sm font-bold py-2 pl-4 pr-3 rounded-lg border border-stone-700 hover:border-indigo-500 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[100px] justify-between"
-					>
-						<span>
-							{selectedTime() === 0 ? "∞ Unlimited" : `${selectedTime()} min`}
-						</span>
-						<svg
-							class={`w-4 h-4 transition-transform ${isOpen() ? "rotate-180" : ""}`}
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
+				<Show when={currentMode() !== "vs_computer"}>
+					<div class="relative">
+						<button
+							onClick={toggleDropdown}
+							class="flex items-center gap-2 bg-stone-800 hover:bg-stone-700 text-stone-200 text-sm font-bold py-2 pl-4 pr-3 rounded-lg border border-stone-700 hover:border-indigo-500 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[100px] justify-between"
 						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M19 9l-7 7-7-7"
-							/>
-						</svg>
-					</button>
+							<span>
+								{selectedTime() === 0 ? "∞ Unlimited" : `${selectedTime()} min`}
+							</span>
+							<svg
+								class={`w-4 h-4 transition-transform ${isOpen() ? "rotate-180" : ""}`}
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M19 9l-7 7-7-7"
+								/>
+							</svg>
+						</button>
 
-					<Show when={isOpen()}>
-						<div
-							class="fixed inset-0 z-10 cursor-default"
-							onClick={() => setIsOpen(false)}
-						/>
-						<div class="absolute right-0 mt-2 w-56 bg-stone-800 rounded-xl shadow-xl border border-stone-700 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-							<div class="max-h-[80vh] overflow-y-auto py-1">
-								<For each={timeCategories}>
-									{(category) => (
-										<div class="p-2">
-											<div class="text-xs font-bold text-stone-500 uppercase tracking-wider px-2 mb-1">
-												{category.label}
+						<Show when={isOpen()}>
+							<div
+								class="fixed inset-0 z-10 cursor-default"
+								onClick={() => setIsOpen(false)}
+							/>
+							<div class="absolute right-0 mt-2 w-56 bg-stone-800 rounded-xl shadow-xl border border-stone-700 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+								<div class="max-h-[80vh] overflow-y-auto py-1">
+									<For each={timeCategories}>
+										{(category) => (
+											<div class="p-2">
+												<div class="text-xs font-bold text-stone-500 uppercase tracking-wider px-2 mb-1">
+													{category.label}
+												</div>
+												<div class="grid grid-cols-2 gap-1">
+													<For each={category.options}>
+														{(option) => (
+															<button
+																onClick={() => handleSelect(option)}
+																class={`text-sm font-bold py-2 px-3 rounded-md transition-colors text-center ${
+																	selectedTime() === option
+																		? "bg-indigo-600 text-white"
+																		: "text-stone-300 hover:bg-stone-700 hover:text-white"
+																}`}
+															>
+																{option} min
+															</button>
+														)}
+													</For>
+												</div>
 											</div>
-											<div class="grid grid-cols-2 gap-1">
-												<For each={category.options}>
-													{(option) => (
-														<button
-															onClick={() => handleSelect(option)}
-															class={`text-sm font-bold py-2 px-3 rounded-md transition-colors text-center ${
-																selectedTime() === option
-																	? "bg-indigo-600 text-white"
-																	: "text-stone-300 hover:bg-stone-700 hover:text-white"
-															}`}
-														>
-															{option} min
-														</button>
-													)}
-												</For>
-											</div>
-										</div>
-									)}
-								</For>
-								<div class="p-2 border-t border-stone-700">
-									<button
-										onClick={() => handleSelect(0)}
-										class={`w-full text-sm font-bold py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-2 ${
-											selectedTime() === 0
-												? "bg-indigo-600 text-white"
-												: "text-stone-300 hover:bg-stone-700 hover:text-white"
-										}`}
-									>
-										<span>∞</span> Unlimited
-									</button>
+										)}
+									</For>
+									<div class="p-2 border-t border-stone-700">
+										<button
+											onClick={() => handleSelect(0)}
+											class={`w-full text-sm font-bold py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-2 ${
+												selectedTime() === 0
+													? "bg-indigo-600 text-white"
+													: "text-stone-300 hover:bg-stone-700 hover:text-white"
+											}`}
+										>
+											<span>∞</span> Unlimited
+										</button>
+									</div>
 								</div>
 							</div>
-						</div>
-					</Show>
-				</div>
+						</Show>
+					</div>
+				</Show>
 
 				<button
 					type="button"
 					onClick={() =>
 						props.onRestart?.({
 							mode: currentMode(),
-							timeControl: selectedTime(),
+							timeControl: currentMode() === "vs_computer" ? 0 : selectedTime(),
 						})
 					}
 					disabled={props.isRestarting}

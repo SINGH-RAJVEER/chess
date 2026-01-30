@@ -1,14 +1,10 @@
 globalThis.__nitro_main__ = import.meta.url;
-import { N as NodeResponse, s as serve } from "./_libs/srvx.mjs";
+import { a as FastResponse, s as serve } from "./_libs/srvx.mjs";
 import { d as defineHandler, H as HTTPError, t as toEventHandler, a as defineLazyEventHandler, b as H3Core, c as toRequest } from "./_libs/h3.mjs";
 import { d as decodePath, w as withLeadingSlash, a as withoutTrailingSlash, j as joinURL } from "./_libs/ufo.mjs";
 import { promises } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import "node:http";
-import "node:stream";
-import "node:https";
-import "node:http2";
 import "./_libs/rou3.mjs";
 function lazyService(loader) {
   let promise, mod;
@@ -30,7 +26,7 @@ const services = {
 globalThis.__nitro_vite_envs__ = services;
 const errorHandler$1 = (error, event) => {
   const res = defaultHandler(error, event);
-  return new NodeResponse(typeof res.body === "string" ? res.body : JSON.stringify(res.body, null, 2), res);
+  return new FastResponse(typeof res.body === "string" ? res.body : JSON.stringify(res.body, null, 2), res);
 };
 function defaultHandler(error, event, opts) {
   const isSensitive = error.unhandled;
@@ -97,40 +93,54 @@ const headers = ((m) => function headersRouteRule(event) {
   }
 });
 const assets = {
-  "/assets/index-D8u8-zlO.js": {
-    "type": "text/javascript; charset=utf-8",
-    "etag": '"486b-Qk77Vc7Dn1ixqr1SJDGa5rgOl50"',
-    "mtime": "2026-01-29T09:38:12.933Z",
-    "size": 18539,
-    "path": "../public/assets/index-D8u8-zlO.js"
-  },
-  "/assets/main-CgUdaIwE.css": {
-    "type": "text/css; charset=utf-8",
-    "etag": '"6c9a-KKUGgHUplUm5Ra72KZFpMiB6rUU"',
-    "mtime": "2026-01-29T09:38:12.933Z",
-    "size": 27802,
-    "path": "../public/assets/main-CgUdaIwE.css"
-  },
-  "/assets/_-CP0jnJwe.js": {
-    "type": "text/javascript; charset=utf-8",
-    "etag": '"ea-6bYelF4Q9eD2RaFgHWWPfWoETeE"',
-    "mtime": "2026-01-29T09:38:12.933Z",
-    "size": 234,
-    "path": "../public/assets/_-CP0jnJwe.js"
-  },
   "/favicon.ico": {
     "type": "image/vnd.microsoft.icon",
     "etag": '"298-hdW7/pL89QptiszdYCHH67XxLxs"',
-    "mtime": "2026-01-29T09:38:12.846Z",
+    "mtime": "2026-01-30T09:07:11.656Z",
     "size": 664,
     "path": "../public/favicon.ico"
   },
-  "/assets/main-DDTxMDnH.js": {
+  "/assets/header-BwuxLTCF.js": {
     "type": "text/javascript; charset=utf-8",
-    "etag": '"2dc74-O5wOD8eocdAesaBS7J/OspQhIP8"',
-    "mtime": "2026-01-29T09:38:12.933Z",
-    "size": 187508,
-    "path": "../public/assets/main-DDTxMDnH.js"
+    "etag": '"248a-1CHrrtkLXKA4ACc/OhCa0Z01G4M"',
+    "mtime": "2026-01-30T09:07:11.783Z",
+    "size": 9354,
+    "path": "../public/assets/header-BwuxLTCF.js"
+  },
+  "/assets/_-Dpk3lMgr.js": {
+    "type": "text/javascript; charset=utf-8",
+    "etag": '"ea-rUO+Q+KB/9jr8fa6i6gkZfNWSi4"',
+    "mtime": "2026-01-30T09:07:11.783Z",
+    "size": 234,
+    "path": "../public/assets/_-Dpk3lMgr.js"
+  },
+  "/assets/index-CuYFmFIp.js": {
+    "type": "text/javascript; charset=utf-8",
+    "etag": '"3f7c-xfBwvIo8mDSc+njPnjNSLu2wQNg"',
+    "mtime": "2026-01-30T09:07:11.783Z",
+    "size": 16252,
+    "path": "../public/assets/index-CuYFmFIp.js"
+  },
+  "/assets/computer-C80VJd61.js": {
+    "type": "text/javascript; charset=utf-8",
+    "etag": '"31af-wDW8WuNsL4tU9iJjTwD6CAcQlw4"',
+    "mtime": "2026-01-30T09:07:11.783Z",
+    "size": 12719,
+    "path": "../public/assets/computer-C80VJd61.js"
+  },
+  "/assets/main-EDjZMvz_.css": {
+    "type": "text/css; charset=utf-8",
+    "etag": '"75d1-9Egj6+vylEc51DWPkjTGP09+NMk"',
+    "mtime": "2026-01-30T09:07:11.783Z",
+    "size": 30161,
+    "path": "../public/assets/main-EDjZMvz_.css"
+  },
+  "/assets/main-DjaMb6fr.js": {
+    "type": "text/javascript; charset=utf-8",
+    "etag": '"2de00-Grwq2WtY8TX9Fc7BHU6nrShWU04"',
+    "mtime": "2026-01-30T09:07:11.783Z",
+    "size": 187904,
+    "path": "../public/assets/main-DjaMb6fr.js"
   }
 };
 function readAsset(id) {
@@ -365,6 +375,7 @@ const host = process.env.NITRO_HOST || process.env.HOST;
 const cert = process.env.NITRO_SSL_CERT;
 const key = process.env.NITRO_SSL_KEY;
 const nitroApp = useNitroApp();
+let _fetch = nitroApp.fetch;
 serve({
   port,
   hostname: host,
@@ -372,10 +383,11 @@ serve({
     cert,
     key
   } : void 0,
-  fetch: nitroApp.fetch
+  fetch: _fetch,
+  bun: { websocket: void 0 }
 });
 trapUnhandledErrors();
-const nodeServer = {};
+const bun = {};
 function fetchViteEnv(viteEnvName, input, init) {
   const envs = globalThis.__nitro_vite_envs__ || {};
   const viteEnv = envs[viteEnvName];
@@ -392,5 +404,5 @@ const ssrRenderer$1 = /* @__PURE__ */ Object.freeze({
   default: ssrRenderer
 });
 export {
-  nodeServer as default
+  bun as default
 };
