@@ -12,9 +12,12 @@ export default defineConfig({
   plugins: [
     lucidePreprocess(),
     // devtools(), // Disabled to avoid port conflict
-    nitro(),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({
+      server: {
+        preset: "bun",
+      },
+    }),
     solidPlugin({ ssr: true }),
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],

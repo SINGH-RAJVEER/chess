@@ -2,11 +2,13 @@ services:
   application:
     build:
       context: ./application
-    network_mode: host
+    ports:
+      - "3000:3000"
     restart: always
 
   engine:
     build:
       context: ./engine
-    network_mode: host
+    ports:
+      - "8080:8080"
     restart: always
