@@ -41,5 +41,8 @@
     "drizzle-kit": "^0.31.8",
     "typescript": "^5.7.2",
     "vite-plugin-solid": "^2.11.10"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
   }
 }
