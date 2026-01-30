@@ -11,13 +11,9 @@ import lucidePreprocess from "vite-plugin-lucide-preprocess";
 export default defineConfig({
   plugins: [
     lucidePreprocess(),
-    // devtools(), // Disabled to avoid port conflict
+    nitro(),
     tailwindcss(),
-    tanstackStart({
-      server: {
-        preset: "vercel"
-      }
-    }),
+    tanstackStart(),
     solidPlugin({ ssr: true }),
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],
