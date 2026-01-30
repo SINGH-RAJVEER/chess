@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --bun vite dev --port 3000",
-    "build": "vite build",
+    "build": "NITRO_PRESET=vercel vite build && cp -r drizzle .vercel/output/functions/__server.func/",
     "preview": "vite preview",
     "test": "vitest run",
     "format": "biome format",
