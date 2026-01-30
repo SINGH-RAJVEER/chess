@@ -266,6 +266,31 @@ function ComputerGame() {
 		setPendingMove(null);
 	};
 
+	const handleTakeback = async () => {
+		if (undoMutation.isPending) return;
+		
+		try {
+			// If it's White's turn, we need to undo twice (Black's move then White's move)
+			// to get back to the state before White's last move.
+			// If it's Black's turn (Computer is thinking), we just undo once.
+			if (turn() === "White") {
+				if ((boardQuery.data?.moves?.length || 0) >= 2) {
+					await undoMutation.mutateAsync();
+					await undoMutation.mutateAsync();
+				} else if ((boardQuery.data?.moves?.length || 0) === 1) {
+					// Should rarely happen in vs_computer as computer moves fast
+					await undoMutation.mutateAsync();
+				}
+			} else {
+				if ((boardQuery.data?.moves?.length || 0) >= 1) {
+					await undoMutation.mutateAsync();
+				}
+			}
+		} catch (e) {
+			console.error("Takeback failed", e);
+		}
+	};
+
 	const handleReset = (opts?: {
 		mode: "vs_player" | "vs_computer";
 		timeControl: number;
@@ -526,29 +551,44 @@ function ComputerGame() {
 								</Show>
 							</div>
 
-							<Show when={turn() === "White" && pendingMove()}>
-								<div class="flex gap-2 w-full mt-4">
+							<div class="w-full flex flex-col gap-2 mt-2">
+								<Show when={!pendingMove()}>
 									<button
-										onClick={handleConfirmMove}
-										disabled={moveMutation.isPending}
-										class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
+										onClick={handleTakeback}
+										disabled={
+											undoMutation.isPending ||
+											(boardQuery.data?.moves?.length || 0) === 0
+										}
+										class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-2"
 									>
-										<Show
-											when={moveMutation.isPending}
-											fallback={<span>✓ Submit</span>}
+										<span>↺</span> Takeback
+									</button>
+								</Show>
+
+								<Show when={turn() === "White" && pendingMove()}>
+									<div class="flex gap-2 w-full">
+										<button
+											onClick={handleConfirmMove}
+											disabled={moveMutation.isPending}
+											class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
 										>
-											<span>...</span>
-										</Show>
-									</button>
-									<button
-										onClick={handleCancelMove}
-										disabled={moveMutation.isPending}
-										class="flex-1 bg-stone-600 hover:bg-stone-500 disabled:opacity-50 text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
-									>
-										<span>✕</span> Cancel
-									</button>
-								</div>
-							</Show>
+											<Show
+												when={moveMutation.isPending}
+												fallback={<span>✓ Submit</span>}
+											>
+												<span>...</span>
+											</Show>
+										</button>
+										<button
+											onClick={handleCancelMove}
+											disabled={moveMutation.isPending}
+											class="flex-1 bg-stone-600 hover:bg-stone-500 disabled:opacity-50 text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all uppercase tracking-wider text-sm flex items-center justify-center gap-1"
+										>
+											<span>✕</span> Cancel
+										</button>
+									</div>
+								</Show>
+							</div>
 						</div>
 					</div>
 				</div>
