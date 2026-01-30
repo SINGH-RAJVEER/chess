@@ -19,4 +19,7 @@ export default defineConfig({
       projects: ["./tsconfig.json"],
     }),
   ],
+  ssr: {
+    external: ["bun:sqlite"],
+  },
 });

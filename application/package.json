@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --bun vite dev --port 3000",
+    "dev": "vite dev --port 3000",
     "build": "NITRO_PRESET=vercel vite build && cp -r drizzle .vercel/output/functions/__server.func/",
     "preview": "vite preview",
     "test": "vitest run",
@@ -24,9 +24,9 @@
     "@tanstack/solid-router-devtools": "^1.133.20",
     "@tanstack/solid-router-ssr-query": "^1.132.25",
     "@tanstack/solid-start": "^1.132.25",
-    "@types/better-sqlite3": "^7.6.13",
     "better-auth": "^1.4.12",
     "better-sqlite3": "^12.6.2",
+    "chess.js": "^1.4.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
     "lucide-solid": "^0.544.0",
@@ -40,6 +40,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
     "@tanstack/devtools-vite": "^0.3.11",
+    "@types/better-sqlite3": "^7.6.13",
     "drizzle-kit": "^0.31.8",
     "typescript": "^5.7.2",
     "vite-plugin-solid": "^2.11.10"
