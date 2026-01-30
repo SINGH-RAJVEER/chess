@@ -436,7 +436,8 @@ export const makeMove = createServerFn({ method: "POST" })
 
       if (currentGame.mode === "vs_computer" && nextTurn === "Black" && newStatus === "Ongoing") {
         const fen = piecesToFen(updatedPieces, nextTurn, currentMove || undefined);
-        fetch("http://127.0.0.1:8080/api/engine-move", {
+        const engineUrl = process.env.CHESS_ENGINE_URL || "http://127.0.0.1:8080";
+        fetch(`${engineUrl}/api/engine-move`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fen }),
