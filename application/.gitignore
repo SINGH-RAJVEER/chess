@@ -9,3 +9,5 @@ dist-ssr
 .wrangler
 .vercel
 .env*.local
+.output
+chess.db
