@@ -13,11 +13,7 @@ export default defineConfig({
     lucidePreprocess(),
     // devtools(), // Disabled to avoid port conflict
     tailwindcss(),
-    tanstackStart({
-      server: {
-        preset: "bun",
-      },
-    }),
+    tanstackStart(),
     solidPlugin({ ssr: true }),
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],
