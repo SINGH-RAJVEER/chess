@@ -1,5 +1,6 @@
-import { a as createComponent, n as mergeProps, u as useContext, d as createMemo, y as splitProps, s as ssr, z as ssrElement, t as escape, p as ssrHydrationKey, D as Dynamic, j as createResource, h as createSignal, l as Suspense, H as HydrationScript, N as NoHydration, q as ssrStyleProperty, F as For, A as useAssets, b as createContext, B as createUniqueId, c as createRenderEffect, o as onCleanup } from "../_libs/solid-js.mjs";
-import { Q as QueryClient, a as QueryClientProvider } from "../_chunks/_libs/@tanstack/solid-query.mjs";
+import { b as createComponent, n as mergeProps, u as useContext, d as createMemo, y as splitProps, s as ssr, z as ssrElement, t as escape, p as ssrHydrationKey, D as Dynamic, j as createResource, h as createSignal, l as Suspense, H as HydrationScript, N as NoHydration, q as ssrStyleProperty, F as For, A as useAssets, c as createContext, B as createUniqueId, a as createRenderEffect, o as onCleanup } from "../_libs/solid-js.mjs";
+import { Q as QueryClientProvider } from "../_chunks/_libs/@tanstack/solid-query.mjs";
+import { q as queryClient } from "./query-BCHCwASR.mjs";
 import { R as RouterCore, B as BaseRootRoute, w as isModuleNotFoundError, x as isDangerousProtocol, y as exactPathTest, z as removeTrailingSlash, A as deepEqual, C as functionalUpdate, D as BaseRoute, E as preloadWarning, f as escapeHtml } from "../_chunks/_libs/@tanstack/router-core.mjs";
 import { m as mergeRefs } from "../_chunks/_libs/@solid-primitives/refs.mjs";
 import { d as dummyMatchContext, m as matchContext, a as useRouterState, u as useRouter, b as useIntersectionObserver, O as Outlet } from "./index.mjs";
@@ -951,13 +952,6 @@ const Scripts = () => {
   }
   return allScripts.map((asset, i) => createComponent(Asset, asset));
 };
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1e3 * 60
-    }
-  }
-});
 var _tmpl$ = ["<div", ' style="', '"><h2>Something went wrong!</h2><p>', '</p><pre style="', '">', "</pre></div>"], _tmpl$2 = ["<head>", "", "</head>"], _tmpl$3 = ["<html", ' lang="en">', "<body><!--$-->", "<!--/--><!--$-->", "<!--/--></body></html>"];
 function ErrorComponent({
   error
@@ -994,7 +988,7 @@ function RootComponent() {
     }
   })), escape(createComponent(Scripts, {})));
 }
-const $$splitComponentImporter$2 = () => import("./computer-eHdEi32P.mjs");
+const $$splitComponentImporter$2 = () => import("./computer-DW9mXP59.mjs");
 const Route$2 = createFileRoute("/computer")({
   component: lazyRouteComponent($$splitComponentImporter$2, "component")
 });
@@ -1002,7 +996,7 @@ const $$splitComponentImporter$1 = () => import("./_-F7W2RJJQ.mjs");
 const Route$1 = createFileRoute("/$")({
   component: lazyRouteComponent($$splitComponentImporter$1, "component")
 });
-const $$splitComponentImporter = () => import("./index-MFT7AsEP.mjs");
+const $$splitComponentImporter = () => import("./index-D73XY3Ux.mjs");
 const Route2 = createFileRoute("/")({
   component: lazyRouteComponent($$splitComponentImporter, "component")
 });

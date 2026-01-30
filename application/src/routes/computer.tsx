@@ -66,66 +66,71 @@ function ComputerGame() {
 		}
 	});
 
-	const boardQuery = useQuery(() => ({
-		queryKey: ["board"],
-		queryFn: async () => {
-			try {
-				return await getBoard();
-			} catch (e) {
-				console.error("✗ Failed to fetch board:", e);
-				throw e;
-			}
-		},
-		staleTime: 0,
-		refetchOnWindowFocus: true,
-		refetchInterval: (query) => {
-			const data = query.state.data;
-			if (
-				data &&
-				data.mode === "vs_computer" &&
-				data.turn === "Black" &&
-				data.status === "Ongoing"
-			) {
-				return 1000;
-			}
-			return false;
-		},
-	}));
+  const boardQuery = useQuery(() => ({
+    queryKey: ["board", "vs_computer"],
+    queryFn: async () => {
+      try {
+        return await getBoard({ data: { mode: "vs_computer" } });
+      } catch (e) {
+        console.error("✗ Failed to fetch board:", e);
+        throw e;
+      }
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (
+        data &&
+        data.mode === "vs_computer" &&
+        data.turn === "Black" &&
+        data.status === "Ongoing"
+      ) {
+        return 1000;
+      }
+      return false;
+    },
+  }));
 
-	// Auto-start vs_computer if not in that mode
-	createEffect(() => {
-		if (boardQuery.data && boardQuery.data.mode !== "vs_computer") {
-			handleReset({ mode: "vs_computer", timeControl: 0 });
-		}
-	});
+  // Auto-start vs_computer if not in that mode
+  createEffect(() => {
+    if (boardQuery.data && boardQuery.data.mode !== "vs_computer") {
+      handleReset({ mode: "vs_computer", timeControl: 0 });
+    }
+  });
 
-	const moveMutation = useMutation(() => ({
-		mutationFn: (args: { data: { from: number; to: number } }) =>
-			makeMove(args),
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: ["board"] });
-			setPendingMove(null);
-		},
-		onError: (e: unknown) => {
-			const msg =
-				e && typeof e === "object" && "message" in e
-					? (e as any).message
-					: String(e);
-			setErrorMsg(`Move failed: ${msg}`);
-			setTimeout(() => setErrorMsg(null), 3000);
-		},
-	}));
+  const moveMutation = useMutation(() => ({
+    mutationFn: (args: { data: { from: number; to: number } }) => {
+      if (!boardQuery.data?.id) throw new Error("Game ID not found");
+      return makeMove({ data: { ...args.data, gameId: boardQuery.data.id } });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["board", "vs_computer"] });
+      setPendingMove(null);
+    },
+    onError: (e: unknown) => {
+      const msg =
+        e && typeof e === "object" && "message" in e
+          ? (e as any).message
+          : String(e);
+      setErrorMsg(`Move failed: ${msg}`);
+      setTimeout(() => setErrorMsg(null), 3000);
+    },
+  }));
 
-	const undoMutation = useMutation(() => ({
-		mutationFn: () => undoMove(),
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: ["board"] });
-		},
-		onError: (e: any) => {
-			setErrorMsg(`Undo failed: ${e.message}`);
-			setTimeout(() => setErrorMsg(null), 3000);
-		},
-	}));
+  const undoMutation = useMutation(() => ({
+    mutationFn: () => {
+      if (!boardQuery.data?.id) throw new Error("Game ID not found");
+      return undoMove({ data: { gameId: boardQuery.data.id } });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["board", "vs_computer"] });
+    },
+    onError: (e: any) => {
+      setErrorMsg(`Undo failed: ${e.message}`);
+      setTimeout(() => setErrorMsg(null), 3000);
+    },
+  }));
 
 	const resetMutation = useMutation(() => ({
 		mutationFn: (opts?: {
@@ -234,7 +239,10 @@ function ComputerGame() {
 			setSelectedSquare(squareIndex);
 			setErrorMsg(null);
 			try {
-				const moves = await getMoves({ data: squareIndex });
+				if (!boardQuery.data?.id) return;
+				const moves = await getMoves({
+					data: { square: squareIndex, gameId: boardQuery.data.id },
+				});
 				setValidMoves(Array.isArray(moves) ? moves : []);
 			} catch (e: any) {
 				setErrorMsg(`API Error: ${e?.message || "Unknown error"}`);
@@ -590,6 +598,50 @@ function ComputerGame() {
 								</Show>
 							</div>
 						</div>
+					</div>
+				</div>
+			</div>
+
+			{/* Footer: Move History */}
+			<div class="bg-stone-900 border-t border-stone-800 p-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.5)] z-40">
+				<div class="max-w-[1800px] mx-auto flex items-center gap-4 overflow-x-auto scrollbar-thin scrollbar-thumb-stone-600 scrollbar-track-stone-900 px-4 pb-2">
+					<div class="text-xs font-black text-stone-500 uppercase tracking-widest px-3 py-1 bg-stone-800 rounded-md shrink-0">
+						History
+					</div>
+					<div class="flex items-center gap-6 px-2 min-w-max">
+						<For
+							each={Array.from({
+								length: Math.ceil((boardQuery.data?.moves?.length || 0) / 2),
+							})}
+						>
+							{(_, i) => {
+								const index = i();
+								const moveIndex = index * 2;
+								const whiteMove = boardQuery.data?.moves?.[moveIndex];
+								const blackMove = boardQuery.data?.moves?.[moveIndex + 1];
+								return (
+									<div class="flex items-center text-sm font-mono">
+										<span class="text-stone-600 mr-2 select-none group-hover:text-stone-500 transition-colors">
+											{index + 1}.
+										</span>
+										<span class="font-bold text-stone-300 px-2 py-0.5 rounded hover:bg-stone-800 transition-colors cursor-pointer">
+											{whiteMove?.notation}
+										</span>
+										<Show when={blackMove}>
+											<span class="font-bold text-stone-300 px-2 py-0.5 rounded hover:bg-stone-800 transition-colors cursor-pointer ml-1">
+												{blackMove?.notation}
+											</span>
+										</Show>
+									</div>
+								);
+							}}
+						</For>
+						<Show when={boardQuery.data?.moves?.length === 0}>
+							<span class="text-stone-600 text-sm italic">
+								Waiting for start...
+							</span>
+						</Show>
+						<div id="move-anchor" class="w-2" />
 					</div>
 				</div>
 			</div>

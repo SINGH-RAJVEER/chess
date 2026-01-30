@@ -1,6 +1,7 @@
 import { T as TSS_SERVER_FUNCTION, c as createServerFn } from "./index.mjs";
 import Client from "better-sqlite3";
-import { s as sqliteTable, i as integer, t as text, d as drizzle, a as desc, e as eq, b as and } from "../_libs/drizzle-orm.mjs";
+import { q } from "./query-BCHCwASR.mjs";
+import { s as sqliteTable, i as integer, t as text, d as drizzle, a as desc, e as eq, b as and, c as inArray } from "../_libs/drizzle-orm.mjs";
 import "../_chunks/_libs/@tanstack/history.mjs";
 import "../_chunks/_libs/@tanstack/router-core.mjs";
 import "../_libs/cookie-es.mjs";
@@ -15,6 +16,8 @@ import "../_libs/srvx.mjs";
 import "../_libs/solid-js.mjs";
 import "../_libs/tiny-warning.mjs";
 import "../_libs/isbot.mjs";
+import "../_chunks/_libs/@tanstack/solid-query.mjs";
+import "../_chunks/_libs/@tanstack/query-core.mjs";
 const createServerRpc = (serverFnMeta, splitImportFn) => {
   const url = "/_serverFn/" + serverFnMeta.id;
   return Object.assign(splitImportFn, {
@@ -554,28 +557,32 @@ const schema = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
 const database = new Client("chess.db");
 const db = drizzle(database, { schema });
 const getBoard_createServerFn_handler = createServerRpc({
-  id: "075bb97a5df53025c3a5cac3463aa1757848b60aac35966d56b3f5f04c96a880",
+  id: "95e928ba95487362d6afff6ca4d515806e7e351fbe6afa5f24801262b3067845",
   name: "getBoard",
-  filename: "src/lib/game-api.ts"
+  filename: "src/lib/index.ts"
 }, (opts, signal) => getBoard.__executeServer(opts, signal));
 const getBoard = createServerFn({
   method: "POST"
-}).handler(getBoard_createServerFn_handler, async () => {
+}).inputValidator((data) => data).handler(getBoard_createServerFn_handler, async ({
+  data
+}) => {
   try {
+    const mode = data?.mode || "vs_player";
     const serverTime = Date.now();
     let currentGame = await db.query.games.findFirst({
+      where: eq(games.mode, mode),
       orderBy: desc(games.updatedAt)
     });
     if (!currentGame) {
-      console.log("No game found, creating new one");
+      console.log(`No ${mode} game found, creating new one`);
       const initialData = initializeGame();
       const [newGame] = await db.insert(games).values({
         currentTurn: initialData.turn,
         status: "Ongoing",
-        mode: "vs_player",
-        timeControl: 10,
-        whiteTimeRemaining: 10 * 60 * 1e3,
-        blackTimeRemaining: 10 * 60 * 1e3,
+        mode,
+        timeControl: mode === "vs_computer" ? 0 : 10,
+        whiteTimeRemaining: mode === "vs_computer" ? Number.MAX_SAFE_INTEGER : 10 * 60 * 1e3,
+        blackTimeRemaining: mode === "vs_computer" ? Number.MAX_SAFE_INTEGER : 10 * 60 * 1e3,
         createdAt: Date.now(),
         updatedAt: Date.now()
       }).returning();
@@ -593,11 +600,12 @@ const getBoard = createServerFn({
     }
     if (!currentGame) {
       return {
+        id: 0,
         pieces: [],
         turn: "White",
         status: "Ongoing",
         moves: [],
-        mode: "vs_player",
+        mode,
         timeControl: 10,
         whiteTimeRemaining: 6e5,
         blackTimeRemaining: 6e5,
@@ -671,6 +679,7 @@ const getBoard = createServerFn({
       to: formattedMoves[formattedMoves.length - 1].to
     } : null;
     return {
+      id: currentGame.id,
       pieces: piecesResponse,
       capturedPieces,
       moves: formattedMoves,
@@ -690,19 +699,22 @@ const getBoard = createServerFn({
   }
 });
 const getMoves_createServerFn_handler = createServerRpc({
-  id: "7f22913cc8d51a01984f7bf48fae2f2d31d571b490a9d584529e84f9899ea385",
+  id: "129631420af401c96c262730d653c85520c7f45abbe9f9f1a0c226afe377ba96",
   name: "getMoves",
-  filename: "src/lib/game-api.ts"
+  filename: "src/lib/index.ts"
 }, (opts, signal) => getMoves.__executeServer(opts, signal));
 const getMoves = createServerFn({
   method: "POST"
-}).inputValidator((square) => square).handler(getMoves_createServerFn_handler, async ({
-  data: square
+}).inputValidator((data) => data).handler(getMoves_createServerFn_handler, async ({
+  data: {
+    square,
+    gameId
+  }
 }) => {
-  console.log(`Getting valid moves for square: ${square}`);
+  console.log(`Getting valid moves for square: ${square} in game ${gameId}`);
   try {
     const currentGame = await db.query.games.findFirst({
-      orderBy: desc(games.updatedAt)
+      where: eq(games.id, gameId)
     });
     if (!currentGame) {
       console.log("No game found");
@@ -723,17 +735,21 @@ const getMoves = createServerFn({
   }
 });
 const undoMove_createServerFn_handler = createServerRpc({
-  id: "794ae25fdbad27267eddca374cd262923ce3a47f4b66b732f323ab20dcc22590",
+  id: "5cf45770ffbf97d3683ac5adc5168882f2e630c097070095eaae54df0a1c213d",
   name: "undoMove",
-  filename: "src/lib/game-api.ts"
+  filename: "src/lib/index.ts"
 }, (opts, signal) => undoMove.__executeServer(opts, signal));
 const undoMove = createServerFn({
   method: "POST"
-}).handler(undoMove_createServerFn_handler, async () => {
-  console.log("Undoing last move");
+}).inputValidator((data) => data).handler(undoMove_createServerFn_handler, async ({
+  data: {
+    gameId
+  }
+}) => {
+  console.log(`Undoing last move in game ${gameId}`);
   try {
     const currentGame = await db.query.games.findFirst({
-      orderBy: desc(games.updatedAt)
+      where: eq(games.id, gameId)
     });
     if (!currentGame) {
       throw new Error("No game found");
@@ -795,21 +811,22 @@ const undoMove = createServerFn({
   }
 });
 const makeMove_createServerFn_handler = createServerRpc({
-  id: "972086331ae1ccaf15884371b3d836c8b8cb9863f2467b06d69aa6f6555bec6c",
+  id: "1108d962036347ce5bf840bba29e0af741ec3c05516bd6276164d3217127b51f",
   name: "makeMove",
-  filename: "src/lib/game-api.ts"
+  filename: "src/lib/index.ts"
 }, (opts, signal) => makeMove.__executeServer(opts, signal));
 const makeMove = createServerFn({
   method: "POST"
 }).inputValidator((args) => args).handler(makeMove_createServerFn_handler, async ({
   data: {
     from,
-    to
+    to,
+    gameId
   }
 }) => {
   try {
     const currentGame = await db.query.games.findFirst({
-      orderBy: desc(games.updatedAt)
+      where: eq(games.id, gameId)
     });
     if (!currentGame) {
       throw new Error("No game found");
@@ -903,7 +920,6 @@ const makeMove = createServerFn({
       status: newStatus,
       updatedAt: now,
       lastMoveTime: now,
-      // Set the timestamp for the next turn's calculation
       whiteTimeRemaining: whiteTime,
       blackTimeRemaining: blackTime
     }).where(eq(games.id, currentGame.id));
@@ -1018,9 +1034,9 @@ async function applyMove(gameId, from, to) {
   }).where(eq(games.id, gameId));
 }
 const resetGame_createServerFn_handler = createServerRpc({
-  id: "614b8f455b0bec4996eb16fc2e9a0377d9b5aca3671eb868a2af8c02e22f2c72",
+  id: "4180547286fb2de3eb3b3ca5e12fd7958423f6106b062ea5571396a6374ce00d",
   name: "resetGame",
-  filename: "src/lib/game-api.ts"
+  filename: "src/lib/index.ts"
 }, (opts, signal) => resetGame.__executeServer(opts, signal));
 const resetGame = createServerFn({
   method: "POST"
@@ -1031,9 +1047,15 @@ const resetGame = createServerFn({
   const timeControl = data?.timeControl !== void 0 ? data.timeControl : 10;
   console.log(`Starting new game: ${mode}, ${timeControl} mins`);
   try {
-    await db.delete(moves);
-    await db.delete(pieces);
-    await db.delete(games);
+    const gamesToDelete = await db.query.games.findMany({
+      where: eq(games.mode, mode)
+    });
+    const gameIds = gamesToDelete.map((g) => g.id);
+    if (gameIds.length > 0) {
+      await db.delete(moves).where(inArray(moves.gameId, gameIds));
+      await db.delete(pieces).where(inArray(pieces.gameId, gameIds));
+      await db.delete(games).where(inArray(games.id, gameIds));
+    }
     const initialData = initializeGame();
     const [newGame] = await db.insert(games).values({
       currentTurn: initialData.turn,
@@ -1045,7 +1067,6 @@ const resetGame = createServerFn({
       createdAt: Date.now(),
       updatedAt: Date.now(),
       lastMoveTime: null
-      // Reset timer
     }).returning();
     if (newGame) {
       const piecesToInsert = initialData.pieces.map((piece) => ({
@@ -1069,6 +1090,7 @@ export {
   getBoard_createServerFn_handler,
   getMoves_createServerFn_handler,
   makeMove_createServerFn_handler,
+  q as queryClient,
   resetGame_createServerFn_handler,
   undoMove_createServerFn_handler
 };

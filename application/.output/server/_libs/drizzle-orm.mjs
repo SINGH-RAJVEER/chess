@@ -4708,6 +4708,7 @@ function drizzle(...params) {
 export {
   desc as a,
   and as b,
+  inArray as c,
   drizzle as d,
   eq as e,
   integer as i,

@@ -1,5 +1,5 @@
 import { Q as QueryClient$1, M as MutationObserver, s as shouldThrowError, n as noop, a as notifyManager, h as hydrate, b as QueryObserver } from "./query-core.mjs";
-import { c as createRenderEffect, o as onCleanup, a as createComponent, b as createContext, u as useContext, d as createMemo, e as createStore, f as createComputed, g as on, i as isServer, h as createSignal, j as createResource, k as unwrap, r as reconcile } from "../../../_libs/solid-js.mjs";
+import { c as createContext, a as createRenderEffect, o as onCleanup, b as createComponent, u as useContext, d as createMemo, e as createStore, f as createComputed, g as on, i as isServer, h as createSignal, j as createResource, k as unwrap, r as reconcile } from "../../../_libs/solid-js.mjs";
 var QueryClientContext = createContext(void 0);
 var useQueryClient = (queryClient) => {
   if (queryClient) {
@@ -308,8 +308,8 @@ var QueryClient = class extends QueryClient$1 {
   }
 };
 export {
-  QueryClient as Q,
-  QueryClientProvider as a,
+  QueryClientProvider as Q,
+  QueryClient as a,
   useQuery as b,
   useMutation as c,
   useQueryClient as u

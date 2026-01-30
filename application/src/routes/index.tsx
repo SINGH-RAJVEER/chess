@@ -69,10 +69,10 @@ function Home() {
   });
 
   const boardQuery = useQuery(() => ({
-    queryKey: ["board"],
+    queryKey: ["board", "vs_player"],
     queryFn: async () => {
       try {
-        return await getBoard();
+        return await getBoard({ data: { mode: "vs_player" } });
       } catch (e) {
         console.error("✗ Failed to fetch board:", e);
         throw e;
@@ -83,10 +83,12 @@ function Home() {
   }));
 
   const moveMutation = useMutation(() => ({
-    mutationFn: (args: { data: { from: number; to: number } }) =>
-      makeMove(args),
+    mutationFn: (args: { data: { from: number; to: number } }) => {
+      if (!boardQuery.data?.id) throw new Error("Game ID not found");
+      return makeMove({ data: { ...args.data, gameId: boardQuery.data.id } });
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["board"] });
+      await queryClient.invalidateQueries({ queryKey: ["board", "vs_player"] });
       setPendingMove(null);
     },
     onError: (e: unknown) => {
@@ -101,9 +103,12 @@ function Home() {
   }));
 
   const undoMutation = useMutation(() => ({
-    mutationFn: () => undoMove(),
+    mutationFn: () => {
+      if (!boardQuery.data?.id) throw new Error("Game ID not found");
+      return undoMove({ data: { gameId: boardQuery.data.id } });
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["board"] });
+      await queryClient.invalidateQueries({ queryKey: ["board", "vs_player"] });
 
       setTimeout(() => setSuccessMsg(null), 2000);
     },
@@ -270,7 +275,10 @@ function Home() {
       setErrorMsg(null);
 
       try {
-        const moves = await getMoves({ data: squareIndex });
+        if (!boardQuery.data?.id) return;
+        const moves = await getMoves({
+          data: { square: squareIndex, gameId: boardQuery.data.id },
+        });
 
         setValidMoves(Array.isArray(moves) ? moves : []);
       } catch (e: any) {

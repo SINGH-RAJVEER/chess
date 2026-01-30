@@ -1,7 +1,7 @@
 use actix_cors::Cors;
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
-use shakmaty::{CastlingMode, Chess, Position, Move, Piece, Role, Color};
+use shakmaty::{CastlingMode, Chess, Position, Move, Role, Color};
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
 
@@ -130,7 +130,7 @@ async fn get_engine_move(req: web::Json<EngineRequest>) -> impl Responder {
         }),
     };
 
-    let best_move = find_best_move(&position, 6);
+    let best_move = find_best_move(&position, 5);
 
     match best_move {
         Some(m) => {
