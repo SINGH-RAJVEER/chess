@@ -5,6 +5,6 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 WORKDIR /app
-COPY --from=builder /app/target/release/engine ./engine
+COPY --from=builder /app/target/release/chess ./chess
 EXPOSE 8080
-CMD ["./engine"]
+CMD ["./chess"]
