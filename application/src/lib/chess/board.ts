@@ -1,4 +1,5 @@
-import type { Color, Piece } from "../../db/schema";
+import type { Color } from "@chess/types";
+import type { Piece } from "@chess/db/schema";
 
 export function getRow(square: number): number {
   return Math.floor(square / 8);
@@ -16,7 +17,7 @@ export function getSquareFromRowCol(row: number, col: number): number {
 export function indexToAlgebraic(square: number): string {
   const row = getRow(square);
   const col = getCol(square);
-  const file = String.fromCharCode('a'.charCodeAt(0) + col);
+  const file = String.fromCharCode("a".charCodeAt(0) + col);
   const rank = 8 - row;
   return `${file}${rank}`;
 }
@@ -24,7 +25,7 @@ export function indexToAlgebraic(square: number): string {
 export function algebraicToIndex(square: string): number {
   const file = square[0];
   const rank = parseInt(square[1], 10);
-  const col = file.charCodeAt(0) - 'a'.charCodeAt(0);
+  const col = file.charCodeAt(0) - "a".charCodeAt(0);
   const row = 8 - rank;
   return getSquareFromRowCol(row, col);
 }

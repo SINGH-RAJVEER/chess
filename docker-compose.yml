@@ -5,6 +5,12 @@ services:
     ports:
       - "3000:3000"
     restart: always
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/chess
+      - CHESS_ENGINE_URL=http://engine:8080
+    depends_on:
+      - db
+      - engine
 
   engine:
     build:
@@ -12,3 +18,19 @@ services:
     ports:
       - "8080:8080"
     restart: always
+
+  db:
+    image: chess:postgres
+    container_name: chess-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chess
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:

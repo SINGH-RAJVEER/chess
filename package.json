@@ -1,0 +1,24 @@
+{
+  "name": "chess-monorepo",
+  "private": true,
+  "packageManager": "bun@1.2.22",
+  "workspaces": [
+    "application",
+    "engine",
+    "packages/types",
+    "packages/db"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "check": "turbo run check",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.6"
+  }
+}

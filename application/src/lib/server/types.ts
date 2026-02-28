@@ -1,4 +1,4 @@
-import type { Color, GameStatus, PieceType } from "../../db/schema";
+import type { Color, GameStatus, PieceType } from "@chess/types";
 
 export type BoardResponse = {
   id: number;
@@ -31,4 +31,5 @@ export type BoardResponse = {
     to: number;
   } | null;
   serverTime: number;
+  userColor?: Color | "Spectator";
 };

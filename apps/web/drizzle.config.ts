@@ -8,8 +8,6 @@ export default defineConfig({
   out: "../packages/db/drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url:
-      process.env.DATABASE_URL ||
-      "postgres://postgres:postgres@localhost:5432/chess",
+    url: process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/chess",
   },
 });

@@ -1,14 +1,13 @@
-import { Chess, type Move as ChessMove } from "chess.js";
-import type { Color, Move, Piece } from "../../db/schema";
+import { Chess, type Move as ChessMove, type Square } from "chess.js";
+import type { Color, Move, Piece } from "@chess/db/schema";
 import {
+  algebraicToIndex,
   getCol,
   getPieceAt,
   getRow,
   getSquareFromRowCol,
   indexToAlgebraic,
-  algebraicToIndex,
 } from "./board";
-
 
 export function piecesToFen(
   pieces: Piece[],
@@ -73,13 +72,11 @@ export function piecesToFen(
   );
   if (whiteKing && !whiteKing.hasMoved) {
     const whiteRookK = pieces.find(
-      (p) =>
-        p.pieceType === "Rook" && p.color === "White" && p.square === 63,
+      (p) => p.pieceType === "Rook" && p.color === "White" && p.square === 63,
     );
     if (whiteRookK && !whiteRookK.hasMoved) castling += "K";
     const whiteRookQ = pieces.find(
-      (p) =>
-        p.pieceType === "Rook" && p.color === "White" && p.square === 56,
+      (p) => p.pieceType === "Rook" && p.color === "White" && p.square === 56,
     );
     if (whiteRookQ && !whiteRookQ.hasMoved) castling += "Q";
   }
@@ -89,13 +86,11 @@ export function piecesToFen(
   );
   if (blackKing && !blackKing.hasMoved) {
     const blackRookK = pieces.find(
-      (p) =>
-        p.pieceType === "Rook" && p.color === "Black" && p.square === 7,
+      (p) => p.pieceType === "Rook" && p.color === "Black" && p.square === 7,
     );
     if (blackRookK && !blackRookK.hasMoved) castling += "k";
     const blackRookQ = pieces.find(
-      (p) =>
-        p.pieceType === "Rook" && p.color === "Black" && p.square === 0,
+      (p) => p.pieceType === "Rook" && p.color === "Black" && p.square === 0,
     );
     if (blackRookQ && !blackRookQ.hasMoved) castling += "q";
   }
@@ -118,7 +113,11 @@ export function piecesToFen(
   return fen;
 }
 
-function getChessInstance(pieces: Piece[], turn: Color, lastMove?: Move): Chess {
+function getChessInstance(
+  pieces: Piece[],
+  turn: Color,
+  lastMove?: Move,
+): Chess {
   const fen = piecesToFen(pieces, turn, lastMove);
   // Chess.js might throw on invalid FEN, but our generator should be safe.
   // We can try/catch if needed.
@@ -130,7 +129,7 @@ export function isCheck(pieces: Piece[], color: Color): boolean {
   // chess.inCheck() returns true if the side to move is in check.
   // If we want to check if White is in check, we should load FEN with White to move.
   // But wait, the color passed is usually the current turn.
-  
+
   try {
     const chess = getChessInstance(pieces, color); // Load with 'color' to move
     return chess.inCheck();
@@ -154,18 +153,21 @@ export function getMoveDetails(
 
     // Check for promotion
     const piece = getPieceAt(pieces, from);
-    let promotion: string | undefined = undefined;
+    let promotion: string | undefined;
     if (piece?.pieceType === "Pawn") {
-       const toRow = getRow(to);
-       if ((piece.color === "White" && toRow === 0) || (piece.color === "Black" && toRow === 7)) {
-         promotion = 'q'; // Default to Queen for checking details
-       }
+      const toRow = getRow(to);
+      if (
+        (piece.color === "White" && toRow === 0) ||
+        (piece.color === "Black" && toRow === 7)
+      ) {
+        promotion = "q"; // Default to Queen for checking details
+      }
     }
 
     try {
-        return chess.move({ from: fromAlg, to: toAlg, promotion });
+      return chess.move({ from: fromAlg, to: toAlg, promotion });
     } catch {
-        return null;
+      return null;
     }
   } catch (e) {
     console.error("getMoveDetails error", e);
@@ -194,15 +196,15 @@ export function getValidMoves(
 
   try {
     const chess = getChessInstance(pieces, piece.color, lastMove);
-    const fromAlg = indexToAlgebraic(square);
-    
+    const fromAlg = indexToAlgebraic(square) as Square;
+
     // Get moves for this square
-    const moves = chess.moves({ square: fromAlg as any, verbose: true });
-    
-    return moves.map(m => algebraicToIndex(m.to));
+    const moves = chess.moves({ square: fromAlg, verbose: true });
+
+    return moves.map((m) => algebraicToIndex(m.to));
   } catch (e) {
-     console.error("getValidMoves error", e);
-     return [];
+    console.error("getValidMoves error", e);
+    return [];
   }
 }
 
@@ -214,13 +216,13 @@ export function getAllLegalMoves(
   try {
     const chess = getChessInstance(pieces, color, lastMove);
     const moves = chess.moves({ verbose: true });
-    return moves.map(m => ({
-        from: algebraicToIndex(m.from),
-        to: algebraicToIndex(m.to)
+    return moves.map((m) => ({
+      from: algebraicToIndex(m.from),
+      to: algebraicToIndex(m.to),
     }));
   } catch (e) {
-      console.error("getAllLegalMoves error", e);
-      return [];
+    console.error("getAllLegalMoves error", e);
+    return [];
   }
 }
 
@@ -233,16 +235,16 @@ export function getGameStatus(
     const chess = getChessInstance(pieces, turn, lastMove);
     if (chess.isCheckmate()) return "Checkmate";
     if (chess.isStalemate()) return "Stalemate";
-    // Also check for draw by insufficient material or repetition if desired, 
+    // Also check for draw by insufficient material or repetition if desired,
     // but the app only lists Ongoing, Checkmate, Stalemate, Timeout.
     // If it's a draw but not stalemate (e.g. 50 move rule), we might treat as Stalemate or Ongoing?
     // For now, let's stick to strict definitions.
     if (chess.isDraw()) return "Stalemate"; // Map other draws to Stalemate for simplicity or add "Draw" status later
-    
+
     return "Ongoing";
   } catch (e) {
-      console.error("getGameStatus error", e);
-      return "Ongoing";
+    console.error("getGameStatus error", e);
+    return "Ongoing";
   }
 }
 
@@ -254,36 +256,43 @@ export function initializeGame(): {
   // We can just use the manual setup code from before as it's static and correct.
   // Or we can load chess.js default and map it.
   // Mapping chess.js default board to pieces is safer to ensure sync.
-  
+
   const chess = new Chess();
   const board = chess.board(); // (Piece | null)[][]
   const pieces: Omit<Piece, "id" | "gameId">[] = [];
 
-  for(let row = 0; row < 8; row++) {
-      for(let col = 0; col < 8; col++) {
-          const cell = board[row][col];
-          if(cell) {
-              pieces.push({
-                  color: cell.color === 'w' ? 'White' : 'Black',
-                  pieceType: typeToPieceType(cell.type),
-                  square: getSquareFromRowCol(row, col),
-                  hasMoved: false // Approximation. In new game, nothing moved.
-              });
-          }
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const cell = board[row][col];
+      if (cell) {
+        pieces.push({
+          color: cell.color === "w" ? "White" : "Black",
+          pieceType: typeToPieceType(cell.type),
+          square: getSquareFromRowCol(row, col),
+          hasMoved: false, // Approximation. In new game, nothing moved.
+        });
       }
+    }
   }
 
   return { pieces, turn: "White" };
 }
 
 function typeToPieceType(type: string): Piece["pieceType"] {
-    switch(type) {
-        case 'p': return 'Pawn';
-        case 'n': return 'Knight';
-        case 'b': return 'Bishop';
-        case 'r': return 'Rook';
-        case 'q': return 'Queen';
-        case 'k': return 'King';
-        default: throw new Error(`Unknown piece type: ${type}`);
-    }
+  switch (type) {
+    case "p":
+      return "Pawn";
+    case "n":
+      return "Knight";
+    case "b":
+      return "Bishop";
+    case "r":
+      return "Rook";
+    case "q":
+      return "Queen";
+    case "k":
+      return "King";
+    default:
+      throw new Error(`Unknown piece type: ${type}`);
+  }
 }
