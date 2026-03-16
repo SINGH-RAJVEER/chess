@@ -3,12 +3,13 @@
   "private": true,
   "packageManager": "bun@1.2.22",
   "workspaces": [
-    "application",
-    "engine",
+    "apps/web",
+    "apps/engine",
     "packages/types",
     "packages/db"
   ],
   "scripts": {
+    "lockfile:generate": "bun install --lockfile-only",
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
     "test": "turbo run test",

@@ -1,5 +1,5 @@
-import { Chess, type Move as ChessMove, type Square } from "chess.js";
 import type { Color, Move, Piece } from "@chess/db/schema";
+import { Chess, type Move as ChessMove, type Square } from "chess.js";
 import {
 	algebraicToIndex,
 	getCol,

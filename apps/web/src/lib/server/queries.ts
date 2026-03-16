@@ -1,8 +1,8 @@
+import { db, schema } from "@chess/db";
+import type { Game } from "@chess/db/schema";
+import type { PieceType } from "@chess/types";
 import { createServerFn } from "@tanstack/solid-start";
 import { and, desc, eq, or } from "drizzle-orm";
-import { db, schema } from "@chess/db";
-import type { PieceType } from "@chess/types";
-import type { Game } from "@chess/db/schema";
 import { getCol, getRow, getValidMoves, initializeGame } from "../chess";
 import type { BoardResponse } from "./types";
 

@@ -1,8 +1,8 @@
+import type { Color, PieceType } from "@chess/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/solid-query";
 import { createFileRoute } from "@tanstack/solid-router";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import Header from "../components/header";
-import type { Color, PieceType } from "@chess/types";
 import { makeMove, resetGame, undoMove } from "../lib/server/mutations";
 import { getBoard, getMoves } from "../lib/server/queries";
 

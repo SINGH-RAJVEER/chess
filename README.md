@@ -4,8 +4,8 @@ A full-stack chess application built as a Turbo monorepo with shared workspace p
 
 ## Workspace Packages
 
-- `application` — Web UI (SolidStart/Bun)
-- `engine` — Rust chess engine service
+- `apps/web` — Web UI (SolidStart/Bun)
+- `apps/engine` — Rust chess engine service
 - `packages/types` — Shared TypeScript types (Color, PieceType, GameStatus, etc.)
 - `packages/db` — Database schema, migrations, and Drizzle ORM client
 
@@ -44,10 +44,10 @@ bunx turbo run build --filter=@chess/db
 
 ## Database Management
 
-Run from the `application` folder (where drizzle.config.ts points to packages/db):
+Run from the `apps/web` folder (where drizzle.config.ts points to packages/db):
 
 ```bash
-cd application
+cd apps/web
 bun run db:generate  # Generate migrations from schema changes
 bun run db:migrate   # Apply pending migrations
 bun run db:studio    # Open Drizzle Studio UI
@@ -57,8 +57,9 @@ bun run db:studio    # Open Drizzle Studio UI
 
 ```text
 .
-├── application/              # Web app (SolidStart)
-├── engine/                   # Rust chess engine
+├── apps/
+│   ├── web/                  # Web app (SolidStart)
+│   └── engine/               # Rust chess engine
 ├── packages/
 │   ├── db/                  # Database layer (@chess/db)
 │   │   ├── drizzle/

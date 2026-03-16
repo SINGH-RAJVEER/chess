@@ -1,6 +1,7 @@
 use actix_cors::Cors;
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
+
 use shakmaty::{CastlingMode, Chess, Position, Move, Role, Color};
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;

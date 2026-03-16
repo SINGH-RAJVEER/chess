@@ -1,5 +1,5 @@
-import type { Color } from "@chess/types";
 import type { Piece } from "@chess/db/schema";
+import type { Color } from "@chess/types";
 
 export function getRow(square: number): number {
 	return Math.floor(square / 8);

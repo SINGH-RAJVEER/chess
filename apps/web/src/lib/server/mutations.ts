@@ -1,8 +1,7 @@
-import { createServerFn } from "@tanstack/solid-start";
-import { and, desc, eq, or } from "drizzle-orm";
 import { db, schema } from "@chess/db";
 import type { Color, PieceType } from "@chess/types";
-import type { Game, Move, Piece } from "@chess/db/schema";
+import { createServerFn } from "@tanstack/solid-start";
+import { and, desc, eq, or } from "drizzle-orm";
 import {
 	getCol,
 	getGameStatus,

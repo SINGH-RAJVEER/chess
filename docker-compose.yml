@@ -1,7 +1,7 @@
 services:
   application:
     build:
-      context: ./application
+      context: ./apps/web
     ports:
       - "3000:3000"
     restart: always
@@ -14,7 +14,7 @@ services:
 
   engine:
     build:
-      context: ./engine
+      context: ./apps/engine
     ports:
       - "8080:8080"
     restart: always
