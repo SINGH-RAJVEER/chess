@@ -1,0 +1,104 @@
+services:
+  application:
+    image: chess:application
+    container_name: chess-application
+    build:
+      context: ../../
+      dockerfile: docker/dev/web.Dockerfile
+    working_dir: /app
+    command:
+      [
+        "sh",
+        "-c",
+        "bun install && cd apps/web && bun run dev --host 0.0.0.0 --port 3000",
+      ]
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - VITE_API_PROXY_TARGET=http://api:4000
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ../../:/app
+      - root_node_modules:/app/node_modules
+      - web_node_modules:/app/apps/web/node_modules
+    depends_on:
+      api:
+        condition: service_started
+
+  api:
+    image: chess:api
+    container_name: chess-api
+    build:
+      context: ../../
+      dockerfile: docker/dev/api.Dockerfile
+    working_dir: /app
+    command:
+      [
+        "sh",
+        "-c",
+        "bun install && cd apps/api && bun run db:migrate && bun run dev",
+      ]
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    volumes:
+      - ../../:/app
+      - root_node_modules:/app/node_modules
+      - api_node_modules:/app/apps/api/node_modules
+      - db_node_modules:/app/packages/db/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+      engine:
+        condition: service_started
+
+  engine:
+    image: chess:engine
+    container_name: chess-engine
+    build:
+      context: ../../
+      dockerfile: docker/dev/engine.Dockerfile
+    working_dir: /app
+    command: ["sh", "-c", "cd apps/engine && cargo watch -x run"]
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    volumes:
+      - ../../:/app
+      - cargo_registry:/usr/local/cargo/registry
+      - cargo_git:/usr/local/cargo/git
+      - engine_target:/app/apps/engine/target
+
+  db:
+    image: postgres:alpine
+    container_name: chess-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d chess"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chess
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
+  root_node_modules:
+  web_node_modules:
+  api_node_modules:
+  db_node_modules:
+  cargo_registry:
+  cargo_git:
+  engine_target:

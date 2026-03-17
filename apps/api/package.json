@@ -1,0 +1,38 @@
+{
+	"name": "@chess/api",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun --hot src/index.ts",
+		"build": "bun build ./src/index.ts --target bun --outdir dist",
+		"start": "bun dist/index.js",
+		"typecheck": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"format": "biome format",
+		"lint": "biome lint",
+		"check": "biome check",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"db:studio": "drizzle-kit studio"
+	},
+	"dependencies": {
+		"@chess/db": "workspace:*",
+		"@chess/types": "workspace:*",
+		"bcryptjs": "^3.0.3",
+		"better-auth": "^1.5.5",
+		"chess.js": "^1.4.0",
+		"dotenv": "^17.2.3",
+		"drizzle-orm": "^0.45.1",
+		"hono": "^4.7.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.7",
+		"@types/bcryptjs": "^3.0.0",
+		"@types/bun": "^1.2.22",
+		"drizzle-kit": "^0.31.10",
+		"typescript": "^5.7.2"
+	},
+	"engines": {
+		"bun": ">=1.0.0"
+	}
+}

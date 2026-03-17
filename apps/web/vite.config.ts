@@ -1,31 +1,27 @@
+import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
-import { tanstackStart } from "@tanstack/solid-start/plugin/vite";
-import { nitro } from "nitro/vite";
-import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig, searchForWorkspaceRoot } from "vite";
 import lucidePreprocess from "vite-plugin-lucide-preprocess";
-import solidPlugin from "vite-plugin-solid";
-import viteTsConfigPaths from "vite-tsconfig-paths";
+
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || "http://127.0.0.1:4000";
 
 export default defineConfig({
-	plugins: [
-		lucidePreprocess(),
-		nitro(),
-		tailwindcss(),
-		tanstackStart(),
-		solidPlugin({ ssr: true }),
-		viteTsConfigPaths({
-			projects: ["./tsconfig.json"],
-		}),
-	],
+	plugins: [lucidePreprocess(), tailwindcss(), react()],
 	resolve: {
-		dedupe: ["solid-js", "solid-js/web"],
+		alias: {
+			"@": path.resolve(__dirname, "./src"),
+		},
 	},
-	ssr: {
-		external: ["postgres"],
-	},
-	build: {
-		rollupOptions: {
-			external: ["postgres"],
+	server: {
+		fs: {
+			allow: [searchForWorkspaceRoot(process.cwd())],
+		},
+		proxy: {
+			"/api": {
+				target: apiProxyTarget,
+				changeOrigin: true,
+			},
 		},
 	},
 });

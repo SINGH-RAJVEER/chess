@@ -1,282 +1,282 @@
 {
-  "id": "7afa8006-d977-49f9-9b67-2a0b30548fed",
-  "prevId": "00000000-0000-0000-0000-000000000000",
-  "version": "7",
-  "dialect": "postgresql",
-  "tables": {
-    "public.games": {
-      "name": "games",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "current_turn": {
-          "name": "current_turn",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mode": {
-          "name": "mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'vs_player'"
-        },
-        "time_control": {
-          "name": "time_control",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 10
-        },
-        "white_time_remaining": {
-          "name": "white_time_remaining",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 600000
-        },
-        "black_time_remaining": {
-          "name": "black_time_remaining",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 600000
-        },
-        "last_move_time": {
-          "name": "last_move_time",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "white_player_id": {
-          "name": "white_player_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "black_player_id": {
-          "name": "black_player_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.moves": {
-      "name": "moves",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "game_id": {
-          "name": "game_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "from_square": {
-          "name": "from_square",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "to_square": {
-          "name": "to_square",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "piece_type": {
-          "name": "piece_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "piece_color": {
-          "name": "piece_color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "captured_piece_type": {
-          "name": "captured_piece_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "move_number": {
-          "name": "move_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "moves_game_id_games_id_fk": {
-          "name": "moves_game_id_games_id_fk",
-          "tableFrom": "moves",
-          "tableTo": "games",
-          "columnsFrom": ["game_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.pieces": {
-      "name": "pieces",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "game_id": {
-          "name": "game_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "color": {
-          "name": "color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "piece_type": {
-          "name": "piece_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "square": {
-          "name": "square",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "has_moved": {
-          "name": "has_moved",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "pieces_game_id_games_id_fk": {
-          "name": "pieces_game_id_games_id_fk",
-          "tableFrom": "pieces",
-          "tableTo": "games",
-          "columnsFrom": ["game_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.queue": {
-      "name": "queue",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "player_id": {
-          "name": "player_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "time_control": {
-          "name": "time_control",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "joined_at": {
-          "name": "joined_at",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    }
-  },
-  "enums": {},
-  "schemas": {},
-  "sequences": {},
-  "roles": {},
-  "policies": {},
-  "views": {},
-  "_meta": {
-    "columns": {},
-    "schemas": {},
-    "tables": {}
-  }
+	"id": "7afa8006-d977-49f9-9b67-2a0b30548fed",
+	"prevId": "00000000-0000-0000-0000-000000000000",
+	"version": "7",
+	"dialect": "postgresql",
+	"tables": {
+		"public.games": {
+			"name": "games",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"current_turn": {
+					"name": "current_turn",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"mode": {
+					"name": "mode",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"default": "'vs_player'"
+				},
+				"time_control": {
+					"name": "time_control",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 10
+				},
+				"white_time_remaining": {
+					"name": "white_time_remaining",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 600000
+				},
+				"black_time_remaining": {
+					"name": "black_time_remaining",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"default": 600000
+				},
+				"last_move_time": {
+					"name": "last_move_time",
+					"type": "bigint",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"white_player_id": {
+					"name": "white_player_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"black_player_id": {
+					"name": "black_player_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "bigint",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"updated_at": {
+					"name": "updated_at",
+					"type": "bigint",
+					"primaryKey": false,
+					"notNull": true
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.moves": {
+			"name": "moves",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"game_id": {
+					"name": "game_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"from_square": {
+					"name": "from_square",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"to_square": {
+					"name": "to_square",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"piece_type": {
+					"name": "piece_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"piece_color": {
+					"name": "piece_color",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"captured_piece_type": {
+					"name": "captured_piece_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"move_number": {
+					"name": "move_number",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "bigint",
+					"primaryKey": false,
+					"notNull": true
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"moves_game_id_games_id_fk": {
+					"name": "moves_game_id_games_id_fk",
+					"tableFrom": "moves",
+					"tableTo": "games",
+					"columnsFrom": ["game_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.pieces": {
+			"name": "pieces",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"game_id": {
+					"name": "game_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"color": {
+					"name": "color",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"piece_type": {
+					"name": "piece_type",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"square": {
+					"name": "square",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"has_moved": {
+					"name": "has_moved",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true,
+					"default": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"pieces_game_id_games_id_fk": {
+					"name": "pieces_game_id_games_id_fk",
+					"tableFrom": "pieces",
+					"tableTo": "games",
+					"columnsFrom": ["game_id"],
+					"columnsTo": ["id"],
+					"onDelete": "no action",
+					"onUpdate": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		},
+		"public.queue": {
+			"name": "queue",
+			"schema": "",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "serial",
+					"primaryKey": true,
+					"notNull": true
+				},
+				"player_id": {
+					"name": "player_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"time_control": {
+					"name": "time_control",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true
+				},
+				"joined_at": {
+					"name": "joined_at",
+					"type": "bigint",
+					"primaryKey": false,
+					"notNull": true
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"policies": {},
+			"checkConstraints": {},
+			"isRLSEnabled": false
+		}
+	},
+	"enums": {},
+	"schemas": {},
+	"sequences": {},
+	"roles": {},
+	"policies": {},
+	"views": {},
+	"_meta": {
+		"columns": {},
+		"schemas": {},
+		"tables": {}
+	}
 }

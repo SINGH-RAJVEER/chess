@@ -150,7 +150,7 @@ async fn get_engine_move(req: web::Json<EngineRequest>) -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!("Starting engine server at http://127.0.0.1:8080");
+    println!("Starting engine server at http://0.0.0.0:8080");
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -163,7 +163,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .service(get_engine_move)
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 }
