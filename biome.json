@@ -10,7 +10,13 @@
 	},
 	"overrides": [
 		{
-			"includes": ["apps/web/src/routeTree.gen.ts", "dist/**", "target/**", ".turbo/**", ".vercel/**"],
+			"includes": [
+				"apps/web/src/routeTree.gen.ts",
+				"dist/**",
+				"target/**",
+				".turbo/**",
+				".vercel/**"
+			],
 			"linter": {
 				"enabled": false
 			},

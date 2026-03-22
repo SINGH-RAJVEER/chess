@@ -1,27 +1,27 @@
 {
-  "name": "chess-monorepo",
-  "private": true,
-  "packageManager": "bun@1.2.22",
-  "workspaces": [
-    "apps/api",
-    "apps/web",
-    "apps/engine",
-    "packages/types",
-    "packages/db"
-  ],
-  "scripts": {
-    "lockfile:generate": "bun install --lockfile-only",
-    "dev": "turbo run dev --parallel --ui=tui",
-    "build": "turbo run build",
-    "test": "turbo run test",
-    "lint": "turbo run lint",
-    "format": "turbo run format",
-    "check": "turbo run check",
-    "typecheck": "turbo run typecheck",
-    "clean": "turbo run clean"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.7",
-    "turbo": "^2.5.6"
-  }
+	"name": "chess-monorepo",
+	"private": true,
+	"packageManager": "bun@1.2.22",
+	"workspaces": [
+		"apps/api",
+		"apps/web",
+		"apps/engine",
+		"packages/types",
+		"packages/db"
+	],
+	"scripts": {
+		"lockfile:generate": "bun install --lockfile-only",
+		"dev": "turbo run dev --parallel --ui=tui",
+		"build": "turbo run build",
+		"test": "turbo run test",
+		"lint": "turbo run lint",
+		"format": "turbo run format",
+		"check": "turbo run check",
+		"typecheck": "turbo run typecheck",
+		"clean": "turbo run clean"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.7",
+		"turbo": "^2.5.6"
+	}
 }

@@ -13,13 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import Header from "../components/header";
-import {
-	getBoard,
-	getMoves,
-	makeMove,
-	resetGame,
-	undoMove,
-} from "../lib/api";
+import { getBoard, getMoves, makeMove, resetGame, undoMove } from "../lib/api";
 
 const PIECE_SYMBOLS: Record<Color, Record<PieceType, string>> = {
 	White: {
@@ -443,7 +437,7 @@ export default function HomePage() {
 								</div>
 
 								<div className="flex flex-col gap-2 mt-2">
-								{turn === "Black" && (
+									{turn === "Black" && (
 										<Button
 											size="sm"
 											variant="ghost"

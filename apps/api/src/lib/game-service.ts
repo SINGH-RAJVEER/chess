@@ -39,8 +39,7 @@ async function createGame({
 	blackPlayerId?: string | null;
 }) {
 	const initialData = initializeGame();
-	const startingTime =
-		timeControl === 0 ? Number.MAX_SAFE_INTEGER : timeControl * 60 * 1000;
+	const startingTime = timeControl === 0 ? Number.MAX_SAFE_INTEGER : timeControl * 60 * 1000;
 
 	const [newGame] = await db
 		.insert(schema.games)

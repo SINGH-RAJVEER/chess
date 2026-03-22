@@ -22,9 +22,7 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 	});
 
 	if (!response.ok) {
-		const body = (await response
-			.json()
-			.catch(() => ({ error: response.statusText }))) as {
+		const body = (await response.json().catch(() => ({ error: response.statusText }))) as {
 			error?: string;
 		};
 		throw new Error(body.error || response.statusText);
@@ -55,14 +53,10 @@ export function getMoves(params: GetMovesParams): Promise<number[]> {
 
 export function getQueueStatus(playerId: string): Promise<QueueStatusResponse> {
 	const searchParams = new URLSearchParams({ playerId });
-	return apiRequest<QueueStatusResponse>(
-		`/api/queue-status?${searchParams.toString()}`,
-	);
+	return apiRequest<QueueStatusResponse>(`/api/queue-status?${searchParams.toString()}`);
 }
 
-export function joinQueue(
-	body: JoinQueueRequest,
-): Promise<QueueStatusResponse> {
+export function joinQueue(body: JoinQueueRequest): Promise<QueueStatusResponse> {
 	return apiRequest<QueueStatusResponse>("/api/join-queue", {
 		method: "POST",
 		body: JSON.stringify(body),

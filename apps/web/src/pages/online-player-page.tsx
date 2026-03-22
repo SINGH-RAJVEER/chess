@@ -283,7 +283,7 @@ export default function OnlinePlayerPage() {
 		setPendingMove(null);
 	};
 
-		const handleUndo = async () => {
+	const handleUndo = async () => {
 		if (!boardData?.id || isUndoPending) return;
 
 		try {
