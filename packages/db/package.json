@@ -6,15 +6,23 @@
 	"scripts": {
 		"format": "biome format",
 		"lint": "biome lint",
-		"check": "biome check"
+		"check": "biome check",
+		"db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+		"db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+		"db:studio": "drizzle-kit studio --config=drizzle.config.ts"
 	},
 	"exports": {
 		".": "./src/index.ts",
+		"./config": "./src/config.ts",
 		"./schema": "./src/schema.ts"
 	},
 	"dependencies": {
 		"@chess/types": "workspace:*",
 		"drizzle-orm": "^0.45.1",
 		"postgres": "^3.4.8"
+	},
+	"devDependencies": {
+		"dotenv": "^17.2.3",
+		"drizzle-kit": "^0.31.10"
 	}
 }

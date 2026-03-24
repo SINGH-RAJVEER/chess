@@ -10,10 +10,7 @@
 		"clean": "rm -rf dist",
 		"format": "biome format",
 		"lint": "biome lint",
-		"check": "biome check",
-		"db:generate": "drizzle-kit generate",
-		"db:migrate": "drizzle-kit migrate",
-		"db:studio": "drizzle-kit studio"
+		"check": "biome check"
 	},
 	"dependencies": {
 		"@chess/db": "workspace:*",
@@ -29,7 +26,6 @@
 		"@biomejs/biome": "2.4.7",
 		"@types/bcryptjs": "^3.0.0",
 		"@types/bun": "^1.2.22",
-		"drizzle-kit": "^0.31.10",
 		"typescript": "^5.7.2"
 	},
 	"engines": {

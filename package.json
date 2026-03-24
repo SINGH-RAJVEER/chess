@@ -18,6 +18,9 @@
 		"format": "turbo run format",
 		"check": "turbo run check",
 		"typecheck": "turbo run typecheck",
+		"db:generate": "bun --cwd packages/db run db:generate",
+		"db:migrate": "bun --cwd packages/db run db:migrate",
+		"db:studio": "bun --cwd packages/db run db:studio",
 		"clean": "turbo run clean"
 	},
 	"devDependencies": {

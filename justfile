@@ -2,6 +2,7 @@ set shell := ["bash", "-lc"]
 
 app_dir := "apps/web"
 engine_dir := "apps/engine"
+db_dir := "packages/db"
 compose_file := "docker/dev/docker-compose.yml"
 
 # Show available recipes
@@ -86,15 +87,15 @@ web-clean:
 
 # Generate Drizzle migrations
 db-generate:
-    cd {{app_dir}} && bun run db:generate
+    cd {{db_dir}} && bun run db:generate
 
 # Apply pending Drizzle migrations
 db-migrate:
-    cd {{app_dir}} && bun run db:migrate
+    cd {{db_dir}} && bun run db:migrate
 
 # Open Drizzle Studio
 db-studio:
-    cd {{app_dir}} && bun run db:studio
+    cd {{db_dir}} && bun run db:studio
 
 # Start only the Rust engine
 engine-dev:

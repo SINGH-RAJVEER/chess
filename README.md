@@ -46,10 +46,11 @@ bunx turbo run build --filter=@chess/db
 
 ## Database Management
 
-Run from the `apps/api` folder:
+The `packages/db` workspace is the single source of truth for schema, migrations, Drizzle config, and DB connection defaults.
+
+Run from the repo root:
 
 ```bash
-cd apps/api
 bun run db:generate  # Generate migrations from schema changes
 bun run db:migrate   # Apply pending migrations
 bun run db:studio    # Open Drizzle Studio UI
@@ -65,9 +66,11 @@ bun run db:studio    # Open Drizzle Studio UI
 │   └── engine/               # Rust chess engine
 ├── packages/
 │   ├── db/                  # Database layer (@chess/db)
-│   │   ├── drizzle/
+│   │   ├── drizzle/         # Generated SQL migrations + metadata
+│   │   ├── drizzle.config.ts
 │   │   └── src/
-│   │       ├── index.ts     # DB client & schema exports
+│   │       ├── config.ts    # DB env + path resolution
+│   │       ├── index.ts     # DB client & package exports
 │   │       └── schema.ts    # Drizzle table definitions
 │   └── types/               # Shared types (@chess/types)
 │       └── src/
@@ -82,7 +85,7 @@ bun run db:studio    # Open Drizzle Studio UI
 ## Architecture
 
 - **Shared Types Package**: All domain types (Color, PieceType, GameStatus, etc.) are defined in `@chess/types` and imported across projects
-- **Database Package**: Schema, migrations, and client initialization live in `@chess/db`; application code imports from this package
+- **Database Package**: Schema, migrations, Drizzle config, and client initialization live in `@chess/db`; application code imports from this package
 - **Web App**: A client-side React app that calls the Hono API over HTTP
 - **API App**: Owns queueing, game mutation/query logic, DB access, and engine requests
 - **Engine**: Pure Rust, no direct dependencies on other workspace packages (uses HTTP API)
