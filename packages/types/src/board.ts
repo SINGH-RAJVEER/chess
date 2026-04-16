@@ -13,6 +13,10 @@ export type BoardMove = {
 	pieceType: PieceType;
 	captured?: PieceType;
 	notation: string;
+	isCheck?: boolean;
+	isCheckmate?: boolean;
+	isCastle?: boolean;
+	promotion?: PieceType;
 };
 
 export type BoardResponse = {
@@ -27,6 +31,7 @@ export type BoardResponse = {
 	status: GameStatus;
 	mode: GameMode;
 	timeControl: number;
+	increment: number;
 	whiteTimeRemaining: number;
 	blackTimeRemaining: number;
 	lastMoveTime: number | null;
@@ -36,4 +41,8 @@ export type BoardResponse = {
 	} | null;
 	serverTime: number;
 	userColor?: UserColor;
+	isCheck: boolean;
+	drawOfferedBy: Color | null;
+	moveCount: number;
+	halfMoveClock: number;
 };

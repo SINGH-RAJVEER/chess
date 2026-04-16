@@ -2,6 +2,8 @@ import { db, type Game, schema } from "@chess/db";
 import type {
 	BoardResponse,
 	Color,
+	DrawOfferResponse,
+	DrawRespondResponse,
 	GetBoardParams,
 	GetMovesParams,
 	JoinQueueRequest,
@@ -11,6 +13,8 @@ import type {
 	QueueStatusResponse,
 	ResetGameRequest,
 	ResetGameResponse,
+	ResignRequest,
+	ResignResponse,
 	UndoMoveRequest,
 	UndoMoveResponse,
 } from "@chess/types";
@@ -23,6 +27,7 @@ import {
 	getSquareFromRowCol,
 	getValidMoves,
 	initializeGame,
+	isInCheck,
 	piecesToFen,
 } from "./chess";
 import { typeToPieceType } from "./utils";
@@ -30,11 +35,13 @@ import { typeToPieceType } from "./utils";
 async function createGame({
 	mode,
 	timeControl,
+	increment = 0,
 	whitePlayerId = null,
 	blackPlayerId = null,
 }: {
 	mode: "vs_player" | "vs_computer";
 	timeControl: number;
+	increment?: number;
 	whitePlayerId?: string | null;
 	blackPlayerId?: string | null;
 }) {
@@ -48,6 +55,7 @@ async function createGame({
 			status: "Ongoing",
 			mode,
 			timeControl,
+			increment,
 			whiteTimeRemaining: startingTime,
 			blackTimeRemaining: startingTime,
 			createdAt: Date.now(),
@@ -55,6 +63,8 @@ async function createGame({
 			lastMoveTime: null,
 			whitePlayerId,
 			blackPlayerId,
+			drawOfferedBy: null,
+			halfMoveClock: 0,
 		})
 		.returning();
 
@@ -124,6 +134,11 @@ export async function getBoard({
 						eq(schema.games.status, "Checkmate"),
 						eq(schema.games.status, "Stalemate"),
 						eq(schema.games.status, "Timeout"),
+						eq(schema.games.status, "Resignation"),
+						eq(schema.games.status, "Draw"),
+						eq(schema.games.status, "InsufficientMaterial"),
+						eq(schema.games.status, "ThreefoldRepetition"),
+						eq(schema.games.status, "FiftyMoveRule"),
 					),
 					or(eq(schema.games.whitePlayerId, playerId), eq(schema.games.blackPlayerId, playerId)),
 				),
@@ -174,12 +189,17 @@ export async function getBoard({
 				moves: [],
 				mode: resolvedMode,
 				timeControl: 10,
+				increment: 0,
 				whiteTimeRemaining: 600000,
 				blackTimeRemaining: 600000,
 				lastMoveTime: null,
 				lastMove: null,
 				capturedPieces: { white: [], black: [] },
 				serverTime,
+				isCheck: false,
+				drawOfferedBy: null,
+				moveCount: 0,
+				halfMoveClock: 0,
 			};
 		}
 
@@ -221,15 +241,32 @@ export async function getBoard({
 		const formattedMoves = moveHistory.map((move) => {
 			const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
 			const fromFile = files[getCol(move.fromSquare)];
-			const fromRank = 8 - getRow(move.fromSquare);
 			const toFile = files[getCol(move.toSquare)];
 			const toRank = 8 - getRow(move.toSquare);
 
+			const isCastle =
+				move.pieceType === "King" &&
+				Math.abs(getCol(move.fromSquare) - getCol(move.toSquare)) === 2;
+			const isKingside = isCastle && getCol(move.toSquare) === 6;
+
 			let notation = "";
-			if (move.pieceType !== "Pawn") {
-				notation += move.pieceType === "Knight" ? "N" : move.pieceType[0];
+			if (isCastle) {
+				notation = isKingside ? "O-O" : "O-O-O";
+			} else {
+				if (move.pieceType !== "Pawn") {
+					notation += move.pieceType === "Knight" ? "N" : move.pieceType[0];
+				}
+				if (move.capturedPieceType) {
+					if (move.pieceType === "Pawn") {
+						notation += fromFile;
+					}
+					notation += "x";
+				}
+				notation += `${toFile}${toRank}`;
+				if (move.promotionPiece) {
+					notation += `=${move.promotionPiece === "Knight" ? "N" : move.promotionPiece[0]}`;
+				}
 			}
-			notation += `${fromFile}${fromRank}-${toFile}${toRank}`;
 
 			if (move.capturedPieceType) {
 				if (move.pieceColor === "White") {
@@ -246,6 +283,8 @@ export async function getBoard({
 				pieceType: move.pieceType,
 				captured: move.capturedPieceType || undefined,
 				notation,
+				isCastle,
+				promotion: move.promotionPiece || undefined,
 			};
 		});
 
@@ -263,6 +302,12 @@ export async function getBoard({
 			else if (currentGame.blackPlayerId === playerId) userColor = "Black";
 		}
 
+		const lastDbMove = moveHistory.length > 0 ? moveHistory[moveHistory.length - 1] : undefined;
+		const checkStatus =
+			currentGame.status === "Ongoing"
+				? isInCheck(pieces, currentGame.currentTurn, lastDbMove)
+				: false;
+
 		return {
 			id: currentGame.id,
 			pieces: pieces.map((piece) => ({
@@ -276,12 +321,17 @@ export async function getBoard({
 			status: currentGame.status,
 			mode: currentGame.mode,
 			timeControl: currentGame.timeControl,
+			increment: currentGame.increment ?? 0,
 			whiteTimeRemaining: currentGame.whiteTimeRemaining,
 			blackTimeRemaining: currentGame.blackTimeRemaining,
 			lastMoveTime: currentGame.lastMoveTime,
 			lastMove,
 			serverTime,
 			userColor,
+			isCheck: checkStatus,
+			drawOfferedBy: currentGame.drawOfferedBy ?? null,
+			moveCount: moveHistory.length,
+			halfMoveClock: currentGame.halfMoveClock ?? 0,
 		};
 	} catch (error) {
 		console.error("Error in getBoard:", error);
@@ -318,14 +368,17 @@ export async function getMoves({ square, gameId }: GetMovesParams): Promise<numb
 export async function resetGame({
 	mode,
 	timeControl,
+	increment,
 }: ResetGameRequest): Promise<ResetGameResponse> {
 	const resolvedMode = mode || "vs_player";
 	const resolvedTimeControl = timeControl ?? 10;
+	const resolvedIncrement = increment ?? 0;
 
 	if (resolvedMode === "vs_player") {
 		await createGame({
 			mode: "vs_player",
 			timeControl: resolvedTimeControl,
+			increment: resolvedIncrement,
 		});
 		return { success: true };
 	}
@@ -333,6 +386,7 @@ export async function resetGame({
 	await createGame({
 		mode: resolvedMode,
 		timeControl: resolvedTimeControl,
+		increment: resolvedIncrement,
 	});
 
 	return { success: true };
@@ -341,6 +395,7 @@ export async function resetGame({
 export async function joinQueue({
 	playerId,
 	timeControl,
+	increment = 0,
 }: JoinQueueRequest): Promise<QueueStatusResponse> {
 	const activeGame = await db.query.games.findFirst({
 		where: and(
@@ -360,14 +415,14 @@ export async function joinQueue({
 	if (existingQueue && existingQueue.timeControl !== timeControl) {
 		await db
 			.update(schema.queue)
-			.set({ timeControl, joinedAt: Date.now() })
+			.set({ timeControl, increment, joinedAt: Date.now() })
 			.where(eq(schema.queue.id, existingQueue.id));
 	}
 
 	await db.delete(schema.queue).where(eq(schema.queue.playerId, playerId));
 
 	const validOpponent = await db.query.queue.findFirst({
-		where: eq(schema.queue.timeControl, timeControl),
+		where: and(eq(schema.queue.timeControl, timeControl), eq(schema.queue.increment, increment)),
 		orderBy: schema.queue.joinedAt,
 	});
 
@@ -380,6 +435,7 @@ export async function joinQueue({
 		const newGame = await createGame({
 			mode: "vs_player",
 			timeControl,
+			increment,
 			whitePlayerId: whiteId,
 			blackPlayerId: blackId,
 		});
@@ -392,6 +448,7 @@ export async function joinQueue({
 	await db.insert(schema.queue).values({
 		playerId,
 		timeControl,
+		increment,
 		joinedAt: Date.now(),
 	});
 
@@ -474,6 +531,7 @@ export async function undoMove({ gameId }: UndoMoveRequest): Promise<UndoMoveRes
 				currentTurn: lastMove.pieceColor,
 				status: "Ongoing",
 				updatedAt: Date.now(),
+				drawOfferedBy: null,
 			})
 			.where(eq(schema.games.id, currentGame.id));
 
@@ -484,7 +542,99 @@ export async function undoMove({ gameId }: UndoMoveRequest): Promise<UndoMoveRes
 	}
 }
 
-export async function makeMove({ from, to, gameId }: MakeMoveRequest): Promise<MakeMoveResponse> {
+export async function resign({ gameId, color }: ResignRequest): Promise<ResignResponse> {
+	const currentGame = await db.query.games.findFirst({
+		where: eq(schema.games.id, gameId),
+	});
+
+	if (!currentGame) {
+		throw new Error("No game found");
+	}
+
+	if (currentGame.status !== "Ongoing") {
+		throw new Error("Game is not ongoing");
+	}
+
+	const winner: Color = color === "White" ? "Black" : "White";
+
+	await db
+		.update(schema.games)
+		.set({
+			status: "Resignation",
+			updatedAt: Date.now(),
+		})
+		.where(eq(schema.games.id, gameId));
+
+	return { success: true, status: "Resignation", winner };
+}
+
+export async function offerDraw({
+	gameId,
+	color,
+}: {
+	gameId: number;
+	color: Color;
+}): Promise<DrawOfferResponse> {
+	const currentGame = await db.query.games.findFirst({
+		where: eq(schema.games.id, gameId),
+	});
+
+	if (!currentGame) {
+		throw new Error("No game found");
+	}
+
+	if (currentGame.status !== "Ongoing") {
+		throw new Error("Game is not ongoing");
+	}
+
+	await db
+		.update(schema.games)
+		.set({ drawOfferedBy: color, updatedAt: Date.now() })
+		.where(eq(schema.games.id, gameId));
+
+	return { success: true, drawOfferedBy: color };
+}
+
+export async function respondToDraw({
+	gameId,
+	accept,
+}: {
+	gameId: number;
+	accept: boolean;
+}): Promise<DrawRespondResponse> {
+	const currentGame = await db.query.games.findFirst({
+		where: eq(schema.games.id, gameId),
+	});
+
+	if (!currentGame) {
+		throw new Error("No game found");
+	}
+
+	if (currentGame.status !== "Ongoing") {
+		throw new Error("Game is not ongoing");
+	}
+
+	if (accept) {
+		await db
+			.update(schema.games)
+			.set({ status: "Draw", drawOfferedBy: null, updatedAt: Date.now() })
+			.where(eq(schema.games.id, gameId));
+		return { success: true, status: "Draw" };
+	}
+
+	await db
+		.update(schema.games)
+		.set({ drawOfferedBy: null, updatedAt: Date.now() })
+		.where(eq(schema.games.id, gameId));
+	return { success: true, status: "Ongoing" };
+}
+
+export async function makeMove({
+	from,
+	to,
+	gameId,
+	promotion,
+}: MakeMoveRequest): Promise<MakeMoveResponse> {
 	const currentGame = await db.query.games.findFirst({
 		where: eq(schema.games.id, gameId),
 	});
@@ -506,7 +656,14 @@ export async function makeMove({ from, to, gameId }: MakeMoveRequest): Promise<M
 		orderBy: desc(schema.moves.moveNumber),
 	});
 
-	const moveDetails = getMoveDetails(pieces, from, to, currentGame.currentTurn, lastMove);
+	const moveDetails = getMoveDetails(
+		pieces,
+		from,
+		to,
+		currentGame.currentTurn,
+		lastMove,
+		promotion,
+	);
 	if (!moveDetails) {
 		throw new Error("Invalid move");
 	}
@@ -514,13 +671,14 @@ export async function makeMove({ from, to, gameId }: MakeMoveRequest): Promise<M
 	const now = Date.now();
 	let whiteTime = currentGame.whiteTimeRemaining;
 	let blackTime = currentGame.blackTimeRemaining;
+	const incrementMs = (currentGame.increment ?? 0) * 1000;
 
 	if (currentGame.lastMoveTime && currentGame.timeControl !== 0) {
 		const elapsed = now - currentGame.lastMoveTime;
 		if (currentGame.currentTurn === "White") {
-			whiteTime = Math.max(0, whiteTime - elapsed);
+			whiteTime = Math.max(0, whiteTime - elapsed) + incrementMs;
 		} else {
-			blackTime = Math.max(0, blackTime - elapsed);
+			blackTime = Math.max(0, blackTime - elapsed) + incrementMs;
 		}
 	}
 
@@ -540,7 +698,8 @@ export async function makeMove({ from, to, gameId }: MakeMoveRequest): Promise<M
 			.where(and(eq(schema.pieces.gameId, currentGame.id), eq(schema.pieces.square, targetSquare)));
 	}
 
-	if (moveDetails.flags.includes("k") || moveDetails.flags.includes("q")) {
+	const isCastle = moveDetails.flags.includes("k") || moveDetails.flags.includes("q");
+	if (isCastle) {
 		const isKingside = moveDetails.flags.includes("k");
 		const row = getRow(from);
 		const rookFromCol = isKingside ? 7 : 0;
@@ -557,8 +716,10 @@ export async function makeMove({ from, to, gameId }: MakeMoveRequest): Promise<M
 	}
 
 	let finalPieceType: PieceType = movingPiece.pieceType;
+	let promotionPiece: PieceType | undefined;
 	if (moveDetails.promotion) {
 		finalPieceType = typeToPieceType(moveDetails.promotion);
+		promotionPiece = finalPieceType;
 	}
 
 	await db
@@ -577,6 +738,7 @@ export async function makeMove({ from, to, gameId }: MakeMoveRequest): Promise<M
 		pieceType: movingPiece.pieceType,
 		pieceColor: movingPiece.color,
 		capturedPieceType,
+		promotionPiece,
 		moveNumber: moveCount.length + 1,
 		createdAt: now,
 	});
@@ -586,26 +748,40 @@ export async function makeMove({ from, to, gameId }: MakeMoveRequest): Promise<M
 	});
 
 	const nextTurn: Color = currentGame.currentTurn === "White" ? "Black" : "White";
-	const currentMove = await db.query.moves.findFirst({
+	const currentMoveRecord = await db.query.moves.findFirst({
 		where: eq(schema.moves.gameId, currentGame.id),
 		orderBy: desc(schema.moves.moveNumber),
 	});
-	const newStatus = getGameStatus(updatedPieces, nextTurn, currentMove);
+	const newStatus = getGameStatus(updatedPieces, nextTurn, currentMoveRecord);
+	const checkAfterMove =
+		newStatus === "Ongoing" ? isInCheck(updatedPieces, nextTurn, currentMoveRecord) : false;
+	const isCheckmate = newStatus === "Checkmate";
+
+	// Update half-move clock (reset on pawn move or capture)
+	const halfMoveClock =
+		movingPiece.pieceType === "Pawn" || capturedPieceType
+			? 0
+			: (currentGame.halfMoveClock ?? 0) + 1;
+
+	// Check 50-move rule
+	const finalStatus = halfMoveClock >= 100 && newStatus === "Ongoing" ? "FiftyMoveRule" : newStatus;
 
 	await db
 		.update(schema.games)
 		.set({
 			currentTurn: nextTurn,
-			status: newStatus,
+			status: finalStatus,
 			updatedAt: now,
 			lastMoveTime: now,
 			whiteTimeRemaining: whiteTime,
 			blackTimeRemaining: blackTime,
+			drawOfferedBy: null,
+			halfMoveClock,
 		})
 		.where(eq(schema.games.id, currentGame.id));
 
-	if (currentGame.mode === "vs_computer" && nextTurn === "Black" && newStatus === "Ongoing") {
-		const fen = piecesToFen(updatedPieces, nextTurn, currentMove || undefined);
+	if (currentGame.mode === "vs_computer" && nextTurn === "Black" && finalStatus === "Ongoing") {
+		const fen = piecesToFen(updatedPieces, nextTurn, currentMoveRecord || undefined);
 		const engineUrl = process.env.CHESS_ENGINE_URL || "http://127.0.0.1:8080";
 
 		fetch(`${engineUrl}/api/engine-move`, {
@@ -623,10 +799,24 @@ export async function makeMove({ from, to, gameId }: MakeMoveRequest): Promise<M
 				const toFile = data.best_move.charCodeAt(2) - 97;
 				const toRank = 8 - parseInt(data.best_move[3], 10);
 
+				// Handle engine promotion
+				let enginePromotion: PieceType | undefined;
+				if (data.best_move.length === 5) {
+					const promoChar = data.best_move[4];
+					const promoMap: Record<string, PieceType> = {
+						q: "Queen",
+						r: "Rook",
+						b: "Bishop",
+						n: "Knight",
+					};
+					enginePromotion = promoMap[promoChar];
+				}
+
 				await applyMove(
 					currentGame.id,
 					getSquareFromRowCol(fromRank, fromFile),
 					getSquareFromRowCol(toRank, toFile),
+					enginePromotion,
 				);
 			})
 			.catch((error: Error) => {
@@ -637,12 +827,16 @@ export async function makeMove({ from, to, gameId }: MakeMoveRequest): Promise<M
 	return {
 		success: true,
 		nextTurn,
-		status: newStatus,
+		status: finalStatus,
 		captured: capturedPieceType !== undefined,
+		isCheck: checkAfterMove,
+		isCheckmate,
+		isCastle,
+		promotion: promotionPiece,
 	};
 }
 
-export async function applyMove(gameId: number, from: number, to: number) {
+export async function applyMove(gameId: number, from: number, to: number, promotion?: PieceType) {
 	const currentGame = await db.query.games.findFirst({
 		where: eq(schema.games.id, gameId),
 	});
@@ -657,7 +851,15 @@ export async function applyMove(gameId: number, from: number, to: number) {
 		orderBy: desc(schema.moves.moveNumber),
 	});
 
-	const moveDetails = getMoveDetails(pieces, from, to, currentGame.currentTurn, lastMove);
+	const promotionPiece = promotion as import("@chess/types").PromotionPiece | undefined;
+	const moveDetails = getMoveDetails(
+		pieces,
+		from,
+		to,
+		currentGame.currentTurn,
+		lastMove,
+		promotionPiece,
+	);
 	if (!moveDetails) return;
 
 	const movingPiece = pieces.find((piece) => piece.square === from);
@@ -697,8 +899,10 @@ export async function applyMove(gameId: number, from: number, to: number) {
 	}
 
 	let finalPieceType: PieceType = movingPiece.pieceType;
+	let finalPromotionPiece: PieceType | undefined;
 	if (moveDetails.promotion) {
 		finalPieceType = typeToPieceType(moveDetails.promotion);
+		finalPromotionPiece = finalPieceType;
 	}
 
 	await db
@@ -709,6 +913,7 @@ export async function applyMove(gameId: number, from: number, to: number) {
 	const moveCount = await db.query.moves.findMany({
 		where: eq(schema.moves.gameId, gameId),
 	});
+	const now = Date.now();
 	await db.insert(schema.moves).values({
 		gameId,
 		fromSquare: from,
@@ -716,8 +921,9 @@ export async function applyMove(gameId: number, from: number, to: number) {
 		pieceType: movingPiece.pieceType,
 		pieceColor: movingPiece.color,
 		capturedPieceType,
+		promotionPiece: finalPromotionPiece,
 		moveNumber: moveCount.length + 1,
-		createdAt: Date.now(),
+		createdAt: now,
 	});
 
 	const updatedPieces = await db.query.pieces.findMany({
@@ -730,13 +936,36 @@ export async function applyMove(gameId: number, from: number, to: number) {
 	});
 	const newStatus = getGameStatus(updatedPieces, nextTurn, finalMove);
 
+	const halfMoveClock =
+		movingPiece.pieceType === "Pawn" || capturedPieceType
+			? 0
+			: (currentGame.halfMoveClock ?? 0) + 1;
+
+	const finalStatus = halfMoveClock >= 100 && newStatus === "Ongoing" ? "FiftyMoveRule" : newStatus;
+
+	// Apply increment for computer
+	let whiteTime = currentGame.whiteTimeRemaining;
+	let blackTime = currentGame.blackTimeRemaining;
+	const incrementMs = (currentGame.increment ?? 0) * 1000;
+	if (currentGame.lastMoveTime && currentGame.timeControl !== 0) {
+		const elapsed = now - currentGame.lastMoveTime;
+		if (movingPiece.color === "White") {
+			whiteTime = Math.max(0, whiteTime - elapsed) + incrementMs;
+		} else {
+			blackTime = Math.max(0, blackTime - elapsed) + incrementMs;
+		}
+	}
+
 	await db
 		.update(schema.games)
 		.set({
 			currentTurn: nextTurn,
-			status: newStatus,
-			updatedAt: Date.now(),
-			lastMoveTime: Date.now(),
+			status: finalStatus,
+			updatedAt: now,
+			lastMoveTime: now,
+			whiteTimeRemaining: whiteTime,
+			blackTimeRemaining: blackTime,
+			halfMoveClock,
 		})
 		.where(eq(schema.games.id, gameId));
 }

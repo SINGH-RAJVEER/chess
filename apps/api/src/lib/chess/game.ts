@@ -1,5 +1,5 @@
 import type { Move, Piece } from "@chess/db/schema";
-import type { Color } from "@chess/types";
+import type { Color, GameStatus, PromotionPiece } from "@chess/types";
 import { Chess, type Move as ChessMove, type Square } from "chess.js";
 import { typeToPieceType } from "../utils";
 import {
@@ -109,12 +109,20 @@ function getChessInstance(pieces: Piece[], turn: Color, lastMove?: Move): Chess 
 	return new Chess(piecesToFen(pieces, turn, lastMove));
 }
 
+const PROMOTION_MAP: Record<string, string> = {
+	Queen: "q",
+	Rook: "r",
+	Bishop: "b",
+	Knight: "n",
+};
+
 export function getMoveDetails(
 	pieces: Piece[],
 	from: number,
 	to: number,
 	color: Color,
 	lastMove?: Move,
+	promotion?: PromotionPiece,
 ): ChessMove | null {
 	try {
 		const chess = getChessInstance(pieces, color, lastMove);
@@ -122,19 +130,19 @@ export function getMoveDetails(
 		const toAlgebraic = indexToAlgebraic(to);
 
 		const piece = getPieceAt(pieces, from);
-		let promotion: string | undefined;
+		let promotionChar: string | undefined;
 		if (piece?.pieceType === "Pawn") {
 			const destinationRow = getRow(to);
 			if (
 				(piece.color === "White" && destinationRow === 0) ||
 				(piece.color === "Black" && destinationRow === 7)
 			) {
-				promotion = "q";
+				promotionChar = promotion ? PROMOTION_MAP[promotion] : "q";
 			}
 		}
 
 		try {
-			return chess.move({ from: fromAlgebraic, to: toAlgebraic, promotion });
+			return chess.move({ from: fromAlgebraic, to: toAlgebraic, promotion: promotionChar });
 		} catch {
 			return null;
 		}
@@ -160,22 +168,59 @@ export function getValidMoves(pieces: Piece[], square: number, lastMove?: Move):
 	}
 }
 
-export function getGameStatus(
-	pieces: Piece[],
-	turn: Color,
-	lastMove?: Move,
-): "Ongoing" | "Checkmate" | "Stalemate" {
+export function isInCheck(pieces: Piece[], turn: Color, lastMove?: Move): boolean {
+	try {
+		const chess = getChessInstance(pieces, turn, lastMove);
+		return chess.isCheck();
+	} catch {
+		return false;
+	}
+}
+
+export function isPromotion(pieces: Piece[], from: number, to: number): boolean {
+	const piece = getPieceAt(pieces, from);
+	if (!piece || piece.pieceType !== "Pawn") return false;
+	const destRow = getRow(to);
+	return (piece.color === "White" && destRow === 0) || (piece.color === "Black" && destRow === 7);
+}
+
+export function getGameStatus(pieces: Piece[], turn: Color, lastMove?: Move): GameStatus {
 	try {
 		const chess = getChessInstance(pieces, turn, lastMove);
 		if (chess.isCheckmate()) return "Checkmate";
 		if (chess.isStalemate()) return "Stalemate";
-		if (chess.isDraw()) return "Stalemate";
+		if (chess.isInsufficientMaterial()) return "InsufficientMaterial";
+		if (chess.isThreefoldRepetition()) return "ThreefoldRepetition";
+		if (chess.isDraw()) return "Draw";
 
 		return "Ongoing";
 	} catch (error) {
 		console.error("getGameStatus error", error);
 		return "Ongoing";
 	}
+}
+
+export function isMoveCapture(
+	pieces: Piece[],
+	from: number,
+	to: number,
+	color: Color,
+	lastMove?: Move,
+): boolean {
+	const moveDetails = getMoveDetails(pieces, from, to, color, lastMove);
+	return moveDetails?.captured !== undefined;
+}
+
+export function isCastleMove(
+	pieces: Piece[],
+	from: number,
+	to: number,
+	color: Color,
+	lastMove?: Move,
+): boolean {
+	const moveDetails = getMoveDetails(pieces, from, to, color, lastMove);
+	if (!moveDetails) return false;
+	return moveDetails.flags.includes("k") || moveDetails.flags.includes("q");
 }
 
 export function initializeGame(): {

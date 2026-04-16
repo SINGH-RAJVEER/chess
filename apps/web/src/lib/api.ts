@@ -1,5 +1,8 @@
 import type {
 	BoardResponse,
+	Color,
+	DrawOfferResponse,
+	DrawRespondResponse,
 	GetBoardParams,
 	GetMovesParams,
 	JoinQueueRequest,
@@ -8,6 +11,7 @@ import type {
 	QueueStatusResponse,
 	ResetGameRequest,
 	ResetGameResponse,
+	ResignResponse,
 	UndoMoveRequest,
 	UndoMoveResponse,
 } from "@chess/types";
@@ -81,6 +85,27 @@ export function resetGame(body: ResetGameRequest): Promise<ResetGameResponse> {
 	return apiRequest<ResetGameResponse>("/api/reset", {
 		method: "POST",
 		body: JSON.stringify(body),
+	});
+}
+
+export function resignGame(gameId: number, color: Color): Promise<ResignResponse> {
+	return apiRequest<ResignResponse>("/api/resign", {
+		method: "POST",
+		body: JSON.stringify({ gameId, color }),
+	});
+}
+
+export function offerDraw(gameId: number, color: Color): Promise<DrawOfferResponse> {
+	return apiRequest<DrawOfferResponse>("/api/draw-offer", {
+		method: "POST",
+		body: JSON.stringify({ gameId, color }),
+	});
+}
+
+export function respondToDraw(gameId: number, accept: boolean): Promise<DrawRespondResponse> {
+	return apiRequest<DrawRespondResponse>("/api/draw-respond", {
+		method: "POST",
+		body: JSON.stringify({ gameId, accept }),
 	});
 }
 

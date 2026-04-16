@@ -1,9 +1,12 @@
 import type {
+	Color,
+	DrawRespondRequest,
 	GameMode,
 	GetBoardParams,
 	JoinQueueRequest,
 	MakeMoveRequest,
 	ResetGameRequest,
+	ResignRequest,
 	UndoMoveRequest,
 } from "@chess/types";
 import { config } from "dotenv";
@@ -15,7 +18,10 @@ import {
 	getQueueStatus,
 	joinQueue,
 	makeMove,
+	offerDraw,
 	resetGame,
+	resign,
+	respondToDraw,
 	undoMove,
 } from "./lib/game-service";
 import authRouter from "./routes/auth";
@@ -74,6 +80,7 @@ api.post("/reset", async (context) => {
 		await resetGame({
 			mode: body.mode || "vs_player",
 			timeControl: body.timeControl ?? 10,
+			increment: body.increment ?? 0,
 		}),
 	);
 });
@@ -88,6 +95,7 @@ api.post("/join-queue", async (context) => {
 		await joinQueue({
 			playerId: body.playerId,
 			timeControl: body.timeControl,
+			increment: body.increment ?? 0,
 		}),
 	);
 });
@@ -103,6 +111,7 @@ api.post("/move", async (context) => {
 			from: body.from,
 			to: body.to,
 			gameId: body.gameId,
+			promotion: body.promotion,
 		}),
 	);
 });
@@ -114,6 +123,33 @@ api.post("/undo", async (context) => {
 	}
 
 	return context.json(await undoMove({ gameId: body.gameId }));
+});
+
+api.post("/resign", async (context) => {
+	const body = (await context.req.json()) as Partial<ResignRequest>;
+	if (body.gameId === undefined || !body.color) {
+		return context.json({ error: "gameId and color are required" }, 400);
+	}
+
+	return context.json(await resign({ gameId: body.gameId, color: body.color }));
+});
+
+api.post("/draw-offer", async (context) => {
+	const body = (await context.req.json()) as { gameId?: number; color?: Color };
+	if (body.gameId === undefined || !body.color) {
+		return context.json({ error: "gameId and color are required" }, 400);
+	}
+
+	return context.json(await offerDraw({ gameId: body.gameId, color: body.color }));
+});
+
+api.post("/draw-respond", async (context) => {
+	const body = (await context.req.json()) as Partial<DrawRespondRequest>;
+	if (body.gameId === undefined || body.accept === undefined) {
+		return context.json({ error: "gameId and accept are required" }, 400);
+	}
+
+	return context.json(await respondToDraw({ gameId: body.gameId, accept: body.accept }));
 });
 
 export default {

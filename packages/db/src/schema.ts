@@ -73,11 +73,14 @@ export const games = pgTable("games", {
 	status: text("status").notNull().$type<GameStatus>(),
 	mode: text("mode").notNull().default("vs_player").$type<"vs_player" | "vs_computer">(),
 	timeControl: integer("time_control").notNull().default(10),
+	increment: integer("increment").notNull().default(0),
 	whiteTimeRemaining: integer("white_time_remaining").notNull().default(600000),
 	blackTimeRemaining: integer("black_time_remaining").notNull().default(600000),
 	lastMoveTime: bigint("last_move_time", { mode: "number" }),
 	whitePlayerId: varchar("white_player_id", { length: 256 }),
 	blackPlayerId: varchar("black_player_id", { length: 256 }),
+	drawOfferedBy: text("draw_offered_by").$type<Color>(),
+	halfMoveClock: integer("half_move_clock").notNull().default(0),
 	createdAt: bigint("created_at", { mode: "number" }).notNull(),
 	updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
 });
@@ -86,6 +89,7 @@ export const queue = pgTable("queue", {
 	id: serial("id").primaryKey(),
 	playerId: varchar("player_id", { length: 256 }).notNull(),
 	timeControl: integer("time_control").notNull(),
+	increment: integer("increment").notNull().default(0),
 	joinedAt: bigint("joined_at", { mode: "number" }).notNull(),
 });
 
@@ -110,6 +114,7 @@ export const moves = pgTable("moves", {
 	pieceType: text("piece_type").notNull().$type<PieceType>(),
 	pieceColor: text("piece_color").notNull().$type<Color>(),
 	capturedPieceType: text("captured_piece_type").$type<PieceType>(),
+	promotionPiece: text("promotion_piece").$type<PieceType>(),
 	moveNumber: integer("move_number").notNull(),
 	createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });

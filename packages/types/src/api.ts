@@ -1,5 +1,5 @@
 import type { BoardResponse } from "./board";
-import type { Color, GameMode, GameStatus, PieceType, QueueStatus } from "./chess";
+import type { Color, GameMode, GameStatus, PieceType, PromotionPiece, QueueStatus } from "./chess";
 
 export type GetBoardParams = {
 	mode?: GameMode;
@@ -19,21 +19,39 @@ export type GetQueueStatusParams = {
 export type ResetGameRequest = {
 	mode: GameMode;
 	timeControl: number;
+	increment?: number;
 };
 
 export type JoinQueueRequest = {
 	playerId: string;
 	timeControl: number;
+	increment?: number;
 };
 
 export type MakeMoveRequest = {
 	from: number;
 	to: number;
 	gameId: number;
+	promotion?: PromotionPiece;
 };
 
 export type UndoMoveRequest = {
 	gameId: number;
+};
+
+export type ResignRequest = {
+	gameId: number;
+	color: Color;
+};
+
+export type DrawOfferRequest = {
+	gameId: number;
+	color: Color;
+};
+
+export type DrawRespondRequest = {
+	gameId: number;
+	accept: boolean;
 };
 
 export type QueueStatusResponse = {
@@ -51,11 +69,31 @@ export type MakeMoveResponse = {
 	nextTurn: Color;
 	status: GameStatus;
 	captured: boolean;
+	isCheck: boolean;
+	isCheckmate: boolean;
+	isCastle: boolean;
+	promotion?: PieceType;
 };
 
 export type UndoMoveResponse = {
 	success: boolean;
 	message?: string;
+};
+
+export type ResignResponse = {
+	success: boolean;
+	status: GameStatus;
+	winner: Color;
+};
+
+export type DrawOfferResponse = {
+	success: boolean;
+	drawOfferedBy: Color | null;
+};
+
+export type DrawRespondResponse = {
+	success: boolean;
+	status: GameStatus;
 };
 
 export type CapturedPieces = {
