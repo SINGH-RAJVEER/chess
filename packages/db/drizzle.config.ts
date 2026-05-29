@@ -5,8 +5,8 @@ import { databasePaths, getDatabaseUrl } from "./src/config";
 config({ path: databasePaths.workspaceEnvPath });
 
 export default defineConfig({
-	schema: databasePaths.schema,
-	out: databasePaths.migrations,
+	schema: "./src/schema.ts",
+	out: "./drizzle",
 	dialect: "postgresql",
 	dbCredentials: {
 		url: getDatabaseUrl(),

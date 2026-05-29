@@ -2,3 +2,6 @@
 node_modules
 .turbo
 AGENTS.md
+.env
+.postgres/
+.direnv

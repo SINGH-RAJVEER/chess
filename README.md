@@ -12,9 +12,8 @@ A full-stack chess application.
 
 ## Prerequisites
 
-- Bun `>= 1.0`
-- Rust toolchain (`cargo`, `rustfmt`, `clippy`)
-- PostgreSQL database
+- Nix with flakes enabled
+- direnv (`direnv allow` once on first clone)
 
 ## Install dependencies
 
@@ -79,7 +78,8 @@ bun run db:studio    # Open Drizzle Studio UI
 │           └── index.ts     # Main export
 ├── package.json             # Root workspace config
 ├── turbo.json               # Turbo build configuration
-└── docker/dev/docker-compose.yml  # Local dev environment
+├── justfile                 # Dev task runner
+└── flake.nix                # Nix dev shell (PostgreSQL + toolchain)
 ```
 
 ## Architecture
@@ -90,15 +90,17 @@ bun run db:studio    # Open Drizzle Studio UI
 - **API App**: Owns queueing, game mutation/query logic, DB access, and engine requests
 - **Engine**: Pure Rust, no direct dependencies on other workspace packages (uses HTTP API)
 
-## Docker Dev Stack
+## Local Dev Stack (Nix + direnv)
 
-- `application` serves the React frontend on port `3000`
-- `api` serves the Hono backend on port `4000`
-- `engine` serves the Rust chess engine on port `8080`
-- `db` serves PostgreSQL on port `5432`
+PostgreSQL is managed automatically by the Nix flake. Entering the project directory via direnv starts the database cluster. All services run on:
 
-Run the full local stack with:
+- `web` → port `3000`
+- `api` → port `4000`
+- `engine` → port `8080`
+- `db` (PostgreSQL) → port `5432`
+
+Run the full local stack with a single command:
 
 ```bash
-just docker-up
+just
 ```

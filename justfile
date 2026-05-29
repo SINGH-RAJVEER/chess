@@ -1,11 +1,10 @@
-set shell := ["bash", "-lc"]
+set shell := ["bash", "-c"]
 
 app_dir := "apps/web"
 engine_dir := "apps/engine"
 db_dir := "packages/db"
-compose_file := "docker/dev/docker-compose.yml"
 
-# Show available recipes
+# Show all available commands
 default:
     @just --list
 
@@ -17,8 +16,8 @@ install:
 lockfile:
     bun run lockfile:generate
 
-# Start all dev services through Turbo
-dev:
+# Start all services: PostgreSQL → web + api + engine in parallel
+dev: db-start
     bun run dev
 
 # Build all workspaces
@@ -85,12 +84,47 @@ web-typecheck:
 web-clean:
     cd {{app_dir}} && bun run clean
 
+# Ensure PostgreSQL is running (init cluster on first run)
+db-start:
+    #!/usr/bin/env bash
+    set -e
+    if ! command -v pg_ctl &>/dev/null; then
+      exec nix develop --command just db-start
+    fi
+    export PGDATA="$PWD/.postgres/data"
+    export PGHOST="$PWD/.postgres"
+    mkdir -p "$PGHOST"
+    if [ ! -d "$PGDATA" ]; then
+      echo "chess: initialising PostgreSQL cluster..."
+      initdb --auth=trust --username=postgres --pgdata="$PGDATA" \
+             --no-locale --encoding=UTF8
+    fi
+    if ! pg_ctl status -D "$PGDATA" 2>/dev/null | grep -q "server is running"; then
+      echo "chess: starting PostgreSQL on localhost:5432..."
+      pg_ctl start -D "$PGDATA" -l "$PGDATA/postgres.log" \
+        -o "-p 5432 -k $PGHOST -h localhost" -w
+      createdb -h localhost -p 5432 -U postgres chess 2>/dev/null || true
+      echo "chess: PostgreSQL ready at localhost:5432/chess"
+    fi
+
+# Stop PostgreSQL
+db-stop:
+    #!/usr/bin/env bash
+    if ! command -v pg_ctl &>/dev/null; then
+      exec nix develop --command just db-stop
+    fi
+    export PGDATA="$PWD/.postgres/data"
+    if pg_ctl status -D "$PGDATA" 2>/dev/null | grep -q "server is running"; then
+      echo "chess: stopping PostgreSQL..."
+      pg_ctl stop -D "$PGDATA" -m fast
+    fi
+
 # Generate Drizzle migrations
-db-generate:
+db-generate: db-start
     cd {{db_dir}} && bun run db:generate
 
 # Apply pending Drizzle migrations
-db-migrate:
+db-migrate: db-start
     cd {{db_dir}} && bun run db:migrate
 
 # Open Drizzle Studio
@@ -124,26 +158,6 @@ engine-check:
 # Clean Rust build artifacts
 engine-clean:
     cd {{engine_dir}} && bun run clean
-
-# Start the local Docker stack in the foreground
-docker-up:
-    docker compose -f {{compose_file}} up --build
-
-# Start the local Docker stack in the background
-docker-up-d:
-    docker compose -f {{compose_file}} up --build -d
-
-# Stop the local Docker stack
-docker-down:
-    docker compose -f {{compose_file}} down
-
-# Tail logs from the local Docker stack
-docker-logs:
-    docker compose -f {{compose_file}} logs -f
-
-# Show Docker service status
-docker-ps:
-    docker compose -f {{compose_file}} ps
 
 # Run a Turbo task for a specific workspace, e.g. `just turbo dev @chess/application`
 turbo task filter:
