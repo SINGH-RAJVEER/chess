@@ -24,7 +24,8 @@ bun install
 ## Run from root
 
 ```bash
-bun run dev        # Start all workspace dev tasks
+devenv up          # Start PostgreSQL, web, api, and engine
+bun run dev        # Start workspace dev tasks without managed services
 bun run build      # Build all packages
 bun run test       # Test all packages
 bun run lint       # Lint all packages
@@ -79,7 +80,7 @@ bun run db:studio    # Open Drizzle Studio UI
 ├── package.json             # Root workspace config
 ├── turbo.json               # Turbo build configuration
 ├── justfile                 # Dev task runner
-└── flake.nix                # Nix dev shell (PostgreSQL + toolchain)
+└── flake.nix                # devenv shell, services, and processes
 ```
 
 ## Architecture
@@ -90,9 +91,11 @@ bun run db:studio    # Open Drizzle Studio UI
 - **API App**: Owns queueing, game mutation/query logic, DB access, and engine requests
 - **Engine**: Pure Rust, no direct dependencies on other workspace packages (uses HTTP API)
 
-## Local Dev Stack (Nix + direnv)
+## Local Dev Stack (devenv + direnv)
 
-PostgreSQL is managed automatically by the Nix flake. Entering the project directory via direnv starts the database cluster. All services run on:
+The Nix flake defines a `devenv` shell with Bun, Rust, PostgreSQL, and the project process graph. Entering the project directory via direnv loads the tools and variables from `.env`. Start the local stack with `devenv up`.
+
+All services run on:
 
 - `web` → port `3000`
 - `api` → port `4000`
@@ -102,5 +105,14 @@ PostgreSQL is managed automatically by the Nix flake. Entering the project direc
 Run the full local stack with a single command:
 
 ```bash
-just
+just dev
+```
+
+Database-only maintenance commands are still available:
+
+```bash
+just db-start
+just db-stop
+just db-migrate
+just db-studio
 ```

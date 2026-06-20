@@ -6,6 +6,7 @@ export type GameSettings = {
 	soundEnabled: boolean;
 	showCoordinates: boolean;
 	moveAnimation: boolean;
+	confirmMoves: boolean;
 	autoQueen: boolean;
 	showLegalMoves: boolean;
 	showLastMove: boolean;
@@ -18,6 +19,7 @@ const DEFAULT_SETTINGS: GameSettings = {
 	soundEnabled: true,
 	showCoordinates: true,
 	moveAnimation: true,
+	confirmMoves: true,
 	autoQueen: false,
 	showLegalMoves: true,
 	showLastMove: true,

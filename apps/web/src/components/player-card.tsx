@@ -1,6 +1,5 @@
 import type { Color, PieceType } from "@chess/types";
 import { useMemo } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { useSettings } from "@/lib/settings-context";
 import { getPieceImageUrl, getPieceUnicode, MATERIAL_ORDER, PIECE_THEMES } from "@/lib/themes";
 import { cn } from "@/lib/utils";
@@ -37,86 +36,76 @@ export default function PlayerCard({
 	const isUnicode = pieceThemeConfig?.type === "unicode";
 
 	const groupedCaptures = useMemo(() => {
-		const groups = new Map<PieceType, number>();
-		for (const { piece } of capturedPieces) {
-			groups.set(piece, (groups.get(piece) ?? 0) + 1);
+		const groups = new Map<PieceType, { key: string; piece: PieceType }[]>();
+		for (const entry of capturedPieces) {
+			const entries = groups.get(entry.piece) ?? [];
+			entries.push(entry);
+			groups.set(entry.piece, entries);
 		}
-		return MATERIAL_ORDER.filter((p) => groups.has(p)).map((p) => ({
-			piece: p,
-			count: groups.get(p)!,
-		}));
+		return MATERIAL_ORDER.flatMap((piece) => groups.get(piece) ?? []);
 	}, [capturedPieces]);
 
 	return (
-		<Card
+		<div
 			className={cn(
-				"bg-zinc-900 border-zinc-800 transition-opacity duration-300",
+				"flex items-center gap-3 rounded-lg bg-zinc-900 border border-zinc-800 px-4 py-3 transition-opacity duration-300",
 				!isActive && "opacity-50",
 			)}
 		>
-			<CardContent className="p-4 flex flex-col gap-3">
-				<div className="flex items-center gap-3">
-					{icon ?? (
-						<div
-							className={cn(
-								"flex h-10 w-10 items-center justify-center rounded text-lg font-bold border",
-								color === "White"
-									? "bg-zinc-100 text-zinc-900 border-zinc-200"
-									: "bg-zinc-950 text-zinc-100 border-zinc-800",
-							)}
-						>
-							{color[0]}
-						</div>
+			{/* Icon */}
+			{icon ?? (
+				<div
+					className={cn(
+						"flex h-9 w-9 shrink-0 items-center justify-center rounded text-base font-bold border",
+						color === "White"
+							? "bg-zinc-100 text-zinc-900 border-zinc-200"
+							: "bg-zinc-950 text-zinc-100 border-zinc-800",
 					)}
-					<div className="flex flex-col flex-1">
-						<span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
-							{label}
-						</span>
-						{showTime && (
-							<span
-								className={cn(
-									"text-xl font-mono font-light",
-									isLowTime ? "text-red-400" : "text-zinc-100",
-								)}
-							>
-								{time}
-							</span>
-						)}
-					</div>
+				>
+					{color[0]}
 				</div>
+			)}
 
-				{/* Captured pieces */}
-				<div className="flex items-center gap-0.5 min-h-[24px] flex-wrap">
-					{groupedCaptures.map(({ piece, count }) => (
-						<div key={piece} className="flex items-center">
-							{Array.from({ length: count }).map((_, i) => (
-								<span key={`${piece}-${i}`} className="inline-flex -mr-1">
-									{isUnicode ? (
-										<span className="text-lg text-zinc-500 leading-none">
-											{getPieceUnicode(capturedByColor, piece)}
-										</span>
-									) : (
-										<img
-											src={getPieceImageUrl(settings.pieceTheme, capturedByColor, piece)}
-											alt={piece}
-											className="h-5 w-5 opacity-60"
-											draggable={false}
-										/>
-									)}
+			{/* Name + captured pieces */}
+			<div className="flex flex-1 flex-col gap-1 min-w-0">
+				<span className="text-sm font-medium text-zinc-300 leading-none">{label}</span>
+				<div className="flex items-center gap-0.5 flex-wrap min-h-[18px]">
+					{groupedCaptures.map(({ key, piece }) => (
+						<span key={key} className="inline-flex -mr-1">
+							{isUnicode ? (
+								<span className="text-base text-zinc-500 leading-none">
+									{getPieceUnicode(capturedByColor, piece)}
 								</span>
-							))}
-						</div>
-					))}
-					{materialAdvantage !== 0 && (
-						<span className="text-xs font-mono text-zinc-500 ml-1">
-							{materialAdvantage > 0 ? `+${materialAdvantage}` : ""}
+							) : (
+								<img
+									src={getPieceImageUrl(settings.pieceTheme, capturedByColor, piece)}
+									alt={piece}
+									className="h-[18px] w-[18px] opacity-60"
+									draggable={false}
+								/>
+							)}
 						</span>
+					))}
+					{materialAdvantage > 0 && (
+						<span className="text-xs font-mono text-zinc-500 ml-1">+{materialAdvantage}</span>
 					)}
 				</div>
+			</div>
 
-				{/* Action buttons (children) */}
-				{children && <div className="flex flex-col gap-2 mt-1">{children}</div>}
-			</CardContent>
-		</Card>
+			{/* Time + children */}
+			<div className="flex flex-col items-end gap-1 shrink-0">
+				{showTime && (
+					<span
+						className={cn(
+							"text-2xl font-mono font-light tabular-nums leading-none",
+							isLowTime ? "text-red-400" : "text-zinc-100",
+						)}
+					>
+						{time}
+					</span>
+				)}
+				{children}
+			</div>
+		</div>
 	);
 }

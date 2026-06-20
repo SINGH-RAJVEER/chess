@@ -112,7 +112,6 @@ export default function Header(props: HeaderProps) {
 		<>
 			<header className="sticky top-0 z-50 flex items-center justify-between bg-zinc-950 px-6 py-2 text-zinc-100 border-b border-zinc-800">
 				<Link to="/" className="flex w-1/4 items-center gap-2 transition-opacity hover:opacity-80">
-					<span className="text-2xl">\u265B</span>
 					<h1 className="text-xl font-medium tracking-tight lowercase">chess</h1>
 				</Link>
 
@@ -157,14 +156,9 @@ export default function Header(props: HeaderProps) {
 				<div className="flex w-1/4 items-center justify-end gap-2">
 					{currentTab !== "vs_computer" && (
 						<DropdownMenu>
-							<DropdownMenuTrigger className="cursor-pointer">
-								<button
-									type="button"
-									className="flex items-center h-8 text-xs font-medium bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:text-zinc-100 rounded-md px-3"
-								>
-									{getTimeLabel()}
-									<ChevronDown className="ml-2 size-3 transition-transform duration-200" />
-								</button>
+							<DropdownMenuTrigger className="cursor-pointer flex items-center h-8 text-xs font-medium bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:text-zinc-100 rounded-md px-3">
+								{getTimeLabel()}
+								<ChevronDown className="ml-2 size-3 transition-transform duration-200" />
 							</DropdownMenuTrigger>
 							<DropdownMenuContent className="w-52 bg-zinc-900 border-zinc-800 text-zinc-300">
 								{timeCategories.map((category) => (
@@ -241,14 +235,9 @@ export default function Header(props: HeaderProps) {
 
 					{user ? (
 						<DropdownMenu>
-							<DropdownMenuTrigger className="cursor-pointer">
-								<button
-									type="button"
-									className="flex items-center h-8 text-xs font-medium bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:text-zinc-100 rounded-md px-3"
-								>
-									<User className="mr-2 size-3" />
-									{user.name}
-								</button>
+							<DropdownMenuTrigger className="cursor-pointer flex items-center h-8 text-xs font-medium bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:text-zinc-100 rounded-md px-3">
+								<User className="mr-2 size-3" />
+								{user.name}
 							</DropdownMenuTrigger>
 							<DropdownMenuContent className="w-48 bg-zinc-900 border-zinc-800 text-zinc-300">
 								<DropdownMenuLabel className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase px-2 py-1.5">

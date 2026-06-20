@@ -66,7 +66,7 @@ export default function ChessBoard({
 	}, [flipped]);
 
 	return (
-		<div className="relative aspect-square w-[min(85vw,600px)] overflow-hidden rounded-sm shadow-2xl select-none">
+		<div className="relative w-full h-full overflow-hidden rounded-sm shadow-2xl select-none">
 			<div className="grid h-full w-full grid-cols-8 grid-rows-[repeat(8,1fr)]">
 				{orderedSquares.map((squareIndex) => {
 					const row = Math.floor(squareIndex / 8);

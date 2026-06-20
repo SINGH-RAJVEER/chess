@@ -1,35 +1,16 @@
-import type { BoardResponse, Color, PieceType, PromotionPiece } from "@chess/types";
-import { AlertCircle, Cpu, User } from "lucide-react";
+import type { BoardResponse, PromotionPiece } from "@chess/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ChessBoard from "@/components/chess-board";
-import Header from "@/components/header";
-import MoveHistory from "@/components/move-history";
-import PlayerCard from "@/components/player-card";
-import PromotionDialog from "@/components/promotion-dialog";
-import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import ComputerGameView, { type PromotionState } from "@/components/computer-game-view";
 import { getBoard, getMoves, makeMove, resetGame, resignGame, undoMove } from "@/lib/api";
+import {
+	buildCapturedPieceEntries,
+	getClockTime,
+	getPreviewPieces,
+	type PendingMove,
+} from "@/lib/game-utils";
 import { useSettings } from "@/lib/settings-context";
 import { playSound, resumeAudioContext } from "@/lib/sounds";
 import { calculateMaterialAdvantage } from "@/lib/themes";
-
-type PendingMove = { from: number; to: number };
-
-function buildCapturedPieceEntries(capturedPieces: PieceType[] | undefined) {
-	const counts = new Map<PieceType, number>();
-	return (capturedPieces ?? []).map((piece) => {
-		const occurrence = (counts.get(piece) ?? 0) + 1;
-		counts.set(piece, occurrence);
-		return { key: `${piece}-${occurrence}`, piece };
-	});
-}
 
 export default function ComputerPage() {
 	const { settings } = useSettings();
@@ -42,11 +23,7 @@ export default function ComputerPage() {
 	const [isMovePending, setIsMovePending] = useState(false);
 	const [isUndoPending, setIsUndoPending] = useState(false);
 	const [isResetPending, setIsResetPending] = useState(false);
-	const [promotionState, setPromotionState] = useState<{
-		from: number;
-		to: number;
-		color: Color;
-	} | null>(null);
+	const [promotionState, setPromotionState] = useState<PromotionState | null>(null);
 	const prevMoveCountRef = useRef(0);
 
 	const fetchBoard = useCallback(async () => {
@@ -101,33 +78,15 @@ export default function ComputerPage() {
 		prevMoveCountRef.current = moveCount;
 	}, [boardData, settings.soundEnabled]);
 
-	const pieces = useMemo(() => {
-		const basePieces = boardData?.pieces ?? [];
-		if (!pendingMove) return basePieces;
-		return basePieces
-			.filter((p) => p.square !== pendingMove.to)
-			.map((p) => (p.square === pendingMove.from ? { ...p, square: pendingMove.to } : p));
-	}, [boardData?.pieces, pendingMove]);
+	const pieces = useMemo(
+		() => getPreviewPieces(boardData?.pieces, pendingMove),
+		[boardData?.pieces, pendingMove],
+	);
 
 	const turn = boardData?.turn || "White";
 
-	const whiteTime = useMemo(() => {
-		if (!boardData) return 0;
-		if (boardData.timeControl === 0) return Number.MAX_SAFE_INTEGER;
-		if (boardData.turn === "White" && boardData.status === "Ongoing" && boardData.lastMoveTime) {
-			return Math.max(0, boardData.whiteTimeRemaining - (now - boardData.lastMoveTime));
-		}
-		return boardData.whiteTimeRemaining;
-	}, [boardData, now]);
-
-	const blackTime = useMemo(() => {
-		if (!boardData) return 0;
-		if (boardData.timeControl === 0) return Number.MAX_SAFE_INTEGER;
-		if (boardData.turn === "Black" && boardData.status === "Ongoing" && boardData.lastMoveTime) {
-			return Math.max(0, boardData.blackTimeRemaining - (now - boardData.lastMoveTime));
-		}
-		return boardData.blackTimeRemaining;
-	}, [boardData, now]);
+	const whiteTime = useMemo(() => getClockTime(boardData, "White", now), [boardData, now]);
+	const blackTime = useMemo(() => getClockTime(boardData, "Black", now), [boardData, now]);
 
 	const capturedWhite = useMemo(
 		() => buildCapturedPieceEntries(boardData?.capturedPieces?.white),
@@ -142,14 +101,6 @@ export default function ComputerPage() {
 		() => calculateMaterialAdvantage(boardData?.capturedPieces ?? { white: [], black: [] }),
 		[boardData?.capturedPieces],
 	);
-
-	const formatTime = (ms: number) => {
-		if (boardData?.timeControl === 0) return "\u221E";
-		const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-		const minutes = Math.floor(totalSeconds / 60);
-		const seconds = totalSeconds % 60;
-		return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-	};
 
 	const handleSquareClick = async (squareIndex: number) => {
 		resumeAudioContext();
@@ -187,16 +138,19 @@ export default function ComputerPage() {
 				setValidMoves([]);
 				return;
 			}
-			setPendingMove({ from: selectedSquare, to: squareIndex });
+			const move = { from: selectedSquare, to: squareIndex };
+			if (settings.confirmMoves) {
+				setPendingMove(move);
+			} else {
+				void submitMove(move);
+			}
 		}
 		setSelectedSquare(null);
 		setValidMoves([]);
 	};
 
-	const handleConfirmMove = async (promotion?: PromotionPiece) => {
-		const move =
-			pendingMove ?? (promotionState ? { from: promotionState.from, to: promotionState.to } : null);
-		if (!move || !boardData?.id || isMovePending) return;
+	const submitMove = async (move: PendingMove, promotion?: PromotionPiece) => {
+		if (!boardData?.id || isMovePending) return;
 
 		try {
 			setIsMovePending(true);
@@ -210,6 +164,13 @@ export default function ComputerPage() {
 		} finally {
 			setIsMovePending(false);
 		}
+	};
+
+	const handleConfirmMove = async (promotion?: PromotionPiece) => {
+		const move =
+			pendingMove ?? (promotionState ? { from: promotionState.from, to: promotionState.to } : null);
+		if (!move) return;
+		await submitMove(move, promotion);
 	};
 
 	const handlePromotionSelect = (piece: PromotionPiece) => {
@@ -301,150 +262,32 @@ export default function ComputerPage() {
 	};
 
 	return (
-		<div className="flex min-h-screen flex-col bg-zinc-950 font-sans text-zinc-300">
-			<Header
-				onRestart={() => void handleReset()}
-				isRestarting={isResetPending}
-				activeTab="vs_computer"
-				currentTimeControl={boardData?.timeControl}
-			/>
-
-			<div className="relative flex flex-1 flex-col items-center justify-center p-4 lg:p-8">
-				{errorMsg && (
-					<div className="absolute top-4 z-30 rounded bg-red-900/80 px-4 py-1.5 text-xs font-medium text-red-100 backdrop-blur-sm flex items-center gap-2">
-						<AlertCircle className="size-3" />
-						{errorMsg}
-					</div>
-				)}
-
-				<div className="flex w-full max-w-6xl flex-col items-center justify-center gap-6 lg:flex-row lg:gap-12">
-					<div className="order-1 flex w-full max-w-[240px] flex-col gap-4">
-						<PlayerCard
-							label="Engine"
-							color="Black"
-							time={formatTime(blackTime)}
-							isActive={turn === "Black"}
-							capturedPieces={capturedWhite}
-							capturedByColor="White"
-							materialAdvantage={materialAdv < 0 ? Math.abs(materialAdv) : 0}
-							showTime={boardData?.timeControl !== 0}
-							icon={
-								<div className="flex h-10 w-10 items-center justify-center rounded bg-zinc-950 text-zinc-100 border border-zinc-800">
-									<Cpu className="size-5" />
-								</div>
-							}
-						/>
-					</div>
-
-					<div className="order-2">
-						<ChessBoard
-							pieces={pieces}
-							boardData={boardData}
-							selectedSquare={selectedSquare}
-							validMoves={validMoves}
-							isCheck={boardData?.isCheck}
-							onSquareClick={(sq) => void handleSquareClick(sq)}
-						/>
-					</div>
-
-					<div className="order-3 flex w-full max-w-[240px] flex-col gap-4">
-						<PlayerCard
-							label="You"
-							color="White"
-							time={formatTime(whiteTime)}
-							isActive={turn === "White"}
-							capturedPieces={capturedBlack}
-							capturedByColor="Black"
-							materialAdvantage={materialAdv > 0 ? materialAdv : 0}
-							showTime={boardData?.timeControl !== 0}
-							icon={
-								<div className="flex h-10 w-10 items-center justify-center rounded bg-zinc-100 text-zinc-900 border border-zinc-200">
-									<User className="size-5" />
-								</div>
-							}
-						>
-							{!pendingMove && (
-								<Button
-									size="sm"
-									variant="ghost"
-									className="w-full text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 h-7 text-xs"
-									onClick={() => void handleTakeback()}
-									disabled={isUndoPending || (boardData?.moves.length || 0) === 0}
-								>
-									Takeback
-								</Button>
-							)}
-							{turn === "White" && pendingMove && (
-								<div className="flex gap-2">
-									<Button
-										size="sm"
-										className="flex-1 bg-zinc-100 text-zinc-900 hover:bg-white h-7 text-xs"
-										onClick={() => void handleConfirmMove()}
-									>
-										Confirm
-									</Button>
-									<Button
-										size="sm"
-										variant="outline"
-										className="flex-1 border-zinc-700 h-7 text-xs"
-										onClick={handleCancelMove}
-									>
-										Cancel
-									</Button>
-								</div>
-							)}
-							{boardData?.status === "Ongoing" && (
-								<Button
-									size="sm"
-									variant="ghost"
-									className="w-full text-zinc-400 hover:text-red-400 hover:bg-zinc-800 h-7 text-xs"
-									onClick={() => void handleResign()}
-								>
-									Resign
-								</Button>
-							)}
-						</PlayerCard>
-					</div>
-				</div>
-			</div>
-
-			<MoveHistory moves={boardData?.moves ?? []} />
-
-			{promotionState && (
-				<PromotionDialog
-					color={promotionState.color}
-					onSelect={handlePromotionSelect}
-					onCancel={handleCancelMove}
-				/>
-			)}
-
-			<Dialog open={isGameOver} onOpenChange={() => {}}>
-				<DialogContent
-					className="bg-zinc-900 border-zinc-800 text-zinc-100"
-					showCloseButton={false}
-				>
-					<DialogHeader>
-						<DialogTitle className="text-3xl font-light text-center lowercase">
-							{boardData?.status === "Checkmate"
-								? "Checkmate"
-								: boardData?.status === "Resignation"
-									? "Resigned"
-									: "Game Over"}
-						</DialogTitle>
-						<DialogDescription className="text-center text-zinc-400 pt-2">
-							{getGameOverMessage()}
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter className="sm:justify-center mt-6">
-						<Button
-							className="bg-zinc-100 text-zinc-900 hover:bg-white px-8"
-							onClick={() => void handleReset()}
-						>
-							Play Again
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-		</div>
+		<ComputerGameView
+			boardData={boardData}
+			pieces={pieces}
+			selectedSquare={selectedSquare}
+			validMoves={validMoves}
+			pendingMove={pendingMove}
+			promotionState={promotionState}
+			errorMsg={errorMsg}
+			turn={turn}
+			whiteTime={whiteTime}
+			blackTime={blackTime}
+			capturedWhite={capturedWhite}
+			capturedBlack={capturedBlack}
+			materialAdvantage={materialAdv}
+			isMovePending={isMovePending}
+			isUndoPending={isUndoPending}
+			isResetPending={isResetPending}
+			isGameOver={isGameOver}
+			gameOverMessage={getGameOverMessage()}
+			onRestart={() => void handleReset()}
+			onSquareClick={(square) => void handleSquareClick(square)}
+			onConfirmMove={(promotion) => void handleConfirmMove(promotion)}
+			onCancelMove={handleCancelMove}
+			onPromotionSelect={handlePromotionSelect}
+			onTakeback={() => void handleTakeback()}
+			onResign={() => void handleResign()}
+		/>
 	);
 }

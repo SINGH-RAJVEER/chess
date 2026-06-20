@@ -9,7 +9,10 @@ type GameControlsProps = {
 	onAcceptDraw?: () => void;
 	onDeclineDraw?: () => void;
 	onTakeback?: () => void;
+	onAcceptTakeback?: () => void;
+	onDeclineTakeback?: () => void;
 	drawOfferedBy?: Color | null;
+	takebackRequestedBy?: Color | null;
 	userColor?: Color;
 	canTakeback?: boolean;
 	canResign?: boolean;
@@ -23,7 +26,10 @@ export default function GameControls({
 	onAcceptDraw,
 	onDeclineDraw,
 	onTakeback,
+	onAcceptTakeback,
+	onDeclineTakeback,
 	drawOfferedBy,
+	takebackRequestedBy,
 	userColor,
 	canTakeback = false,
 	canResign = true,
@@ -35,6 +41,9 @@ export default function GameControls({
 	if (!isGameOngoing) return null;
 
 	const isDrawOfferedToUser = drawOfferedBy != null && drawOfferedBy !== userColor;
+	const isTakebackRequestedToUser =
+		takebackRequestedBy != null && takebackRequestedBy !== userColor;
+	const hasOpenRequest = drawOfferedBy != null || takebackRequestedBy != null;
 
 	return (
 		<div className="flex flex-col gap-2">
@@ -57,6 +66,31 @@ export default function GameControls({
 							variant="outline"
 							className="flex-1 border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 h-7 text-xs"
 							onClick={onDeclineDraw}
+						>
+							Decline
+						</Button>
+					</div>
+				</div>
+			)}
+
+			{isTakebackRequestedToUser && (
+				<div className="flex flex-col gap-1.5 p-2 bg-zinc-800/50 rounded-md border border-zinc-700">
+					<span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+						Takeback requested
+					</span>
+					<div className="flex gap-2">
+						<Button
+							size="sm"
+							className="flex-1 bg-zinc-100 text-zinc-900 hover:bg-white h-7 text-xs"
+							onClick={onAcceptTakeback}
+						>
+							Accept
+						</Button>
+						<Button
+							size="sm"
+							variant="outline"
+							className="flex-1 border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 h-7 text-xs"
+							onClick={onDeclineTakeback}
 						>
 							Decline
 						</Button>
@@ -95,7 +129,7 @@ export default function GameControls({
 				</div>
 			) : (
 				<div className="flex gap-2">
-					{canTakeback && (
+					{canTakeback && !hasOpenRequest && (
 						<Button
 							size="sm"
 							variant="ghost"
@@ -106,7 +140,7 @@ export default function GameControls({
 							Takeback
 						</Button>
 					)}
-					{canOfferDraw && !isDrawOfferedToUser && (
+					{canOfferDraw && !isDrawOfferedToUser && !takebackRequestedBy && (
 						<Button
 							size="sm"
 							variant="ghost"
@@ -118,7 +152,7 @@ export default function GameControls({
 							{drawOfferedBy === userColor ? "Offered" : "Draw"}
 						</Button>
 					)}
-					{canResign && (
+					{canResign && !hasOpenRequest && (
 						<Button
 							size="sm"
 							variant="ghost"

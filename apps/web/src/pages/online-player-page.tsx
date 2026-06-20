@@ -1,7 +1,6 @@
 import type {
 	BoardResponse,
 	Color,
-	PieceType,
 	PromotionPiece,
 	QueueStatusResponse,
 } from "@chess/types";
@@ -35,20 +34,16 @@ import {
 	undoMove,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import {
+	buildCapturedPieceEntries,
+	formatGameTime,
+	getClockTime,
+	getPreviewPieces,
+	type PendingMove,
+} from "@/lib/game-utils";
 import { useSettings } from "@/lib/settings-context";
 import { playSound, resumeAudioContext } from "@/lib/sounds";
 import { calculateMaterialAdvantage } from "@/lib/themes";
-
-type PendingMove = { from: number; to: number };
-
-function buildCapturedPieceEntries(capturedPieces: PieceType[] | undefined) {
-	const counts = new Map<PieceType, number>();
-	return (capturedPieces ?? []).map((piece) => {
-		const occurrence = (counts.get(piece) ?? 0) + 1;
-		counts.set(piece, occurrence);
-		return { key: `${piece}-${occurrence}`, piece };
-	});
-}
 
 export default function OnlinePlayerPage() {
 	const { user, isLoading: isAuthLoading } = useAuth();
@@ -71,6 +66,8 @@ export default function OnlinePlayerPage() {
 	const prevMoveCountRef = useRef(0);
 
 	const playerId = user?.id ?? "";
+	const boardId = boardData?.id ?? 0;
+	const boardStatus = boardData?.status;
 
 	useEffect(() => {
 		if (!isAuthLoading && !user) navigate("/sign-in");
@@ -100,10 +97,10 @@ export default function OnlinePlayerPage() {
 	}, [fetchBoard, playerId]);
 
 	useEffect(() => {
-		if (!playerId || !boardData || boardData.id === 0 || boardData.status !== "Ongoing") return;
+		if (!playerId || boardId === 0 || boardStatus !== "Ongoing") return;
 		const id = window.setInterval(() => void fetchBoard(), 1000);
 		return () => window.clearInterval(id);
-	}, [fetchBoard, boardData?.id, boardData?.status, playerId]);
+	}, [fetchBoard, boardId, boardStatus, playerId]);
 
 	useEffect(() => {
 		if (!playerId || (boardData && boardData.id !== 0)) {
@@ -146,13 +143,10 @@ export default function OnlinePlayerPage() {
 		prevMoveCountRef.current = moveCount;
 	}, [boardData, settings.soundEnabled]);
 
-	const pieces = useMemo(() => {
-		const basePieces = boardData?.pieces ?? [];
-		if (!pendingMove) return basePieces;
-		return basePieces
-			.filter((p) => p.square !== pendingMove.to)
-			.map((p) => (p.square === pendingMove.from ? { ...p, square: pendingMove.to } : p));
-	}, [boardData?.pieces, pendingMove]);
+	const pieces = useMemo(
+		() => getPreviewPieces(boardData?.pieces, pendingMove),
+		[boardData?.pieces, pendingMove],
+	);
 
 	const turn = boardData?.turn || "White";
 	const userColor = boardData?.userColor || "Spectator";
@@ -160,23 +154,8 @@ export default function OnlinePlayerPage() {
 	const isUserTurn = userColor !== "Spectator" && turn === userColor;
 	const flipped = userColor === "Black";
 
-	const whiteTime = useMemo(() => {
-		if (!boardData) return 0;
-		if (boardData.timeControl === 0) return Number.MAX_SAFE_INTEGER;
-		if (boardData.turn === "White" && boardData.status === "Ongoing" && boardData.lastMoveTime) {
-			return Math.max(0, boardData.whiteTimeRemaining - (now - boardData.lastMoveTime));
-		}
-		return boardData.whiteTimeRemaining;
-	}, [boardData, now]);
-
-	const blackTime = useMemo(() => {
-		if (!boardData) return 0;
-		if (boardData.timeControl === 0) return Number.MAX_SAFE_INTEGER;
-		if (boardData.turn === "Black" && boardData.status === "Ongoing" && boardData.lastMoveTime) {
-			return Math.max(0, boardData.blackTimeRemaining - (now - boardData.lastMoveTime));
-		}
-		return boardData.blackTimeRemaining;
-	}, [boardData, now]);
+	const whiteTime = useMemo(() => getClockTime(boardData, "White", now), [boardData, now]);
+	const blackTime = useMemo(() => getClockTime(boardData, "Black", now), [boardData, now]);
 
 	const opponentTime = userColor === "Black" ? whiteTime : blackTime;
 	const userTime = userColor === "Black" ? blackTime : whiteTime;
@@ -214,14 +193,6 @@ export default function OnlinePlayerPage() {
 			: materialAdv > 0
 				? materialAdv
 				: 0;
-
-	const formatTime = (ms: number) => {
-		if (boardData?.timeControl === 0) return "\u221E";
-		const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-		const minutes = Math.floor(totalSeconds / 60);
-		const seconds = totalSeconds % 60;
-		return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-	};
 
 	const handleSquareClick = async (squareIndex: number) => {
 		resumeAudioContext();
@@ -261,16 +232,20 @@ export default function OnlinePlayerPage() {
 				setValidMoves([]);
 				return;
 			}
-			setPendingMove({ from: selectedSquare, to: squareIndex });
+			const move = { from: selectedSquare, to: squareIndex };
+			if (settings.confirmMoves) {
+				setPendingMove(move);
+			} else {
+				void submitMove(move);
+			}
 		}
 		setSelectedSquare(null);
 		setValidMoves([]);
 	};
 
-	const handleConfirmMove = async (promotion?: PromotionPiece) => {
-		const move =
-			pendingMove ?? (promotionState ? { from: promotionState.from, to: promotionState.to } : null);
-		if (!move || !boardData?.id || isMovePending) return;
+	const submitMove = async (move: PendingMove, promotion?: PromotionPiece) => {
+		if (!boardData?.id || isMovePending) return;
+
 		try {
 			setIsMovePending(true);
 			await makeMove({ ...move, gameId: boardData.id, promotion });
@@ -283,6 +258,13 @@ export default function OnlinePlayerPage() {
 		} finally {
 			setIsMovePending(false);
 		}
+	};
+
+	const handleConfirmMove = async (promotion?: PromotionPiece) => {
+		const move =
+			pendingMove ?? (promotionState ? { from: promotionState.from, to: promotionState.to } : null);
+		if (!move) return;
+		await submitMove(move, promotion);
 	};
 
 	const handlePromotionSelect = (piece: PromotionPiece) => {
@@ -394,7 +376,7 @@ export default function OnlinePlayerPage() {
 	};
 
 	return (
-		<div className="flex min-h-screen flex-col bg-zinc-950 font-sans text-zinc-300">
+		<div className="h-screen flex flex-col bg-zinc-950 font-sans text-zinc-300 overflow-hidden">
 			<Header
 				onRestart={handleFindMatch}
 				isRestarting={isJoiningQueue}
@@ -404,75 +386,87 @@ export default function OnlinePlayerPage() {
 				queueStatus={queueStatus.status}
 			/>
 
-			<div className="relative flex flex-1 flex-col items-center justify-center p-4 lg:p-8">
-				{errorMsg && (
-					<div className="absolute top-4 z-30 rounded bg-red-900/80 px-4 py-1.5 text-xs font-medium text-red-100 backdrop-blur-sm flex items-center gap-2">
-						<AlertCircle className="size-3" />
-						{errorMsg}
-					</div>
-				)}
+			<div className="flex-1 min-h-0 flex overflow-hidden">
+				{/* Center: opponent → board → you */}
+				<div className="flex-1 min-h-0 flex flex-col p-4 gap-3 relative">
+					{errorMsg && (
+						<div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 rounded bg-red-900/80 px-4 py-1.5 text-xs font-medium text-red-100 backdrop-blur-sm flex items-center gap-2">
+							<AlertCircle className="size-3" />
+							{errorMsg}
+						</div>
+					)}
 
-				<div className="flex w-full max-w-6xl flex-col items-center justify-center gap-6 lg:flex-row lg:gap-12">
-					<div className="order-1 flex w-full max-w-[240px] flex-col gap-4">
-						<PlayerCard
-							label={hasActiveGame ? `Opponent (${opponentColor})` : "Opponent"}
-							color={opponentColor}
-							time={hasActiveGame ? formatTime(opponentTime) : "--:--"}
-							isActive={!isUserTurn}
-							capturedPieces={opponentCaptured}
-							capturedByColor={userColor === "Spectator" ? "White" : (userColor as Color)}
-							materialAdvantage={opponentMaterialAdv}
-							showTime={boardData?.timeControl !== 0}
-							isLowTime={opponentTime < 30000 && boardData?.timeControl !== 0}
-						/>
+					{/* Opponent card */}
+					<PlayerCard
+						label={hasActiveGame ? `Opponent (${opponentColor})` : "Opponent"}
+						color={opponentColor}
+						time={
+							hasActiveGame
+								? formatGameTime(opponentTime, boardData?.timeControl !== 0)
+								: "--:--"
+						}
+						isActive={!isUserTurn}
+						capturedPieces={opponentCaptured}
+						capturedByColor={userColor === "Spectator" ? "White" : (userColor as Color)}
+						materialAdvantage={opponentMaterialAdv}
+						showTime={boardData?.timeControl !== 0}
+						isLowTime={opponentTime < 30000 && boardData?.timeControl !== 0}
+					/>
+
+					{/* Board — fills remaining height */}
+					<div className="flex-1 min-h-0 flex items-center justify-center">
+						<div className="h-full aspect-square max-w-full">
+							<ChessBoard
+								pieces={pieces}
+								boardData={boardData}
+								selectedSquare={selectedSquare}
+								validMoves={validMoves}
+								flipped={flipped}
+								isCheck={boardData?.isCheck}
+								onSquareClick={(sq) => void handleSquareClick(sq)}
+							/>
+						</div>
 					</div>
 
-					<div className="order-2">
-						<ChessBoard
-							pieces={pieces}
-							boardData={boardData}
-							selectedSquare={selectedSquare}
-							validMoves={validMoves}
-							flipped={flipped}
-							isCheck={boardData?.isCheck}
-							onSquareClick={(sq) => void handleSquareClick(sq)}
-						/>
-					</div>
+					{/* Your card */}
+					<PlayerCard
+						label={hasActiveGame && userColor !== "Spectator" ? `You (${userColor})` : "You"}
+						color={userColor === "Spectator" ? "White" : (userColor as Color)}
+						time={
+							hasActiveGame ? formatGameTime(userTime, boardData?.timeControl !== 0) : "--:--"
+						}
+						isActive={isUserTurn}
+						capturedPieces={userCaptured}
+						capturedByColor={opponentColor}
+						materialAdvantage={userMaterialAdv}
+						showTime={boardData?.timeControl !== 0}
+						isLowTime={userTime < 30000 && boardData?.timeControl !== 0}
+					/>
+				</div>
 
-					<div className="order-3 flex w-full max-w-[240px] flex-col gap-4">
-						<PlayerCard
-							label={hasActiveGame && userColor !== "Spectator" ? `You (${userColor})` : "You"}
-							color={userColor === "Spectator" ? "White" : (userColor as Color)}
-							time={hasActiveGame ? formatTime(userTime) : "--:--"}
-							isActive={isUserTurn}
-							capturedPieces={userCaptured}
-							capturedByColor={opponentColor}
-							materialAdvantage={userMaterialAdv}
-							showTime={boardData?.timeControl !== 0}
-							isLowTime={userTime < 30000 && boardData?.timeControl !== 0}
-						>
-							{hasActiveGame && userColor !== "Spectator" && pendingMove && (
+				{/* Right sidebar: move history + controls */}
+				<div className="w-72 shrink-0 flex flex-col border-l border-zinc-800">
+					<MoveHistory moves={boardData?.moves ?? []} />
+
+					{hasActiveGame && userColor !== "Spectator" && (
+						<div className="shrink-0 border-t border-zinc-800 p-4 flex flex-col gap-2">
+							{pendingMove && (
 								<div className="flex gap-2">
 									<Button
-										size="sm"
-										className="flex-1 bg-zinc-100 text-zinc-900 hover:bg-white h-7 text-xs"
+										className="flex-1 bg-zinc-100 text-zinc-900 hover:bg-white"
 										onClick={() => void handleConfirmMove()}
 									>
 										Confirm
 									</Button>
 									<Button
-										size="sm"
 										variant="outline"
-										className="flex-1 border-zinc-700 h-7 text-xs"
+										className="flex-1 border-zinc-700"
 										onClick={handleCancelMove}
 									>
 										Cancel
 									</Button>
 								</div>
 							)}
-						</PlayerCard>
-
-						{hasActiveGame && userColor !== "Spectator" && (
 							<GameControls
 								onResign={handleResign}
 								onOfferDraw={handleOfferDraw}
@@ -484,12 +478,10 @@ export default function OnlinePlayerPage() {
 								canTakeback={!isUserTurn && !pendingMove && (boardData?.moves.length ?? 0) > 0}
 								isGameOngoing={boardData?.status === "Ongoing"}
 							/>
-						)}
-					</div>
+						</div>
+					)}
 				</div>
 			</div>
-
-			<MoveHistory moves={boardData?.moves ?? []} />
 
 			{promotionState && (
 				<PromotionDialog

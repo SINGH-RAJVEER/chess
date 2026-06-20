@@ -18,14 +18,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
-		const storedUser = localStorage.getItem("chess_user");
-		const storedSession = localStorage.getItem("chess_session");
-
-		if (storedUser && storedSession) {
-			setUser(JSON.parse(storedUser));
-			setSession(JSON.parse(storedSession));
+		try {
+			const storedUser = localStorage.getItem("chess_user");
+			const storedSession = localStorage.getItem("chess_session");
+			if (storedUser && storedSession) {
+				setUser(JSON.parse(storedUser));
+				setSession(JSON.parse(storedSession));
+			}
+		} catch {
+			localStorage.removeItem("chess_user");
+			localStorage.removeItem("chess_session");
+		} finally {
+			setIsLoading(false);
 		}
-		setIsLoading(false);
 	}, []);
 
 	const signIn = async (email: string, password: string) => {

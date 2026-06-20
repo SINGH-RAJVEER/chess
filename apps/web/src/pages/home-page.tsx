@@ -1,5 +1,5 @@
-import type { BoardResponse, Color, PieceType, PromotionPiece } from "@chess/types";
-import { AlertCircle } from "lucide-react";
+import type { BoardResponse, Color, PromotionPiece } from "@chess/types";
+import { AlertCircle, User } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChessBoard from "@/components/chess-board";
 import GameControls from "@/components/game-controls";
@@ -26,20 +26,16 @@ import {
 	respondToDraw,
 	undoMove,
 } from "@/lib/api";
+import {
+	buildCapturedPieceEntries,
+	formatGameTime,
+	getClockTime,
+	getPreviewPieces,
+	type PendingMove,
+} from "@/lib/game-utils";
 import { useSettings } from "@/lib/settings-context";
 import { playSound, resumeAudioContext } from "@/lib/sounds";
 import { calculateMaterialAdvantage } from "@/lib/themes";
-
-type PendingMove = { from: number; to: number };
-
-function buildCapturedPieceEntries(capturedPieces: PieceType[] | undefined) {
-	const counts = new Map<PieceType, number>();
-	return (capturedPieces ?? []).map((piece) => {
-		const occurrence = (counts.get(piece) ?? 0) + 1;
-		counts.set(piece, occurrence);
-		return { key: `${piece}-${occurrence}`, piece };
-	});
-}
 
 export default function HomePage() {
 	const { settings } = useSettings();
@@ -51,6 +47,7 @@ export default function HomePage() {
 	const [now, setNow] = useState(Date.now());
 	const [isMovePending, setIsMovePending] = useState(false);
 	const [isResetPending, setIsResetPending] = useState(false);
+	const [takebackRequestedBy, setTakebackRequestedBy] = useState<Color | null>(null);
 	const [promotionState, setPromotionState] = useState<{
 		from: number;
 		to: number;
@@ -100,33 +97,20 @@ export default function HomePage() {
 		prevMoveCountRef.current = moveCount;
 	}, [boardData, settings.soundEnabled]);
 
-	const pieces = useMemo(() => {
-		const basePieces = boardData?.pieces ?? [];
-		if (!pendingMove) return basePieces;
-		return basePieces
-			.filter((p) => p.square !== pendingMove.to)
-			.map((p) => (p.square === pendingMove.from ? { ...p, square: pendingMove.to } : p));
-	}, [boardData?.pieces, pendingMove]);
+	const pieces = useMemo(
+		() => getPreviewPieces(boardData?.pieces, pendingMove),
+		[boardData?.pieces, pendingMove],
+	);
 
 	const turn = boardData?.turn || "White";
+	const responderColor = useMemo<Color | null>(() => {
+		const requester = takebackRequestedBy ?? boardData?.drawOfferedBy ?? null;
+		if (!requester) return null;
+		return requester === "White" ? "Black" : "White";
+	}, [boardData?.drawOfferedBy, takebackRequestedBy]);
 
-	const whiteTime = useMemo(() => {
-		if (!boardData) return 0;
-		if (boardData.timeControl === 0) return Number.MAX_SAFE_INTEGER;
-		if (boardData.turn === "White" && boardData.status === "Ongoing" && boardData.lastMoveTime) {
-			return Math.max(0, boardData.whiteTimeRemaining - (now - boardData.lastMoveTime));
-		}
-		return boardData.whiteTimeRemaining;
-	}, [boardData, now]);
-
-	const blackTime = useMemo(() => {
-		if (!boardData) return 0;
-		if (boardData.timeControl === 0) return Number.MAX_SAFE_INTEGER;
-		if (boardData.turn === "Black" && boardData.status === "Ongoing" && boardData.lastMoveTime) {
-			return Math.max(0, boardData.blackTimeRemaining - (now - boardData.lastMoveTime));
-		}
-		return boardData.blackTimeRemaining;
-	}, [boardData, now]);
+	const whiteTime = useMemo(() => getClockTime(boardData, "White", now), [boardData, now]);
+	const blackTime = useMemo(() => getClockTime(boardData, "Black", now), [boardData, now]);
 
 	const capturedWhite = useMemo(
 		() => buildCapturedPieceEntries(boardData?.capturedPieces?.white),
@@ -142,16 +126,9 @@ export default function HomePage() {
 		[boardData?.capturedPieces],
 	);
 
-	const formatTime = (ms: number) => {
-		if (boardData?.timeControl === 0) return "\u221E";
-		const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-		const minutes = Math.floor(totalSeconds / 60);
-		const seconds = totalSeconds % 60;
-		return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-	};
-
 	const handleSquareClick = async (squareIndex: number) => {
 		resumeAudioContext();
+		if (takebackRequestedBy || boardData?.drawOfferedBy) return;
 		if (!boardData || boardData.status !== "Ongoing" || pendingMove) return;
 
 		const clickedPiece = pieces.find((p) => p.square === squareIndex);
@@ -192,22 +169,26 @@ export default function HomePage() {
 				return;
 			}
 
-			setPendingMove({ from: selectedSquare, to: squareIndex });
+			const move = { from: selectedSquare, to: squareIndex };
+			if (settings.confirmMoves) {
+				setPendingMove(move);
+			} else {
+				void submitMove(move);
+			}
 		}
 		setSelectedSquare(null);
 		setValidMoves([]);
 	};
 
-	const handleConfirmMove = async (promotion?: PromotionPiece) => {
-		const move =
-			pendingMove ?? (promotionState ? { from: promotionState.from, to: promotionState.to } : null);
-		if (!move || !boardData?.id || isMovePending) return;
+	const submitMove = async (move: PendingMove, promotion?: PromotionPiece) => {
+		if (!boardData?.id || isMovePending) return;
 
 		try {
 			setIsMovePending(true);
 			await makeMove({ ...move, gameId: boardData.id, promotion });
 			setPendingMove(null);
 			setPromotionState(null);
+			setTakebackRequestedBy(null);
 			await fetchBoard();
 		} catch (error) {
 			setErrorMsg(`Move failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -215,6 +196,13 @@ export default function HomePage() {
 		} finally {
 			setIsMovePending(false);
 		}
+	};
+
+	const handleConfirmMove = async (promotion?: PromotionPiece) => {
+		const move =
+			pendingMove ?? (promotionState ? { from: promotionState.from, to: promotionState.to } : null);
+		if (!move) return;
+		await submitMove(move, promotion);
 	};
 
 	const handlePromotionSelect = (piece: PromotionPiece) => {
@@ -232,6 +220,7 @@ export default function HomePage() {
 		if (!boardData?.id) return;
 		try {
 			await undoMove({ gameId: boardData.id });
+			setTakebackRequestedBy(null);
 			await fetchBoard();
 		} catch (error) {
 			setErrorMsg(`Undo failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -247,6 +236,9 @@ export default function HomePage() {
 
 	const handleOfferDraw = async () => {
 		if (!boardData?.id) return;
+		setSelectedSquare(null);
+		setValidMoves([]);
+		setPendingMove(null);
 		await offerDraw(boardData.id, turn);
 		await fetchBoard();
 	};
@@ -263,6 +255,18 @@ export default function HomePage() {
 		await fetchBoard();
 	};
 
+	const handleRequestTakeback = () => {
+		setSelectedSquare(null);
+		setValidMoves([]);
+		setPendingMove(null);
+		setPromotionState(null);
+		setTakebackRequestedBy(turn);
+	};
+
+	const handleDeclineTakeback = () => {
+		setTakebackRequestedBy(null);
+	};
+
 	const handleReset = async (options?: {
 		mode: "vs_player" | "vs_computer";
 		timeControl: number;
@@ -275,6 +279,7 @@ export default function HomePage() {
 			setSelectedSquare(null);
 			setValidMoves([]);
 			setPendingMove(null);
+			setTakebackRequestedBy(null);
 			setErrorMsg(null);
 			prevMoveCountRef.current = 0;
 			if (settings.soundEnabled) playSound("gameStart");
@@ -318,10 +323,13 @@ export default function HomePage() {
 		}
 	};
 
-	const flipped = settings.boardFlipped;
+	const perspectiveColor = responderColor ?? turn;
+	const flipped = perspectiveColor === "Black";
+	const topColor: Color = flipped ? "White" : "Black";
+	const bottomColor: Color = flipped ? "Black" : "White";
 
 	return (
-		<div className="flex min-h-screen flex-col bg-zinc-950 font-sans text-zinc-300">
+		<div className="h-screen flex flex-col bg-zinc-950 font-sans text-zinc-300 overflow-hidden">
 			<Header
 				onRestart={handleReset}
 				isRestarting={isResetPending}
@@ -330,139 +338,130 @@ export default function HomePage() {
 				currentIncrement={boardData?.increment}
 			/>
 
-			<div className="relative flex flex-1 flex-col items-center justify-center p-4 lg:p-8">
-				{errorMsg && (
-					<div className="absolute top-4 z-30 rounded bg-red-900/80 px-4 py-1.5 text-xs font-medium text-red-100 backdrop-blur-sm flex items-center gap-2">
-						<AlertCircle className="size-3" />
-						{errorMsg}
+			<div className="flex-1 min-h-0 flex overflow-hidden">
+				<div className="flex-1 min-h-0 flex flex-col p-4 gap-3 relative">
+					{errorMsg && (
+						<div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 rounded bg-red-900/80 px-4 py-1.5 text-xs font-medium text-red-100 backdrop-blur-sm flex items-center gap-2">
+							<AlertCircle className="size-3" />
+							{errorMsg}
+						</div>
+					)}
+
+					<PlayerCard
+						label={topColor}
+						color={topColor}
+						time={formatGameTime(
+							topColor === "White" ? whiteTime : blackTime,
+							boardData?.timeControl !== 0,
+						)}
+						isActive={turn === topColor}
+						capturedPieces={topColor === "White" ? capturedBlack : capturedWhite}
+						capturedByColor={topColor === "White" ? "Black" : "White"}
+						materialAdvantage={
+							topColor === "White"
+								? materialAdv > 0
+									? materialAdv
+									: 0
+								: materialAdv < 0
+									? Math.abs(materialAdv)
+									: 0
+						}
+						showTime={boardData?.timeControl !== 0}
+						isLowTime={
+							(topColor === "White" ? whiteTime : blackTime) < 30000 &&
+							boardData?.timeControl !== 0
+						}
+						icon={
+							<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-zinc-950 text-zinc-100 border border-zinc-800">
+								<User className="size-4" />
+							</div>
+						}
+					/>
+
+					<div className="flex-1 min-h-0 flex items-center justify-center">
+						<div className="h-full aspect-square max-w-full">
+							<ChessBoard
+								pieces={pieces}
+								boardData={boardData}
+								selectedSquare={selectedSquare}
+								validMoves={validMoves}
+								flipped={flipped}
+								isCheck={boardData?.isCheck}
+								onSquareClick={(sq) => void handleSquareClick(sq)}
+							/>
+						</div>
 					</div>
-				)}
 
-				<div className="flex w-full max-w-6xl flex-col items-center justify-center gap-6 lg:flex-row lg:gap-12">
-					{/* Top/Left Player */}
-					<div className="order-1 flex w-full max-w-[240px] flex-col gap-4 lg:order-1">
-						<PlayerCard
-							label={flipped ? "White" : "Black"}
-							color={flipped ? "White" : "Black"}
-							time={formatTime(flipped ? whiteTime : blackTime)}
-							isActive={turn === (flipped ? "White" : "Black")}
-							capturedPieces={flipped ? capturedBlack : capturedWhite}
-							capturedByColor={flipped ? "Black" : "White"}
-							materialAdvantage={
-								flipped
-									? materialAdv > 0
-										? materialAdv
-										: 0
-									: materialAdv < 0
-										? Math.abs(materialAdv)
-										: 0
-							}
-							showTime={boardData?.timeControl !== 0}
-							isLowTime={(flipped ? whiteTime : blackTime) < 30000 && boardData?.timeControl !== 0}
-						>
-							{turn === (flipped ? "White" : "Black") && pendingMove && (
-								<div className="flex gap-2">
-									<Button
-										size="sm"
-										className="flex-1 bg-zinc-100 text-zinc-900 hover:bg-white h-7 text-xs"
-										onClick={() => void handleConfirmMove()}
-									>
-										Confirm
-									</Button>
-									<Button
-										size="sm"
-										variant="outline"
-										className="flex-1 border-zinc-700 h-7 text-xs"
-										onClick={handleCancelMove}
-									>
-										Cancel
-									</Button>
-								</div>
-							)}
-						</PlayerCard>
+					<PlayerCard
+						label={bottomColor}
+						color={bottomColor}
+						time={formatGameTime(
+							bottomColor === "White" ? whiteTime : blackTime,
+							boardData?.timeControl !== 0,
+						)}
+						isActive={turn === bottomColor}
+						capturedPieces={bottomColor === "White" ? capturedBlack : capturedWhite}
+						capturedByColor={bottomColor === "White" ? "Black" : "White"}
+						materialAdvantage={
+							bottomColor === "White"
+								? materialAdv > 0
+									? materialAdv
+									: 0
+								: materialAdv < 0
+									? Math.abs(materialAdv)
+									: 0
+						}
+						showTime={boardData?.timeControl !== 0}
+						isLowTime={
+							(bottomColor === "White" ? whiteTime : blackTime) < 30000 &&
+							boardData?.timeControl !== 0
+						}
+						icon={
+							<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-zinc-100 text-zinc-900 border border-zinc-200">
+								<User className="size-4" />
+							</div>
+						}
+					/>
+				</div>
 
+				<div className="w-72 shrink-0 flex flex-col border-l border-zinc-800">
+					<MoveHistory moves={boardData?.moves ?? []} />
+
+					<div className="shrink-0 border-t border-zinc-800 p-4 flex flex-col gap-2">
+						{pendingMove && (
+							<div className="flex gap-2">
+								<Button
+									className="flex-1 bg-zinc-100 text-zinc-900 hover:bg-white"
+									disabled={isMovePending}
+									onClick={() => void handleConfirmMove()}
+								>
+									Confirm
+								</Button>
+								<Button
+									variant="outline"
+									className="flex-1 border-zinc-700"
+									disabled={isMovePending}
+									onClick={handleCancelMove}
+								>
+									Cancel
+								</Button>
+							</div>
+						)}
 						<GameControls
 							onResign={handleResign}
 							onOfferDraw={handleOfferDraw}
 							onAcceptDraw={handleAcceptDraw}
 							onDeclineDraw={handleDeclineDraw}
-							onTakeback={() => void handleUndo()}
+							onTakeback={handleRequestTakeback}
+							onAcceptTakeback={() => void handleUndo()}
+							onDeclineTakeback={handleDeclineTakeback}
 							drawOfferedBy={boardData?.drawOfferedBy}
-							userColor={flipped ? "White" : "Black"}
+							takebackRequestedBy={takebackRequestedBy}
+							userColor={bottomColor}
 							canTakeback={
-								turn === (flipped ? "Black" : "White") &&
 								!pendingMove &&
-								(boardData?.moves.length ?? 0) > 0
-							}
-							isGameOngoing={boardData?.status === "Ongoing"}
-						/>
-					</div>
-
-					<div className="order-2">
-						<ChessBoard
-							pieces={pieces}
-							boardData={boardData}
-							selectedSquare={selectedSquare}
-							validMoves={validMoves}
-							flipped={flipped}
-							isCheck={boardData?.isCheck}
-							onSquareClick={(sq) => void handleSquareClick(sq)}
-						/>
-					</div>
-
-					{/* Bottom/Right Player */}
-					<div className="order-3 flex w-full max-w-[240px] flex-col gap-4">
-						<PlayerCard
-							label={flipped ? "Black" : "White"}
-							color={flipped ? "Black" : "White"}
-							time={formatTime(flipped ? blackTime : whiteTime)}
-							isActive={turn === (flipped ? "Black" : "White")}
-							capturedPieces={flipped ? capturedWhite : capturedBlack}
-							capturedByColor={flipped ? "White" : "Black"}
-							materialAdvantage={
-								flipped
-									? materialAdv < 0
-										? Math.abs(materialAdv)
-										: 0
-									: materialAdv > 0
-										? materialAdv
-										: 0
-							}
-							showTime={boardData?.timeControl !== 0}
-							isLowTime={(flipped ? blackTime : whiteTime) < 30000 && boardData?.timeControl !== 0}
-						>
-							{turn === (flipped ? "Black" : "White") && pendingMove && (
-								<div className="flex gap-2">
-									<Button
-										size="sm"
-										className="flex-1 bg-zinc-100 text-zinc-900 hover:bg-white h-7 text-xs"
-										onClick={() => void handleConfirmMove()}
-									>
-										Confirm
-									</Button>
-									<Button
-										size="sm"
-										variant="outline"
-										className="flex-1 border-zinc-700 h-7 text-xs"
-										onClick={handleCancelMove}
-									>
-										Cancel
-									</Button>
-								</div>
-							)}
-						</PlayerCard>
-
-						<GameControls
-							onResign={handleResign}
-							onOfferDraw={handleOfferDraw}
-							onAcceptDraw={handleAcceptDraw}
-							onDeclineDraw={handleDeclineDraw}
-							onTakeback={() => void handleUndo()}
-							drawOfferedBy={boardData?.drawOfferedBy}
-							userColor={flipped ? "Black" : "White"}
-							canTakeback={
-								turn === (flipped ? "White" : "Black") &&
-								!pendingMove &&
+								!takebackRequestedBy &&
+								!boardData?.drawOfferedBy &&
 								(boardData?.moves.length ?? 0) > 0
 							}
 							isGameOngoing={boardData?.status === "Ongoing"}
@@ -470,8 +469,6 @@ export default function HomePage() {
 					</div>
 				</div>
 			</div>
-
-			<MoveHistory moves={boardData?.moves ?? []} />
 
 			{promotionState && (
 				<PromotionDialog

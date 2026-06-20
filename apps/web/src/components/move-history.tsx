@@ -1,5 +1,4 @@
 import type { BoardMove } from "@chess/types";
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 type MoveHistoryProps = {
@@ -26,109 +25,77 @@ export default function MoveHistory({ moves, currentMoveIndex, onNavigate }: Mov
 
 	useEffect(() => {
 		if (scrollRef.current) {
-			scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
 		}
-	}, [moves.length]);
+	});
 
 	const activeIndex = currentMoveIndex ?? moves.length - 1;
 
 	function formatNotation(move: BoardMove): string {
 		if (!move) return "";
-
 		let notation = move.notation;
-
 		if (move.isCheckmate) {
-			notation = notation.replace(/[+#]*$/, "") + "#";
+			notation = `${notation.replace(/[+#]*$/, "")}#`;
 		} else if (move.isCheck) {
-			notation = notation.replace(/[+#]*$/, "") + "+";
+			notation = `${notation.replace(/[+#]*$/, "")}+`;
 		}
-
 		return notation;
 	}
 
 	return (
-		<div className="border-t border-zinc-900 bg-zinc-950 p-3">
-			<div className="mx-auto max-w-6xl">
-				<div className="flex items-center gap-3">
-					<span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest shrink-0">
-						Moves
-					</span>
-
-					{/* Navigation buttons */}
-					{onNavigate && moves.length > 0 && (
-						<div className="flex gap-0.5 shrink-0">
-							<button
-								type="button"
-								className="p-1 text-zinc-600 hover:text-zinc-300 transition-colors disabled:opacity-30"
-								onClick={() => onNavigate(-1)}
-								disabled={activeIndex < 0}
-							>
-								<ChevronFirst className="size-3.5" />
-							</button>
-							<button
-								type="button"
-								className="p-1 text-zinc-600 hover:text-zinc-300 transition-colors disabled:opacity-30"
-								onClick={() => onNavigate(Math.max(-1, activeIndex - 1))}
-								disabled={activeIndex < 0}
-							>
-								<ChevronLeft className="size-3.5" />
-							</button>
-							<button
-								type="button"
-								className="p-1 text-zinc-600 hover:text-zinc-300 transition-colors disabled:opacity-30"
-								onClick={() => onNavigate(Math.min(moves.length - 1, activeIndex + 1))}
-								disabled={activeIndex >= moves.length - 1}
-							>
-								<ChevronRight className="size-3.5" />
-							</button>
-							<button
-								type="button"
-								className="p-1 text-zinc-600 hover:text-zinc-300 transition-colors disabled:opacity-30"
-								onClick={() => onNavigate(moves.length - 1)}
-								disabled={activeIndex >= moves.length - 1}
-							>
-								<ChevronLast className="size-3.5" />
-							</button>
-						</div>
-					)}
-
-					{/* Scrollable move list */}
-					<div ref={scrollRef} className="flex gap-3 overflow-x-auto no-scrollbar">
-						{movePairs.map(
-							({ moveNumber, whiteMove, whiteMoveIndex, blackMove, blackMoveIndex }) => (
-								<div key={moveNumber} className="flex gap-1.5 text-xs font-mono shrink-0">
-									<span className="text-zinc-700 w-5 text-right">{moveNumber}.</span>
-									{whiteMove && (
-										<button
-											type="button"
-											className={`px-1 rounded transition-colors ${
-												whiteMoveIndex === activeIndex
-													? "bg-zinc-700 text-zinc-100"
-													: "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
-											}`}
-											onClick={() => onNavigate?.(whiteMoveIndex)}
-										>
-											{formatNotation(whiteMove)}
-										</button>
-									)}
-									{blackMove && (
-										<button
-											type="button"
-											className={`px-1 rounded transition-colors ${
-												blackMoveIndex === activeIndex
-													? "bg-zinc-700 text-zinc-100"
-													: "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
-											}`}
-											onClick={() => onNavigate?.(blackMoveIndex)}
-										>
-											{formatNotation(blackMove)}
-										</button>
-									)}
-								</div>
-							),
-						)}
-					</div>
-				</div>
+		<div className="flex flex-col flex-1 min-h-0">
+			<div className="px-4 py-3 border-b border-zinc-800">
+				<span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Moves</span>
+			</div>
+			<div ref={scrollRef} className="flex-1 overflow-y-auto">
+				{movePairs.length === 0 ? (
+					<p className="px-4 py-6 text-xs text-zinc-600 text-center">No moves yet</p>
+				) : (
+					<table className="w-full text-sm font-mono">
+						<tbody>
+							{movePairs.map(({ moveNumber, whiteMove, whiteMoveIndex, blackMove, blackMoveIndex }) => (
+								<tr
+									key={moveNumber}
+									className="border-b border-zinc-900 hover:bg-zinc-900/40"
+								>
+									<td className="pl-4 pr-2 py-1.5 text-xs text-zinc-600 w-8 select-none">
+										{moveNumber}.
+									</td>
+									<td className="px-1 py-1.5 w-1/2">
+										{whiteMove && (
+											<button
+												type="button"
+												className={`w-full text-left px-2 py-0.5 rounded transition-colors ${
+													whiteMoveIndex === activeIndex
+														? "bg-zinc-700 text-zinc-100"
+														: "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
+												}`}
+												onClick={() => onNavigate?.(whiteMoveIndex)}
+											>
+												{formatNotation(whiteMove)}
+											</button>
+										)}
+									</td>
+									<td className="px-1 py-1.5 pr-4 w-1/2">
+										{blackMove && (
+											<button
+												type="button"
+												className={`w-full text-left px-2 py-0.5 rounded transition-colors ${
+													blackMoveIndex === activeIndex
+														? "bg-zinc-700 text-zinc-100"
+														: "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
+												}`}
+												onClick={() => onNavigate?.(blackMoveIndex)}
+											>
+												{formatNotation(blackMove)}
+											</button>
+										)}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				)}
 			</div>
 		</div>
 	);

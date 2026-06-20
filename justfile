@@ -16,9 +16,19 @@ install:
 lockfile:
     bun run lockfile:generate
 
-# Start all services: PostgreSQL → web + api + engine in parallel
-dev: db-start
-    bun run dev
+# Start PostgreSQL, web, api, and engine via devenv
+dev:
+    #!/usr/bin/env bash
+    set -e
+    if [ -f .env ]; then
+      set -a
+      source .env
+      set +a
+    fi
+    if ! command -v devenv &>/dev/null; then
+      exec nix develop --no-pure-eval --command devenv up --tui=false
+    fi
+    exec devenv up --tui=false
 
 # Build all workspaces
 build:
@@ -88,32 +98,50 @@ web-clean:
 db-start:
     #!/usr/bin/env bash
     set -e
-    if ! command -v pg_ctl &>/dev/null; then
-      exec nix develop --command just db-start
+    if [ -f .env ]; then
+      set -a
+      source .env
+      set +a
     fi
-    export PGDATA="$PWD/.postgres/data"
-    export PGHOST="$PWD/.postgres"
-    mkdir -p "$PGHOST"
+    PGDATA="${PGDATA:-$PWD/.postgres/data}"
+    PGHOST="${PGHOST:-localhost}"
+    PGPORT="${PGPORT:-5432}"
+    PGUSER="${PGUSER:-postgres}"
+    PGDATABASE="${PGDATABASE:-chess}"
+    if command -v pg_isready &>/dev/null && pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" &>/dev/null; then
+      createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$PGDATABASE" 2>/dev/null || true
+      echo "chess: PostgreSQL ready at $PGHOST:$PGPORT/$PGDATABASE"
+      exit 0
+    fi
+    if ! command -v pg_ctl &>/dev/null; then
+      exec nix develop --no-pure-eval --command just db-start
+    fi
+    mkdir -p "$(dirname "$PGDATA")"
     if [ ! -d "$PGDATA" ]; then
       echo "chess: initialising PostgreSQL cluster..."
-      initdb --auth=trust --username=postgres --pgdata="$PGDATA" \
+      initdb --auth=trust --username="$PGUSER" --pgdata="$PGDATA" \
              --no-locale --encoding=UTF8
     fi
     if ! pg_ctl status -D "$PGDATA" 2>/dev/null | grep -q "server is running"; then
-      echo "chess: starting PostgreSQL on localhost:5432..."
+      echo "chess: starting PostgreSQL on $PGHOST:$PGPORT..."
       pg_ctl start -D "$PGDATA" -l "$PGDATA/postgres.log" \
-        -o "-p 5432 -k $PGHOST -h localhost" -w
-      createdb -h localhost -p 5432 -U postgres chess 2>/dev/null || true
-      echo "chess: PostgreSQL ready at localhost:5432/chess"
+        -o "-p $PGPORT -h $PGHOST" -w
+      createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$PGDATABASE" 2>/dev/null || true
+      echo "chess: PostgreSQL ready at $PGHOST:$PGPORT/$PGDATABASE"
     fi
 
 # Stop PostgreSQL
 db-stop:
     #!/usr/bin/env bash
-    if ! command -v pg_ctl &>/dev/null; then
-      exec nix develop --command just db-stop
+    if [ -f .env ]; then
+      set -a
+      source .env
+      set +a
     fi
-    export PGDATA="$PWD/.postgres/data"
+    if ! command -v pg_ctl &>/dev/null; then
+      exec nix develop --no-pure-eval --command just db-stop
+    fi
+    PGDATA="${PGDATA:-$PWD/.postgres/data}"
     if pg_ctl status -D "$PGDATA" 2>/dev/null | grep -q "server is running"; then
       echo "chess: stopping PostgreSQL..."
       pg_ctl stop -D "$PGDATA" -m fast
