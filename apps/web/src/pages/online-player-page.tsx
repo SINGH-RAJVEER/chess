@@ -1,9 +1,4 @@
-import type {
-	BoardResponse,
-	Color,
-	PromotionPiece,
-	QueueStatusResponse,
-} from "@chess/types";
+import type { BoardResponse, Color, PromotionPiece, QueueStatusResponse } from "@chess/types";
 import { AlertCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -401,9 +396,7 @@ export default function OnlinePlayerPage() {
 						label={hasActiveGame ? `Opponent (${opponentColor})` : "Opponent"}
 						color={opponentColor}
 						time={
-							hasActiveGame
-								? formatGameTime(opponentTime, boardData?.timeControl !== 0)
-								: "--:--"
+							hasActiveGame ? formatGameTime(opponentTime, boardData?.timeControl !== 0) : "--:--"
 						}
 						isActive={!isUserTurn}
 						capturedPieces={opponentCaptured}
@@ -432,9 +425,7 @@ export default function OnlinePlayerPage() {
 					<PlayerCard
 						label={hasActiveGame && userColor !== "Spectator" ? `You (${userColor})` : "You"}
 						color={userColor === "Spectator" ? "White" : (userColor as Color)}
-						time={
-							hasActiveGame ? formatGameTime(userTime, boardData?.timeControl !== 0) : "--:--"
-						}
+						time={hasActiveGame ? formatGameTime(userTime, boardData?.timeControl !== 0) : "--:--"}
 						isActive={isUserTurn}
 						capturedPieces={userCaptured}
 						capturedByColor={opponentColor}

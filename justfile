@@ -1,9 +1,5 @@
 set shell := ["bash", "-c"]
 
-app_dir := "apps/web"
-engine_dir := "apps/engine"
-db_dir := "packages/db"
-
 # Show all available commands
 default:
     @just --list
@@ -60,39 +56,39 @@ clean:
 
 # Start only the web app
 web-dev:
-    cd {{app_dir}} && bun run dev
+    bunx nx run web:dev
 
 # Build the web app
 web-build:
-    cd {{app_dir}} && bun run build
+    bunx nx run web:build
 
 # Preview the web production build
 web-preview:
-    cd {{app_dir}} && bun run preview
+    bunx nx run web:preview
 
 # Start the web production server
 web-start:
-    cd {{app_dir}} && bun run start
+    bunx nx run web:start
 
 # Lint the web app
 web-lint:
-    cd {{app_dir}} && bun run lint
+    bunx nx run web:lint
 
 # Format the web app
 web-format:
-    cd {{app_dir}} && bun run format
+    bunx nx run web:format
 
 # Run Biome checks for the web app
 web-check:
-    cd {{app_dir}} && bun run check
+    bunx nx run web:check
 
 # Typecheck the web app
 web-typecheck:
-    cd {{app_dir}} && bun run typecheck
+    bunx nx run web:typecheck
 
 # Clean web build output
 web-clean:
-    cd {{app_dir}} && bun run clean
+    bunx nx run web:clean
 
 # Ensure PostgreSQL is running (init cluster on first run)
 db-start:
@@ -149,44 +145,44 @@ db-stop:
 
 # Generate Drizzle migrations
 db-generate: db-start
-    cd {{db_dir}} && bun run db:generate
+    bunx nx run db:db:generate
 
 # Apply pending Drizzle migrations
 db-migrate: db-start
-    cd {{db_dir}} && bun run db:migrate
+    bunx nx run db:db:migrate
 
 # Open Drizzle Studio
 db-studio:
-    cd {{db_dir}} && bun run db:studio
+    bunx nx run db:db:studio
 
 # Start only the Rust engine
 engine-dev:
-    cd {{engine_dir}} && bun run dev
+    bunx nx run engine:dev
 
 # Build the Rust engine
 engine-build:
-    cd {{engine_dir}} && bun run build
+    bunx nx run engine:build
 
 # Test the Rust engine
 engine-test:
-    cd {{engine_dir}} && bun run test
+    bunx nx run engine:test
 
 # Lint the Rust engine with clippy
 engine-lint:
-    cd {{engine_dir}} && bun run lint
+    bunx nx run engine:lint
 
 # Format the Rust engine
 engine-format:
-    cd {{engine_dir}} && bun run format
+    bunx nx run engine:format
 
 # Run cargo check for the engine
 engine-check:
-    cd {{engine_dir}} && bun run check
+    bunx nx run engine:check
 
 # Clean Rust build artifacts
 engine-clean:
-    cd {{engine_dir}} && bun run clean
+    bunx nx run engine:clean
 
-# Run a Turbo task for a specific workspace, e.g. `just turbo dev @chess/application`
-turbo task filter:
-    bunx turbo run {{task}} --filter={{filter}}
+# Run an Nx target for a project, e.g. `just nx-target build web`
+nx-target target project:
+    bunx nx run {{project}}:{{target}}

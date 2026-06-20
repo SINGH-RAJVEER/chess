@@ -1,0 +1,68 @@
+{
+	"name": "engine",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"projectType": "application",
+	"root": "apps/engine",
+	"sourceRoot": "apps/engine/src",
+	"tags": ["scope:engine", "type:app", "language:rust"],
+	"targets": {
+		"dev": {
+			"executor": "nx:run-commands",
+			"inputs": ["rust"],
+			"options": {
+				"cwd": "apps/engine",
+				"command": "cargo run"
+			}
+		},
+		"build": {
+			"executor": "nx:run-commands",
+			"inputs": ["rust"],
+			"outputs": ["{projectRoot}/target/release"],
+			"options": {
+				"cwd": "apps/engine",
+				"command": "cargo build --release"
+			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"inputs": ["rust"],
+			"outputs": ["{projectRoot}/target"],
+			"options": {
+				"cwd": "apps/engine",
+				"command": "cargo test"
+			}
+		},
+		"lint": {
+			"executor": "nx:run-commands",
+			"inputs": ["rust"],
+			"options": {
+				"cwd": "apps/engine",
+				"command": "cargo clippy --all-targets --all-features -- -D warnings"
+			}
+		},
+		"format": {
+			"executor": "nx:run-commands",
+			"inputs": ["rust"],
+			"options": {
+				"cwd": "apps/engine",
+				"command": "cargo fmt --all"
+			}
+		},
+		"check": {
+			"executor": "nx:run-commands",
+			"inputs": ["rust"],
+			"outputs": ["{projectRoot}/target"],
+			"options": {
+				"cwd": "apps/engine",
+				"command": "cargo check"
+			}
+		},
+		"clean": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/engine",
+				"command": "cargo clean"
+			}
+		}
+	}
+}

@@ -35,8 +35,7 @@ export function getClockTime(boardData: BoardResponse | null, color: Color, now:
 	const lastMoveTime = boardData.lastMoveTime;
 	const isActiveClock =
 		boardData.turn === color && boardData.status === "Ongoing" && lastMoveTime != null;
-	const remaining =
-		color === "White" ? boardData.whiteTimeRemaining : boardData.blackTimeRemaining;
+	const remaining = color === "White" ? boardData.whiteTimeRemaining : boardData.blackTimeRemaining;
 
 	if (!isActiveClock) return remaining;
 	return Math.max(0, remaining - (now - lastMoveTime));

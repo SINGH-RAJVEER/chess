@@ -215,10 +215,7 @@ export default function ComputerGameView({
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter className="sm:justify-center mt-6">
-						<Button
-							className="bg-zinc-100 text-zinc-900 hover:bg-white px-8"
-							onClick={onRestart}
-						>
+						<Button className="bg-zinc-100 text-zinc-900 hover:bg-white px-8" onClick={onRestart}>
 							Play Again
 						</Button>
 					</DialogFooter>

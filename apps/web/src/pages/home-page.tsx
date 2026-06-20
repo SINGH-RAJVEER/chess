@@ -368,8 +368,7 @@ export default function HomePage() {
 						}
 						showTime={boardData?.timeControl !== 0}
 						isLowTime={
-							(topColor === "White" ? whiteTime : blackTime) < 30000 &&
-							boardData?.timeControl !== 0
+							(topColor === "White" ? whiteTime : blackTime) < 30000 && boardData?.timeControl !== 0
 						}
 						icon={
 							<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-zinc-950 text-zinc-100 border border-zinc-800">

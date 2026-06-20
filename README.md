@@ -1,4 +1,4 @@
-# Chess Monorepo (Turborepo)
+# Chess Monorepo (Nx)
 
 A full-stack chess application.
 
@@ -33,15 +33,16 @@ bun run format     # Format all packages
 bun run typecheck  # Check types
 bun run check      # Biome check
 bun run clean      # Clean all output
+bun run affected:build  # Build only affected projects
 ```
 
 ## Run a single workspace package
 
 ```bash
-bunx turbo run dev --filter=@chess/application
-bunx turbo run dev --filter=@chess/api
-bunx turbo run dev --filter=@chess/engine
-bunx turbo run build --filter=@chess/db
+bunx nx run web:dev
+bunx nx run api:dev
+bunx nx run engine:dev
+bunx nx run db:db:generate
 ```
 
 ## Database Management
@@ -78,7 +79,7 @@ bun run db:studio    # Open Drizzle Studio UI
 │           ├── chess.ts     # Game types
 │           └── index.ts     # Main export
 ├── package.json             # Root workspace config
-├── turbo.json               # Turbo build configuration
+├── nx.json                  # Nx task graph, cache, and input configuration
 ├── justfile                 # Dev task runner
 └── flake.nix                # devenv shell, services, and processes
 ```

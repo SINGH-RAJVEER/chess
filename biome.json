@@ -15,6 +15,9 @@
 				"dist/**",
 				"target/**",
 				".turbo/**",
+				".nx/**",
+				"drizzle/meta/**",
+				"packages/db/drizzle/meta/**",
 				".vercel/**"
 			],
 			"linter": {

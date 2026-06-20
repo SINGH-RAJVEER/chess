@@ -1,0 +1,31 @@
+{
+	"name": "types",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"projectType": "library",
+	"root": "packages/types",
+	"sourceRoot": "packages/types/src",
+	"tags": ["scope:types", "type:lib", "language:ts"],
+	"targets": {
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "packages/types",
+				"command": "bun run lint"
+			}
+		},
+		"format": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "packages/types",
+				"command": "bun run format"
+			}
+		},
+		"check": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "packages/types",
+				"command": "bun run check"
+			}
+		}
+	}
+}

@@ -6,3 +6,5 @@ AGENTS.md
 .postgres/
 .direnv
 .devenv/
+.nx/cache/
+.nx/workspace-data/

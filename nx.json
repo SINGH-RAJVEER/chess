@@ -1,0 +1,72 @@
+{
+	"$schema": "./node_modules/nx/schemas/nx-schema.json",
+	"namedInputs": {
+		"default": ["{projectRoot}/**/*", "sharedGlobals"],
+		"production": [
+			"default",
+			"!{projectRoot}/**/?(*.)+(spec|test).{ts,tsx,js,jsx}",
+			"!{projectRoot}/**/*.md"
+		],
+		"sharedGlobals": [
+			"{workspaceRoot}/package.json",
+			"{workspaceRoot}/bun.lock",
+			"{workspaceRoot}/biome.json"
+		],
+		"rust": [
+			"{projectRoot}/Cargo.toml",
+			"{projectRoot}/Cargo.lock",
+			"{projectRoot}/src/**/*.rs"
+		]
+	},
+	"targetDefaults": {
+		"build": {
+			"cache": true,
+			"dependsOn": ["^build"],
+			"inputs": ["production", "^production"]
+		},
+		"typecheck": {
+			"cache": true,
+			"dependsOn": ["^typecheck"],
+			"inputs": ["production", "^production"]
+		},
+		"test": {
+			"cache": true,
+			"inputs": ["default", "^production"]
+		},
+		"lint": {
+			"cache": true,
+			"inputs": ["default", "^production"]
+		},
+		"check": {
+			"cache": true,
+			"inputs": ["default", "^production"]
+		},
+		"format": {
+			"cache": false,
+			"inputs": ["default"]
+		},
+		"dev": {
+			"cache": false,
+			"continuous": true
+		},
+		"start": {
+			"cache": false
+		},
+		"clean": {
+			"cache": false
+		},
+		"db:generate": {
+			"cache": false,
+			"inputs": ["default", "^production"],
+			"outputs": ["{projectRoot}/drizzle"]
+		},
+		"db:migrate": {
+			"cache": false
+		},
+		"db:studio": {
+			"cache": false,
+			"continuous": true
+		}
+	},
+	"parallel": 4
+}

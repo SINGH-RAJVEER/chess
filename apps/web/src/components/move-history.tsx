@@ -53,46 +53,45 @@ export default function MoveHistory({ moves, currentMoveIndex, onNavigate }: Mov
 				) : (
 					<table className="w-full text-sm font-mono">
 						<tbody>
-							{movePairs.map(({ moveNumber, whiteMove, whiteMoveIndex, blackMove, blackMoveIndex }) => (
-								<tr
-									key={moveNumber}
-									className="border-b border-zinc-900 hover:bg-zinc-900/40"
-								>
-									<td className="pl-4 pr-2 py-1.5 text-xs text-zinc-600 w-8 select-none">
-										{moveNumber}.
-									</td>
-									<td className="px-1 py-1.5 w-1/2">
-										{whiteMove && (
-											<button
-												type="button"
-												className={`w-full text-left px-2 py-0.5 rounded transition-colors ${
-													whiteMoveIndex === activeIndex
-														? "bg-zinc-700 text-zinc-100"
-														: "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
-												}`}
-												onClick={() => onNavigate?.(whiteMoveIndex)}
-											>
-												{formatNotation(whiteMove)}
-											</button>
-										)}
-									</td>
-									<td className="px-1 py-1.5 pr-4 w-1/2">
-										{blackMove && (
-											<button
-												type="button"
-												className={`w-full text-left px-2 py-0.5 rounded transition-colors ${
-													blackMoveIndex === activeIndex
-														? "bg-zinc-700 text-zinc-100"
-														: "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
-												}`}
-												onClick={() => onNavigate?.(blackMoveIndex)}
-											>
-												{formatNotation(blackMove)}
-											</button>
-										)}
-									</td>
-								</tr>
-							))}
+							{movePairs.map(
+								({ moveNumber, whiteMove, whiteMoveIndex, blackMove, blackMoveIndex }) => (
+									<tr key={moveNumber} className="border-b border-zinc-900 hover:bg-zinc-900/40">
+										<td className="pl-4 pr-2 py-1.5 text-xs text-zinc-600 w-8 select-none">
+											{moveNumber}.
+										</td>
+										<td className="px-1 py-1.5 w-1/2">
+											{whiteMove && (
+												<button
+													type="button"
+													className={`w-full text-left px-2 py-0.5 rounded transition-colors ${
+														whiteMoveIndex === activeIndex
+															? "bg-zinc-700 text-zinc-100"
+															: "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
+													}`}
+													onClick={() => onNavigate?.(whiteMoveIndex)}
+												>
+													{formatNotation(whiteMove)}
+												</button>
+											)}
+										</td>
+										<td className="px-1 py-1.5 pr-4 w-1/2">
+											{blackMove && (
+												<button
+													type="button"
+													className={`w-full text-left px-2 py-0.5 rounded transition-colors ${
+														blackMoveIndex === activeIndex
+															? "bg-zinc-700 text-zinc-100"
+															: "text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800"
+													}`}
+													onClick={() => onNavigate?.(blackMoveIndex)}
+												>
+													{formatNotation(blackMove)}
+												</button>
+											)}
+										</td>
+									</tr>
+								),
+							)}
 						</tbody>
 					</table>
 				)}

@@ -1,0 +1,75 @@
+{
+	"name": "web",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"projectType": "application",
+	"root": "apps/web",
+	"sourceRoot": "apps/web/src",
+	"tags": ["scope:web", "type:app", "language:ts"],
+	"implicitDependencies": ["types"],
+	"targets": {
+		"dev": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/web",
+				"command": "bun run dev"
+			}
+		},
+		"build": {
+			"executor": "nx:run-commands",
+			"outputs": ["{projectRoot}/dist"],
+			"options": {
+				"cwd": "apps/web",
+				"command": "bun run build"
+			}
+		},
+		"preview": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/web",
+				"command": "bun run preview"
+			}
+		},
+		"start": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/web",
+				"command": "bun run start"
+			}
+		},
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/web",
+				"command": "bun run typecheck"
+			}
+		},
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/web",
+				"command": "bun run lint"
+			}
+		},
+		"format": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/web",
+				"command": "bun run format"
+			}
+		},
+		"check": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/web",
+				"command": "bun run check"
+			}
+		},
+		"clean": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/web",
+				"command": "bun run clean"
+			}
+		}
+	}
+}

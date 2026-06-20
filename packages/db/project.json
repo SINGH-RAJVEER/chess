@@ -1,0 +1,54 @@
+{
+	"name": "db",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"projectType": "library",
+	"root": "packages/db",
+	"sourceRoot": "packages/db/src",
+	"tags": ["scope:db", "type:lib", "language:ts"],
+	"implicitDependencies": ["types"],
+	"targets": {
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "packages/db",
+				"command": "bun run lint"
+			}
+		},
+		"format": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "packages/db",
+				"command": "bun run format"
+			}
+		},
+		"check": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "packages/db",
+				"command": "bun run check"
+			}
+		},
+		"db:generate": {
+			"executor": "nx:run-commands",
+			"outputs": ["{projectRoot}/drizzle"],
+			"options": {
+				"cwd": "packages/db",
+				"command": "bun run db:generate"
+			}
+		},
+		"db:migrate": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "packages/db",
+				"command": "bun run db:migrate"
+			}
+		},
+		"db:studio": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "packages/db",
+				"command": "bun run db:studio"
+			}
+		}
+	}
+}

@@ -58,9 +58,15 @@
               };
 
               processes = {
-                api.exec = "bash -lc 'set -e; set -a; [ ! -f .env ] || source .env; set +a; until pg_isready -h \"${PGHOST:-localhost}\" -p \"${PGPORT:-5432}\" -U \"${PGUSER:-postgres}\"; do sleep 1; done; (cd packages/db && bun run db:migrate); cd apps/api; exec bun run dev'";
-                engine.exec = "bash -lc 'set -a; [ ! -f .env ] || source .env; set +a; cd apps/engine; exec bun run dev'";
-                web.exec = "bash -lc 'set -a; [ ! -f .env ] || source .env; set +a; cd apps/web; exec bun run dev'";
+                api.exec = ''
+                  bash -lc 'set -e; set -a; [ ! -f .env ] || source .env; set +a; until pg_isready -h "''${PGHOST:-localhost}" -p "''${PGPORT:-5432}" -U "''${PGUSER:-postgres}"; do sleep 1; done; (cd packages/db && bun run db:migrate); cd apps/api; exec bun run dev'
+                '';
+                engine.exec = ''
+                  bash -lc 'set -a; [ ! -f .env ] || source .env; set +a; cd apps/engine; exec bun run dev'
+                '';
+                web.exec = ''
+                  bash -lc 'set -a; [ ! -f .env ] || source .env; set +a; cd apps/web; exec bun run dev'
+                '';
               };
 
               enterShell = ''
