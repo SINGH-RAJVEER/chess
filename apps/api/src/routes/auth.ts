@@ -43,25 +43,6 @@ authRouter.post("/sign-in", async (c) => {
 	}
 });
 
-authRouter.post("/sign-out", async (c) => {
-	const body = await c.req.json();
-	const { sessionId } = body;
-
-	if (!sessionId) {
-		return c.json({ error: "Session ID is required" }, 400);
-	}
-
-	try {
-		await auth.api.signOut({
-			headers: { cookie: `session_token=${sessionId}` },
-		});
-		return c.json({ success: true });
-	} catch (error: unknown) {
-		const err = error as { message?: string };
-		return c.json({ error: err.message || "Sign out failed" }, 400);
-	}
-});
-
 authRouter.get("/session", async (c) => {
 	const sessionId = c.req.query("sessionId");
 
@@ -78,5 +59,7 @@ authRouter.get("/session", async (c) => {
 		return c.json({ session: null, user: null });
 	}
 });
+
+authRouter.all("/*", (c) => auth.handler(c.req.raw));
 
 export default authRouter;

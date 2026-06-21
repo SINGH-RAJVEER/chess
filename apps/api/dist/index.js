@@ -62249,6 +62249,11 @@ var drizzleAdapter = (db4, config4) => {
   };
 };
 // src/lib/auth.ts
+var googleClientId = process.env.GOOGLE_CLIENT_ID;
+var googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+var authBaseUrl = process.env.BETTER_AUTH_URL || "http://localhost:4000/api/auth";
+var webOrigin = process.env.WEB_ORIGIN || "http://localhost:3000";
+var authOrigin = new URL(authBaseUrl).origin;
 var auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -62268,7 +62273,16 @@ var auth = betterAuth({
     updateAge: 60 * 60 * 24
   },
   secret: process.env.BETTER_AUTH_SECRET || "default-secret-change-me",
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:8000/api/auth"
+  baseURL: authBaseUrl,
+  trustedOrigins: [webOrigin, authOrigin],
+  ...googleClientId && googleClientSecret ? {
+    socialProviders: {
+      google: {
+        clientId: googleClientId,
+        clientSecret: googleClientSecret
+      }
+    }
+  } : {}
 });
 
 // src/routes/auth.ts
@@ -62307,22 +62321,6 @@ authRouter.post("/sign-in", async (c) => {
     return c.json({ error: err.message || "Invalid credentials" }, 401);
   }
 });
-authRouter.post("/sign-out", async (c) => {
-  const body = await c.req.json();
-  const { sessionId } = body;
-  if (!sessionId) {
-    return c.json({ error: "Session ID is required" }, 400);
-  }
-  try {
-    await auth.api.signOut({
-      headers: { cookie: `session_token=${sessionId}` }
-    });
-    return c.json({ success: true });
-  } catch (error50) {
-    const err = error50;
-    return c.json({ error: err.message || "Sign out failed" }, 400);
-  }
-});
 authRouter.get("/session", async (c) => {
   const sessionId = c.req.query("sessionId");
   if (!sessionId) {
@@ -62337,6 +62335,7 @@ authRouter.get("/session", async (c) => {
     return c.json({ session: null, user: null });
   }
 });
+authRouter.all("/*", (c) => auth.handler(c.req.raw));
 var auth_default = authRouter;
 
 // src/index.ts
