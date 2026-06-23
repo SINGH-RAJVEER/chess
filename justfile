@@ -16,13 +16,9 @@ lockfile:
 dev:
     #!/usr/bin/env bash
     set -e
-    if [ -f .env ]; then
-      set -a
-      source .env
-      set +a
-    fi
     if ! command -v devenv &>/dev/null; then
-      exec nix develop --no-pure-eval --command devenv up --tui=false
+      echo "chess: devenv is required. Install it, then run 'just dev' again." >&2
+      exit 1
     fi
     exec devenv up --tui=false
 
@@ -91,7 +87,7 @@ web-clean:
     bunx nx run web:clean
 
 # Ensure PostgreSQL is running (init cluster on first run)
-db-start:
+database-start:
     #!/usr/bin/env bash
     set -e
     if [ -f .env ]; then
@@ -110,7 +106,8 @@ db-start:
       exit 0
     fi
     if ! command -v pg_ctl &>/dev/null; then
-      exec nix develop --no-pure-eval --command just db-start
+      echo "chess: PostgreSQL tools are missing. Enter the devenv shell first." >&2
+      exit 1
     fi
     mkdir -p "$(dirname "$PGDATA")"
     if [ ! -d "$PGDATA" ]; then
@@ -127,7 +124,7 @@ db-start:
     fi
 
 # Stop PostgreSQL
-db-stop:
+database-stop:
     #!/usr/bin/env bash
     if [ -f .env ]; then
       set -a
@@ -135,7 +132,8 @@ db-stop:
       set +a
     fi
     if ! command -v pg_ctl &>/dev/null; then
-      exec nix develop --no-pure-eval --command just db-stop
+      echo "chess: PostgreSQL tools are missing. Enter the devenv shell first." >&2
+      exit 1
     fi
     PGDATA="${PGDATA:-$PWD/.postgres/data}"
     if pg_ctl status -D "$PGDATA" 2>/dev/null | grep -q "server is running"; then
@@ -144,16 +142,16 @@ db-stop:
     fi
 
 # Generate Drizzle migrations
-db-generate: db-start
-    bunx nx run db:db:generate
+database-generate: database-start
+    bunx nx run database:database:generate
 
 # Apply pending Drizzle migrations
-db-migrate: db-start
-    bunx nx run db:db:migrate
+database-migrate: database-start
+    bunx nx run database:database:migrate
 
 # Open Drizzle Studio
-db-studio:
-    bunx nx run db:db:studio
+database-studio:
+    bunx nx run database:database:studio
 
 # Start only the Rust engine
 engine-dev:

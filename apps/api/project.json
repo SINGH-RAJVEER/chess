@@ -5,7 +5,7 @@
 	"root": "apps/api",
 	"sourceRoot": "apps/api/src",
 	"tags": ["scope:api", "type:app", "language:ts"],
-	"implicitDependencies": ["db", "types"],
+	"implicitDependencies": ["database", "types"],
 	"targets": {
 		"dev": {
 			"executor": "nx:run-commands",

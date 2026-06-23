@@ -1,4 +1,4 @@
-import { db, type Game, schema } from "@chess/db";
+import { db, type Game, schema } from "@chess/database";
 import type {
 	BoardResponse,
 	Color,

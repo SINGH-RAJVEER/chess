@@ -55,15 +55,15 @@
 		"clean": {
 			"cache": false
 		},
-		"db:generate": {
+		"database:generate": {
 			"cache": false,
 			"inputs": ["default", "^production"],
 			"outputs": ["{projectRoot}/drizzle"]
 		},
-		"db:migrate": {
+		"database:migrate": {
 			"cache": false
 		},
-		"db:studio": {
+		"database:studio": {
 			"cache": false,
 			"continuous": true
 		}

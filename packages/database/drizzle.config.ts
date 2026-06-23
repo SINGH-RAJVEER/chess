@@ -1,8 +1,5 @@
-import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
-import { databasePaths, getDatabaseUrl } from "./src/config";
-
-config({ path: databasePaths.workspaceEnvPath });
+import { getDatabaseUrl } from "./src/config";
 
 export default defineConfig({
 	schema: "./src/schema.ts",

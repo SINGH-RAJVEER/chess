@@ -1,4 +1,4 @@
-import type { Move, Piece } from "@chess/db/schema";
+import type { Move, Piece } from "@chess/database/schema";
 import type { Color, GameStatus, PromotionPiece } from "@chess/types";
 import { Chess, type Move as ChessMove, type Square } from "chess.js";
 import { typeToPieceType } from "../utils";

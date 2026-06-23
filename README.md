@@ -8,18 +8,22 @@ A full-stack chess application.
 - `apps/api` — Hono API app for game state, queueing, and engine orchestration
 - `apps/engine` — Rust chess engine service
 - `packages/types` — Shared TypeScript types (Color, PieceType, GameStatus, etc.)
-- `packages/db` — Database schema, migrations, and Drizzle ORM client
+- `packages/database` — Database schema, migrations, and Drizzle ORM client
 
 ## Prerequisites
 
-- Nix with flakes enabled
-- direnv (`direnv allow` once on first clone)
+- Nix
+- devenv
 
 ## Install dependencies
 
 ```bash
 bun install
 ```
+
+## Environment
+
+Use a single `.env` file at the repository root. The API, DB tooling, web dev server, engine process, and `devenv` all load variables from that file.
 
 ## Run from root
 
@@ -42,19 +46,19 @@ bun run affected:build  # Build only affected projects
 bunx nx run web:dev
 bunx nx run api:dev
 bunx nx run engine:dev
-bunx nx run db:db:generate
+bunx nx run database:database:generate
 ```
 
 ## Database Management
 
-The `packages/db` workspace is the single source of truth for schema, migrations, Drizzle config, and DB connection defaults.
+The `packages/database` workspace is the single source of truth for schema, migrations, Drizzle config, and DB connection defaults.
 
 Run from the repo root:
 
 ```bash
-bun run db:generate  # Generate migrations from schema changes
-bun run db:migrate   # Apply pending migrations
-bun run db:studio    # Open Drizzle Studio UI
+bun run database:generate  # Generate migrations from schema changes
+bun run database:migrate   # Apply pending migrations
+bun run database:studio    # Open Drizzle Studio UI
 ```
 
 ## Project Layout
@@ -66,7 +70,7 @@ bun run db:studio    # Open Drizzle Studio UI
 │   ├── web/                  # React web app
 │   └── engine/               # Rust chess engine
 ├── packages/
-│   ├── db/                  # Database layer (@chess/db)
+│   ├── database/            # Database layer (@chess/database)
 │   │   ├── drizzle/         # Generated SQL migrations + metadata
 │   │   ├── drizzle.config.ts
 │   │   └── src/
@@ -81,20 +85,20 @@ bun run db:studio    # Open Drizzle Studio UI
 ├── package.json             # Root workspace config
 ├── nx.json                  # Nx task graph, cache, and input configuration
 ├── justfile                 # Dev task runner
-└── flake.nix                # devenv shell, services, and processes
+└── devenv.nix               # devenv shell, services, and processes
 ```
 
 ## Architecture
 
 - **Shared Types Package**: All domain types (Color, PieceType, GameStatus, etc.) are defined in `@chess/types` and imported across projects
-- **Database Package**: Schema, migrations, Drizzle config, and client initialization live in `@chess/db`; application code imports from this package
+- **Database Package**: Schema, migrations, Drizzle config, and client initialization live in `@chess/database`; application code imports from this package
 - **Web App**: A client-side React app that calls the Hono API over HTTP
 - **API App**: Owns queueing, game mutation/query logic, DB access, and engine requests
 - **Engine**: Pure Rust, no direct dependencies on other workspace packages (uses HTTP API)
 
-## Local Dev Stack (devenv + direnv)
+## Local Dev Stack (devenv)
 
-The Nix flake defines a `devenv` shell with Bun, Rust, PostgreSQL, and the project process graph. Entering the project directory via direnv loads the tools and variables from `.env`. Start the local stack with `devenv up`.
+`devenv.nix` defines the local shell with Bun, Rust, PostgreSQL, Nix LSPs, and the project process graph. It loads variables from the root `.env` when entering the shell and before starting each process. Start the local stack with `devenv up`.
 
 All services run on:
 
@@ -112,8 +116,8 @@ just dev
 Database-only maintenance commands are still available:
 
 ```bash
-just db-start
-just db-stop
-just db-migrate
-just db-studio
+just database-start
+just database-stop
+just database-migrate
+just database-studio
 ```

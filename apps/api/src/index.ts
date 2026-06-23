@@ -9,7 +9,6 @@ import type {
 	ResignRequest,
 	UndoMoveRequest,
 } from "@chess/types";
-import { config } from "dotenv";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
@@ -25,8 +24,6 @@ import {
 	undoMove,
 } from "./lib/game-service";
 import authRouter from "./routes/auth";
-
-config();
 
 const app = new Hono();
 

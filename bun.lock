@@ -12,7 +12,7 @@
     "apps/api": {
       "name": "@chess/api",
       "dependencies": {
-        "@chess/db": "workspace:*",
+        "@chess/database": "workspace:*",
         "@chess/types": "workspace:*",
         "bcryptjs": "^3.0.3",
         "better-auth": "^1.5.5",
@@ -60,16 +60,16 @@
         "typescript": "^5.7.2",
       },
     },
-    "packages/db": {
-      "name": "@chess/db",
+    "packages/database": {
+      "name": "@chess/database",
       "version": "0.0.0",
       "dependencies": {
         "@chess/types": "workspace:*",
+        "dotenv": "^17.2.3",
         "drizzle-orm": "^0.45.1",
         "postgres": "^3.4.8",
       },
       "devDependencies": {
-        "dotenv": "^17.2.3",
         "drizzle-kit": "^0.31.10",
       },
     },
@@ -185,7 +185,7 @@
 
     "@chess/application": ["@chess/application@workspace:apps/web"],
 
-    "@chess/db": ["@chess/db@workspace:packages/db"],
+    "@chess/database": ["@chess/database@workspace:packages/database"],
 
     "@chess/engine": ["@chess/engine@workspace:apps/engine"],
 

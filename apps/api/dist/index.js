@@ -114,12 +114,12 @@ var require_package = __commonJS((exports, module) => {
 
 // ../../node_modules/.bun/dotenv@17.3.1/node_modules/dotenv/lib/main.js
 var require_main = __commonJS((exports, module) => {
-  var fs = __require("fs");
+  var fs2 = __require("fs");
   var path = __require("path");
-  var os = __require("os");
-  var crypto2 = __require("crypto");
+  var os2 = __require("os");
+  var crypto3 = __require("crypto");
   var packageJson = require_package();
-  var version = packageJson.version;
+  var version2 = packageJson.version;
   var TIPS = [
     "\uD83D\uDD10 encrypt with Dotenvx: https://dotenvx.com",
     "\uD83D\uDD10 prevent committing .env to code: https://dotenvx.com/precommit",
@@ -147,19 +147,19 @@ var require_main = __commonJS((exports, module) => {
   function supportsAnsi() {
     return process.stdout.isTTY;
   }
-  function dim(text) {
-    return supportsAnsi() ? `\x1B[2m${text}\x1B[0m` : text;
+  function dim(text2) {
+    return supportsAnsi() ? `\x1B[2m${text2}\x1B[0m` : text2;
   }
   var LINE = /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/mg;
-  function parse(src) {
+  function parse2(src) {
     const obj = {};
     let lines = src.toString();
     lines = lines.replace(/\r\n?/mg, `
 `);
-    let match;
-    while ((match = LINE.exec(lines)) != null) {
-      const key = match[1];
-      let value = match[2] || "";
+    let match2;
+    while ((match2 = LINE.exec(lines)) != null) {
+      const key = match2[1];
+      let value = match2[2] || "";
       value = value.trim();
       const maybeQuote = value[0];
       value = value.replace(/^(['"`])([\s\S]*)\1$/mg, "$2");
@@ -200,13 +200,13 @@ var require_main = __commonJS((exports, module) => {
     return DotenvModule.parse(decrypted);
   }
   function _warn(message) {
-    console.error(`[dotenv@${version}][WARN] ${message}`);
+    console.error(`[dotenv@${version2}][WARN] ${message}`);
   }
   function _debug(message) {
-    console.log(`[dotenv@${version}][DEBUG] ${message}`);
+    console.log(`[dotenv@${version2}][DEBUG] ${message}`);
   }
   function _log(message) {
-    console.log(`[dotenv@${version}] ${message}`);
+    console.log(`[dotenv@${version2}] ${message}`);
   }
   function _dotenvKey(options) {
     if (options && options.DOTENV_KEY && options.DOTENV_KEY.length > 0) {
@@ -255,7 +255,7 @@ var require_main = __commonJS((exports, module) => {
     if (options && options.path && options.path.length > 0) {
       if (Array.isArray(options.path)) {
         for (const filepath of options.path) {
-          if (fs.existsSync(filepath)) {
+          if (fs2.existsSync(filepath)) {
             possibleVaultPath = filepath.endsWith(".vault") ? filepath : `${filepath}.vault`;
           }
         }
@@ -265,13 +265,13 @@ var require_main = __commonJS((exports, module) => {
     } else {
       possibleVaultPath = path.resolve(process.cwd(), ".env.vault");
     }
-    if (fs.existsSync(possibleVaultPath)) {
+    if (fs2.existsSync(possibleVaultPath)) {
       return possibleVaultPath;
     }
     return null;
   }
   function _resolveHome(envPath) {
-    return envPath[0] === "~" ? path.join(os.homedir(), envPath.slice(1)) : envPath;
+    return envPath[0] === "~" ? path.join(os2.homedir(), envPath.slice(1)) : envPath;
   }
   function _configVault(options) {
     const debug = parseBoolean(process.env.DOTENV_CONFIG_DEBUG || options && options.debug);
@@ -318,7 +318,7 @@ var require_main = __commonJS((exports, module) => {
     const parsedAll = {};
     for (const path2 of optionPaths) {
       try {
-        const parsed = DotenvModule.parse(fs.readFileSync(path2, { encoding }));
+        const parsed = DotenvModule.parse(fs2.readFileSync(path2, { encoding }));
         DotenvModule.populate(parsedAll, parsed, options);
       } catch (e) {
         if (debug) {
@@ -370,7 +370,7 @@ var require_main = __commonJS((exports, module) => {
     const authTag = ciphertext.subarray(-16);
     ciphertext = ciphertext.subarray(12, -16);
     try {
-      const aesgcm = crypto2.createDecipheriv("aes-256-gcm", key, nonce);
+      const aesgcm = crypto3.createDecipheriv("aes-256-gcm", key, nonce);
       aesgcm.setAuthTag(authTag);
       return `${aesgcm.update(ciphertext)}${aesgcm.final()}`;
     } catch (error) {
@@ -425,7 +425,7 @@ var require_main = __commonJS((exports, module) => {
     _parseVault,
     config,
     decrypt,
-    parse,
+    parse: parse2,
     populate
   };
   exports.configDotenv = DotenvModule.configDotenv;
@@ -1570,7 +1570,7 @@ function formatAction(action) {
 }
 var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => fn(adapter), createAdapterFactory = ({ adapter: customAdapter, config: cfg }) => (options) => {
   const uniqueAdapterFactoryInstanceId = Math.random().toString(36).substring(2, 15);
-  const config4 = {
+  const config5 = {
     ...cfg,
     supportsBooleans: cfg.supportsBooleans ?? true,
     supportsDates: cfg.supportsDates ?? true,
@@ -1584,14 +1584,14 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
     disableTransformOutput: cfg.disableTransformOutput ?? false,
     disableTransformJoin: cfg.disableTransformJoin ?? false
   };
-  if (options.advanced?.database?.generateId === "serial" && config4.supportsNumericIds === false)
-    throw new BetterAuthError(`[${config4.adapterName}] Your database or database adapter does not support numeric ids. Please disable "useNumberId" in your config.`);
+  if (options.advanced?.database?.generateId === "serial" && config5.supportsNumericIds === false)
+    throw new BetterAuthError(`[${config5.adapterName}] Your database or database adapter does not support numeric ids. Please disable "useNumberId" in your config.`);
   const schema3 = getAuthTables(options);
   const debugLog = (...args) => {
-    if (config4.debugLogs === true || typeof config4.debugLogs === "object") {
+    if (config5.debugLogs === true || typeof config5.debugLogs === "object") {
       const logger3 = createLogger({ level: "info" });
-      if (typeof config4.debugLogs === "object" && "isRunningAdapterTests" in config4.debugLogs) {
-        if (config4.debugLogs.isRunningAdapterTests) {
+      if (typeof config5.debugLogs === "object" && "isRunningAdapterTests" in config5.debugLogs) {
+        if (config5.debugLogs.isRunningAdapterTests) {
           args.shift();
           debugLogs.push({
             instance: uniqueAdapterFactoryInstanceId,
@@ -1600,69 +1600,69 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
         }
         return;
       }
-      if (typeof config4.debugLogs === "object" && config4.debugLogs.logCondition && !config4.debugLogs.logCondition?.())
+      if (typeof config5.debugLogs === "object" && config5.debugLogs.logCondition && !config5.debugLogs.logCondition?.())
         return;
       if (typeof args[0] === "object" && "method" in args[0]) {
         const method = args.shift().method;
-        if (typeof config4.debugLogs === "object") {
-          if (method === "create" && !config4.debugLogs.create)
+        if (typeof config5.debugLogs === "object") {
+          if (method === "create" && !config5.debugLogs.create)
             return;
-          else if (method === "update" && !config4.debugLogs.update)
+          else if (method === "update" && !config5.debugLogs.update)
             return;
-          else if (method === "updateMany" && !config4.debugLogs.updateMany)
+          else if (method === "updateMany" && !config5.debugLogs.updateMany)
             return;
-          else if (method === "findOne" && !config4.debugLogs.findOne)
+          else if (method === "findOne" && !config5.debugLogs.findOne)
             return;
-          else if (method === "findMany" && !config4.debugLogs.findMany)
+          else if (method === "findMany" && !config5.debugLogs.findMany)
             return;
-          else if (method === "delete" && !config4.debugLogs.delete)
+          else if (method === "delete" && !config5.debugLogs.delete)
             return;
-          else if (method === "deleteMany" && !config4.debugLogs.deleteMany)
+          else if (method === "deleteMany" && !config5.debugLogs.deleteMany)
             return;
-          else if (method === "count" && !config4.debugLogs.count)
+          else if (method === "count" && !config5.debugLogs.count)
             return;
         }
-        logger3.info(`[${config4.adapterName}]`, ...args);
+        logger3.info(`[${config5.adapterName}]`, ...args);
       } else
-        logger3.info(`[${config4.adapterName}]`, ...args);
+        logger3.info(`[${config5.adapterName}]`, ...args);
     }
   };
   const logger2 = createLogger(options.logger);
   const getDefaultModelName = initGetDefaultModelName({
-    usePlural: config4.usePlural,
+    usePlural: config5.usePlural,
     schema: schema3
   });
   const getDefaultFieldName = initGetDefaultFieldName({
-    usePlural: config4.usePlural,
+    usePlural: config5.usePlural,
     schema: schema3
   });
   const getModelName = initGetModelName({
-    usePlural: config4.usePlural,
+    usePlural: config5.usePlural,
     schema: schema3
   });
   const getFieldName = initGetFieldName({
     schema: schema3,
-    usePlural: config4.usePlural
+    usePlural: config5.usePlural
   });
   const idField = initGetIdField({
     schema: schema3,
     options,
-    usePlural: config4.usePlural,
-    disableIdGeneration: config4.disableIdGeneration,
-    customIdGenerator: config4.customIdGenerator,
-    supportsUUIDs: config4.supportsUUIDs
+    usePlural: config5.usePlural,
+    disableIdGeneration: config5.disableIdGeneration,
+    customIdGenerator: config5.customIdGenerator,
+    supportsUUIDs: config5.supportsUUIDs
   });
   const getFieldAttributes = initGetFieldAttributes({
     schema: schema3,
     options,
-    usePlural: config4.usePlural,
-    disableIdGeneration: config4.disableIdGeneration,
-    customIdGenerator: config4.customIdGenerator
+    usePlural: config5.usePlural,
+    disableIdGeneration: config5.disableIdGeneration,
+    customIdGenerator: config5.customIdGenerator
   });
   const transformInput = async (data, defaultModelName, action, forceAllowId) => {
     const transformedData = {};
     const fields = schema3[defaultModelName].fields;
-    const newMappedKeys = config4.mapKeysTransformInput ?? {};
+    const newMappedKeys = config5.mapKeysTransformInput ?? {};
     const useNumberId = options.advanced?.database?.generateId === "serial";
     fields.id = idField({
       customModelName: defaultModelName,
@@ -1691,16 +1691,16 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
           newValue = newValue.map((x) => x !== null ? Number(x) : null);
         else
           newValue = newValue !== null ? Number(newValue) : null;
-      else if (config4.supportsJSON === false && typeof newValue === "object" && fieldAttributes.type === "json")
+      else if (config5.supportsJSON === false && typeof newValue === "object" && fieldAttributes.type === "json")
         newValue = JSON.stringify(newValue);
-      else if (config4.supportsArrays === false && Array.isArray(newValue) && (fieldAttributes.type === "string[]" || fieldAttributes.type === "number[]"))
+      else if (config5.supportsArrays === false && Array.isArray(newValue) && (fieldAttributes.type === "string[]" || fieldAttributes.type === "number[]"))
         newValue = JSON.stringify(newValue);
-      else if (config4.supportsDates === false && newValue instanceof Date && fieldAttributes.type === "date")
+      else if (config5.supportsDates === false && newValue instanceof Date && fieldAttributes.type === "date")
         newValue = newValue.toISOString();
-      else if (config4.supportsBooleans === false && typeof newValue === "boolean")
+      else if (config5.supportsBooleans === false && typeof newValue === "boolean")
         newValue = newValue ? 1 : 0;
-      if (config4.customTransformInput)
-        newValue = config4.customTransformInput({
+      if (config5.customTransformInput)
+        newValue = config5.customTransformInput({
           data: newValue,
           action,
           field: newFieldName,
@@ -1718,7 +1718,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
     const transformSingleOutput = async (data2, unsafe_model2, select3 = []) => {
       if (!data2)
         return null;
-      const newMappedKeys = config4.mapKeysTransformOutput ?? {};
+      const newMappedKeys = config5.mapKeysTransformOutput ?? {};
       const transformedData2 = {};
       const tableSchema = schema3[getDefaultModelName(unsafe_model2)].fields;
       const idKey = Object.entries(newMappedKeys).find(([_, v]) => v === "id")?.[0];
@@ -1736,16 +1736,16 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
           if (originalKey === "id" || field.references?.field === "id") {
             if (typeof newValue !== "undefined" && newValue !== null)
               newValue = String(newValue);
-          } else if (config4.supportsJSON === false && typeof newValue === "string" && field.type === "json")
+          } else if (config5.supportsJSON === false && typeof newValue === "string" && field.type === "json")
             newValue = safeJSONParse(newValue);
-          else if (config4.supportsArrays === false && typeof newValue === "string" && (field.type === "string[]" || field.type === "number[]"))
+          else if (config5.supportsArrays === false && typeof newValue === "string" && (field.type === "string[]" || field.type === "number[]"))
             newValue = safeJSONParse(newValue);
-          else if (config4.supportsDates === false && typeof newValue === "string" && field.type === "date")
+          else if (config5.supportsDates === false && typeof newValue === "string" && field.type === "date")
             newValue = new Date(newValue);
-          else if (config4.supportsBooleans === false && typeof newValue === "number" && field.type === "boolean")
+          else if (config5.supportsBooleans === false && typeof newValue === "number" && field.type === "boolean")
             newValue = newValue === 1;
-          if (config4.customTransformOutput)
-            newValue = config4.customTransformOutput({
+          if (config5.customTransformOutput)
+            newValue = config5.customTransformOutput({
               data: newValue,
               field: newFieldName,
               fieldAttributes: field,
@@ -1803,7 +1803,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
   const transformWhereClause = ({ model, where, action }) => {
     if (!where)
       return;
-    const newMappedKeys = config4.mapKeysTransformInput ?? {};
+    const newMappedKeys = config5.mapKeysTransformInput ?? {};
     return where.map((w) => {
       const { field: unsafe_field, value, operator = "eq", connector = "AND" } = w;
       if (operator === "in") {
@@ -1832,7 +1832,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
           else
             newValue = Number(value);
       }
-      if (fieldAttr.type === "date" && value instanceof Date && !config4.supportsDates)
+      if (fieldAttr.type === "date" && value instanceof Date && !config5.supportsDates)
         newValue = value.toISOString();
       if (fieldAttr.type === "boolean" && typeof newValue === "string")
         newValue = newValue === "true";
@@ -1847,16 +1847,16 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
             newValue = parsed;
         }
       }
-      if (fieldAttr.type === "boolean" && typeof newValue === "boolean" && !config4.supportsBooleans)
+      if (fieldAttr.type === "boolean" && typeof newValue === "boolean" && !config5.supportsBooleans)
         newValue = newValue ? 1 : 0;
-      if (fieldAttr.type === "json" && typeof value === "object" && !config4.supportsJSON)
+      if (fieldAttr.type === "json" && typeof value === "object" && !config5.supportsJSON)
         try {
           newValue = JSON.stringify(value);
         } catch (error49) {
           throw new Error(`Failed to stringify JSON value for field ${fieldName}`, { cause: error49 });
         }
-      if (config4.customTransformInput)
-        newValue = config4.customTransformInput({
+      if (config5.customTransformInput)
+        newValue = config5.customTransformInput({
           data: newValue,
           fieldAttributes: fieldAttr,
           field: fieldName,
@@ -2006,11 +2006,11 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
   const adapter = {
     transaction: async (cb) => {
       if (!lazyLoadTransaction)
-        if (!config4.transaction)
+        if (!config5.transaction)
           lazyLoadTransaction = createAsIsTransaction(adapter);
         else {
-          logger2.debug(`[${config4.adapterName}] - Using provided transaction implementation.`);
-          lazyLoadTransaction = config4.transaction;
+          logger2.debug(`[${config5.adapterName}] - Using provided transaction implementation.`);
+          lazyLoadTransaction = config5.transaction;
         }
       return lazyLoadTransaction(cb);
     },
@@ -2020,7 +2020,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
       const model = getModelName(unsafeModel);
       unsafeModel = getDefaultModelName(unsafeModel);
       if ("id" in unsafeData && typeof unsafeData.id !== "undefined" && !forceAllowId) {
-        logger2.warn(`[${config4.adapterName}] - You are trying to create a record with an id. This is not allowed as we handle id generation for you, unless you pass in the \`forceAllowId\` parameter. The id will be ignored.`);
+        logger2.warn(`[${config5.adapterName}] - You are trying to create a record with an id. This is not allowed as we handle id generation for you, unless you pass in the \`forceAllowId\` parameter. The id will be ignored.`);
         const stack = (/* @__PURE__ */ new Error()).stack?.split(`
 `).filter((_, i) => i !== 1).join(`
 `).replace("Error:", "Create method with `id` being called at:");
@@ -2032,7 +2032,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
         data: unsafeData
       });
       let data = unsafeData;
-      if (!config4.disableTransformInput)
+      if (!config5.disableTransformInput)
         data = await transformInput(unsafeData, unsafeModel, "create", forceAllowId);
       debugLog({ method: "create" }, `${formatTransactionId(thisTransactionId)} ${formatStep(2, 4)}`, `${formatMethod("create")} ${formatAction("Parsed Input")}:`, {
         model,
@@ -2047,7 +2047,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
         res
       });
       let transformed = res;
-      if (!config4.disableTransformOutput)
+      if (!config5.disableTransformOutput)
         transformed = await transformOutput(res, unsafeModel, select2, undefined);
       debugLog({ method: "create" }, `${formatTransactionId(thisTransactionId)} ${formatStep(4, 4)}`, `${formatMethod("create")} ${formatAction("Parsed Result")}:`, {
         model,
@@ -2070,7 +2070,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
         data: unsafeData
       });
       let data = unsafeData;
-      if (!config4.disableTransformInput)
+      if (!config5.disableTransformInput)
         data = await transformInput(unsafeData, unsafeModel, "update");
       debugLog({ method: "update" }, `${formatTransactionId(thisTransactionId)} ${formatStep(2, 4)}`, `${formatMethod("update")} ${formatAction("Parsed Input")}:`, {
         model,
@@ -2086,7 +2086,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
         data: res
       });
       let transformed = res;
-      if (!config4.disableTransformOutput)
+      if (!config5.disableTransformOutput)
         transformed = await transformOutput(res, unsafeModel, undefined, undefined);
       debugLog({ method: "update" }, `${formatTransactionId(thisTransactionId)} ${formatStep(4, 4)}`, `${formatMethod("update")} ${formatAction("Parsed Result")}:`, {
         model,
@@ -2109,7 +2109,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
         data: unsafeData
       });
       let data = unsafeData;
-      if (!config4.disableTransformInput)
+      if (!config5.disableTransformInput)
         data = await transformInput(unsafeData, unsafeModel, "update");
       debugLog({ method: "updateMany" }, `${formatTransactionId(thisTransactionId)} ${formatStep(2, 4)}`, `${formatMethod("updateMany")} ${formatAction("Parsed Input")}:`, {
         model,
@@ -2142,7 +2142,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
       unsafeModel = getDefaultModelName(unsafeModel);
       let join;
       let passJoinToAdapter = true;
-      if (!config4.disableTransformJoin) {
+      if (!config5.disableTransformJoin) {
         const result = transformJoinClause(unsafeModel, unsafeJoin, select2);
         if (result) {
           join = result.join;
@@ -2169,7 +2169,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
         data: res
       });
       let transformed = res;
-      if (!config4.disableTransformOutput)
+      if (!config5.disableTransformOutput)
         transformed = await transformOutput(res, unsafeModel, select2, join);
       debugLog({ method: "findOne" }, `${formatTransactionId(thisTransactionId)} ${formatStep(3, 3)}`, `${formatMethod("findOne")} ${formatAction("Parsed Result")}:`, {
         model,
@@ -2190,7 +2190,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
       unsafeModel = getDefaultModelName(unsafeModel);
       let join;
       let passJoinToAdapter = true;
-      if (!config4.disableTransformJoin) {
+      if (!config5.disableTransformJoin) {
         const result = transformJoinClause(unsafeModel, unsafeJoin, select2);
         if (result) {
           join = result.join;
@@ -2222,7 +2222,7 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
         data: res
       });
       let transformed = res;
-      if (!config4.disableTransformOutput)
+      if (!config5.disableTransformOutput)
         transformed = await Promise.all(res.map(async (r) => {
           return await transformOutput(r, unsafeModel, undefined, join);
         }));
@@ -2310,11 +2310,11 @@ var debugLogs, transactionId = -1, createAsIsTransaction = (adapter) => (fn) => 
       });
     } : undefined,
     options: {
-      adapterConfig: config4,
+      adapterConfig: config5,
       ...adapterInstance.options ?? {}
     },
-    id: config4.adapterId,
-    ...config4.debugLogs?.isRunningAdapterTests ? { adapterTestDebugLogs: {
+    id: config5.adapterId,
+    ...config5.debugLogs?.isRunningAdapterTests ? { adapterTestDebugLogs: {
       resetDebugLogs() {
         debugLogs = debugLogs.filter((log) => log.instance !== uniqueAdapterFactoryInstanceId);
       },
@@ -2372,14 +2372,14 @@ var exports_dist = {};
 __export(exports_dist, {
   memoryAdapter: () => memoryAdapter
 });
-var memoryAdapter = (db3, config4) => {
+var memoryAdapter = (db3, config5) => {
   let lazyOptions = null;
   const adapterCreator = createAdapterFactory({
     config: {
       adapterId: "memory",
       adapterName: "Memory Adapter",
       usePlural: false,
-      debugLogs: config4?.debugLogs || false,
+      debugLogs: config5?.debugLogs || false,
       supportsArrays: true,
       customTransformInput(props) {
         if (props.options.advanced?.database?.generateId === "serial" && props.field === "id" && props.action === "create")
@@ -11495,9 +11495,9 @@ var init_driver = __esm(() => {
 class Log {
   #levels;
   #logger;
-  constructor(config4) {
-    if (isFunction2(config4)) {
-      this.#logger = config4;
+  constructor(config5) {
+    if (isFunction2(config5)) {
+      this.#logger = config5;
       this.#levels = freeze({
         query: true,
         error: true
@@ -11505,8 +11505,8 @@ class Log {
     } else {
       this.#logger = defaultLogger;
       this.#levels = freeze({
-        query: config4.includes("query"),
-        error: config4.includes("error")
+        query: config5.includes("query"),
+        error: config5.includes("error")
       });
     }
   }
@@ -13691,8 +13691,8 @@ class SqliteDriver {
   #connectionMutex = new ConnectionMutex;
   #db;
   #connection;
-  constructor(config4) {
-    this.#config = freeze({ ...config4 });
+  constructor(config5) {
+    this.#config = freeze({ ...config5 });
   }
   async init() {
     this.#db = isFunction2(this.#config.database) ? await this.#config.database() : this.#config.database;
@@ -14268,8 +14268,8 @@ var init_sqlite_adapter = __esm(() => {
 // ../../node_modules/.bun/kysely@0.28.12/node_modules/kysely/dist/esm/dialect/sqlite/sqlite-dialect.js
 class SqliteDialect {
   #config;
-  constructor(config4) {
-    this.#config = freeze({ ...config4 });
+  constructor(config5) {
+    this.#config = freeze({ ...config5 });
   }
   createDriver() {
     return new SqliteDriver(this.#config);
@@ -14716,8 +14716,8 @@ var init_mysql_adapter = __esm(() => {
 // ../../node_modules/.bun/kysely@0.28.12/node_modules/kysely/dist/esm/dialect/mysql/mysql-dialect.js
 class MysqlDialect {
   #config;
-  constructor(config4) {
-    this.#config = config4;
+  constructor(config5) {
+    this.#config = config5;
   }
   createDriver() {
     return new MysqlDriver(this.#config);
@@ -14747,8 +14747,8 @@ class PostgresDriver {
   #config;
   #connections = new WeakMap;
   #pool;
-  constructor(config4) {
-    this.#config = freeze({ ...config4 });
+  constructor(config5) {
+    this.#config = freeze({ ...config5 });
   }
   async init() {
     this.#pool = isFunction2(this.#config.pool) ? await this.#config.pool() : this.#config.pool;
@@ -14870,8 +14870,8 @@ var init_postgres_dialect_config = () => {};
 // ../../node_modules/.bun/kysely@0.28.12/node_modules/kysely/dist/esm/dialect/postgres/postgres-dialect.js
 class PostgresDialect {
   #config;
-  constructor(config4) {
-    this.#config = config4;
+  constructor(config5) {
+    this.#config = config5;
   }
   createDriver() {
     return new PostgresDriver(this.#config);
@@ -14922,8 +14922,8 @@ var init_mssql_dialect_config = () => {};
 class MssqlDriver {
   #config;
   #pool;
-  constructor(config4) {
-    this.#config = freeze({ ...config4 });
+  constructor(config5) {
+    this.#config = freeze({ ...config5 });
     const { tarn, tedious, validateConnections } = this.#config;
     const { validateConnections: deprecatedValidateConnections, ...poolOptions } = tarn.options;
     this.#pool = new tarn.Pool({
@@ -15411,8 +15411,8 @@ var init_mssql_query_compiler = __esm(() => {
 // ../../node_modules/.bun/kysely@0.28.12/node_modules/kysely/dist/esm/dialect/mssql/mssql-dialect.js
 class MssqlDialect {
   #config;
-  constructor(config4) {
-    this.#config = config4;
+  constructor(config5) {
+    this.#config = config5;
   }
   createDriver() {
     return new MssqlDriver(this.#config);
@@ -16054,8 +16054,8 @@ var BunSqliteAdapter = class {
   #connectionMutex = new ConnectionMutex2;
   #db;
   #connection;
-  constructor(config4) {
-    this.#config = { ...config4 };
+  constructor(config5) {
+    this.#config = { ...config5 };
   }
   async init() {
     this.#db = this.#config.database;
@@ -16151,8 +16151,8 @@ var BunSqliteAdapter = class {
   }
 }, BunSqliteQueryCompiler, BunSqliteDialect = class {
   #config;
-  constructor(config4) {
-    this.#config = { ...config4 };
+  constructor(config5) {
+    this.#config = { ...config5 };
   }
   createDriver() {
     return new BunSqliteDriver(this.#config);
@@ -16210,8 +16210,8 @@ var NodeSqliteAdapter = class {
   #connectionMutex = new ConnectionMutex3;
   #db;
   #connection;
-  constructor(config4) {
-    this.#config = { ...config4 };
+  constructor(config5) {
+    this.#config = { ...config5 };
   }
   async init() {
     this.#db = this.#config.database;
@@ -16307,8 +16307,8 @@ var NodeSqliteAdapter = class {
   }
 }, NodeSqliteQueryCompiler, NodeSqliteDialect = class {
   #config;
-  constructor(config4) {
-    this.#config = { ...config4 };
+  constructor(config5) {
+    this.#config = { ...config5 };
   }
   createDriver() {
     return new NodeSqliteDriver(this.#config);
@@ -16349,8 +16349,8 @@ __export(exports_d1_sqlite_dialect_sYHNqBte, {
 var D1SqliteAdapter, D1SqliteDriver = class {
   #config;
   #connection;
-  constructor(config4) {
-    this.#config = { ...config4 };
+  constructor(config5) {
+    this.#config = { ...config5 };
   }
   async init() {
     this.#connection = new D1SqliteConnection(this.#config.database);
@@ -16439,8 +16439,8 @@ var D1SqliteAdapter, D1SqliteDriver = class {
   }
 }, D1SqliteQueryCompiler, D1SqliteDialect = class {
   #config;
-  constructor(config4) {
-    this.#config = { ...config4 };
+  constructor(config5) {
+    this.#config = { ...config5 };
   }
   createDriver() {
     return new D1SqliteDriver(this.#config);
@@ -16493,8 +16493,8 @@ function getKyselyDatabaseType(db3) {
     return "sqlite";
   return null;
 }
-var createKyselyAdapter = async (config4) => {
-  const db3 = config4.database;
+var createKyselyAdapter = async (config5) => {
+  const db3 = config5.database;
   if (!db3)
     return {
       kysely: null,
@@ -16550,7 +16550,7 @@ var createKyselyAdapter = async (config4) => {
     databaseType,
     transaction: undefined
   };
-}, kyselyAdapter = (db3, config4) => {
+}, kyselyAdapter = (db3, config5) => {
   let lazyOptions = null;
   const createCustomAdapter = (db4) => {
     return ({ getFieldName, schema: schema4, getDefaultFieldName, getDefaultModelName, getFieldAttributes, getModelName }) => {
@@ -16580,7 +16580,7 @@ var createKyselyAdapter = async (config4) => {
       };
       const withReturning = async (values2, builder, model, where) => {
         let res;
-        if (config4?.type === "mysql") {
+        if (config5?.type === "mysql") {
           await builder.execute();
           const field = values2.id ? "id" : where.length > 0 && where[0]?.field ? where[0].field : "id";
           if (!values2.id && where.length === 0) {
@@ -16600,7 +16600,7 @@ var createKyselyAdapter = async (config4) => {
           }), "=", value).limit(1).executeTakeFirst();
           return res;
         }
-        if (config4?.type === "mssql") {
+        if (config5?.type === "mssql") {
           res = await builder.outputAll("inserted").executeTakeFirst();
           return res;
         }
@@ -16773,7 +16773,7 @@ var createKyselyAdapter = async (config4) => {
           const { and: and2, or: or2 } = convertWhereClause(model, where);
           let query = db4.selectFrom((eb) => {
             let b2 = eb.selectFrom(model);
-            if (config4?.type === "mssql") {
+            if (config5?.type === "mssql") {
               if (offset !== undefined) {
                 if (!sortBy)
                   b2 = b2.orderBy(getFieldName({
@@ -16878,7 +16878,7 @@ var createKyselyAdapter = async (config4) => {
           const res = (await query.executeTakeFirst()).numDeletedRows;
           return res > Number.MAX_SAFE_INTEGER ? Number.MAX_SAFE_INTEGER : Number(res);
         },
-        options: config4
+        options: config5
       };
     };
   };
@@ -16887,14 +16887,14 @@ var createKyselyAdapter = async (config4) => {
     config: {
       adapterId: "kysely",
       adapterName: "Kysely Adapter",
-      usePlural: config4?.usePlural,
-      debugLogs: config4?.debugLogs,
-      supportsBooleans: config4?.type === "sqlite" || config4?.type === "mssql" || config4?.type === "mysql" || !config4?.type ? false : true,
-      supportsDates: config4?.type === "sqlite" || config4?.type === "mssql" || !config4?.type ? false : true,
-      supportsJSON: config4?.type === "postgres" ? true : false,
+      usePlural: config5?.usePlural,
+      debugLogs: config5?.debugLogs,
+      supportsBooleans: config5?.type === "sqlite" || config5?.type === "mssql" || config5?.type === "mysql" || !config5?.type ? false : true,
+      supportsDates: config5?.type === "sqlite" || config5?.type === "mssql" || !config5?.type ? false : true,
+      supportsJSON: config5?.type === "postgres" ? true : false,
       supportsArrays: false,
-      supportsUUIDs: config4?.type === "postgres" ? true : false,
-      transaction: config4?.transaction ? (cb) => db3.transaction().execute((trx) => {
+      supportsUUIDs: config5?.type === "postgres" ? true : false,
+      transaction: config5?.transaction ? (cb) => db3.transaction().execute((trx) => {
         return cb(createAdapterFactory({
           config: adapterOptions.config,
           adapter: createCustomAdapter(trx)
@@ -16925,9 +16925,6 @@ __export(exports_kysely_adapter, {
 var init_kysely_adapter = __esm(() => {
   init_dist2();
 });
-
-// src/index.ts
-var import_dotenv = __toESM(require_main(), 1);
 
 // ../../node_modules/.bun/hono@4.12.8/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
@@ -25569,13 +25566,15 @@ function drizzle(...params) {
   drizzle2.mock = mock;
 })(drizzle || (drizzle = {}));
 
-// ../../packages/db/src/config.ts
+// ../../packages/database/src/config.ts
+var import_dotenv = __toESM(require_main(), 1);
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 var DEFAULT_DATABASE_URL = "postgres://postgres:postgres@localhost:5432/chess";
 var packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 var workspaceRoot = resolve(packageDir, "../..");
 var workspaceEnvPath = resolve(workspaceRoot, ".env");
+import_dotenv.config({ path: workspaceEnvPath });
 function getDatabaseUrl() {
   return process.env.DATABASE_URL || DEFAULT_DATABASE_URL;
 }
@@ -25587,7 +25586,7 @@ var databasePaths = {
   migrations: resolve(packageDir, "drizzle")
 };
 
-// ../../packages/db/src/schema.ts
+// ../../packages/database/src/schema.ts
 var exports_schema = {};
 __export(exports_schema, {
   verifications: () => verifications,
@@ -25691,7 +25690,7 @@ var moves = pgTable("moves", {
   createdAt: bigint("created_at", { mode: "number" }).notNull()
 });
 
-// ../../packages/db/src/index.ts
+// ../../packages/database/src/index.ts
 var connectionString = getDatabaseUrl();
 var client = src_default(connectionString, { prepare: false });
 var db = drizzle(client, { schema: exports_schema });
@@ -30205,8 +30204,8 @@ function getHost(url) {
     return null;
   }
 }
-function isDynamicBaseURLConfig(config2) {
-  return typeof config2 === "object" && config2 !== null && "allowedHosts" in config2 && Array.isArray(config2.allowedHosts);
+function isDynamicBaseURLConfig(config3) {
+  return typeof config3 === "object" && config3 !== null && "allowedHosts" in config3 && Array.isArray(config3.allowedHosts);
 }
 function getHostFromRequest(request) {
   const forwardedHost = request.headers.get("x-forwarded-host");
@@ -30243,29 +30242,29 @@ var matchesHostPattern = (host, pattern) => {
     return wildcardMatch(normalizedPattern)(normalizedHost);
   return normalizedHost.toLowerCase() === normalizedPattern.toLowerCase();
 };
-function resolveDynamicBaseURL(config2, request, basePath) {
+function resolveDynamicBaseURL(config3, request, basePath) {
   const host = getHostFromRequest(request);
   if (!host) {
-    if (config2.fallback)
-      return withPath(config2.fallback, basePath);
+    if (config3.fallback)
+      return withPath(config3.fallback, basePath);
     throw new BetterAuthError("Could not determine host from request headers. Please provide a fallback URL in your baseURL config.");
   }
-  if (config2.allowedHosts.some((pattern) => matchesHostPattern(host, pattern)))
-    return withPath(`${getProtocolFromRequest(request, config2.protocol)}://${host}`, basePath);
-  if (config2.fallback)
-    return withPath(config2.fallback, basePath);
-  throw new BetterAuthError(`Host "${host}" is not in the allowed hosts list. Allowed hosts: ${config2.allowedHosts.join(", ")}. Add this host to your allowedHosts config or provide a fallback URL.`);
+  if (config3.allowedHosts.some((pattern) => matchesHostPattern(host, pattern)))
+    return withPath(`${getProtocolFromRequest(request, config3.protocol)}://${host}`, basePath);
+  if (config3.fallback)
+    return withPath(config3.fallback, basePath);
+  throw new BetterAuthError(`Host "${host}" is not in the allowed hosts list. Allowed hosts: ${config3.allowedHosts.join(", ")}. Add this host to your allowedHosts config or provide a fallback URL.`);
 }
-function resolveBaseURL(config2, basePath, request, loadEnv, trustedProxyHeaders) {
-  if (isDynamicBaseURLConfig(config2)) {
+function resolveBaseURL(config3, basePath, request, loadEnv, trustedProxyHeaders) {
+  if (isDynamicBaseURLConfig(config3)) {
     if (request)
-      return resolveDynamicBaseURL(config2, request, basePath);
-    if (config2.fallback)
-      return withPath(config2.fallback, basePath);
+      return resolveDynamicBaseURL(config3, request, basePath);
+    if (config3.fallback)
+      return withPath(config3.fallback, basePath);
     return getBaseURL(undefined, basePath, request, loadEnv, trustedProxyHeaders);
   }
-  if (typeof config2 === "string")
-    return getBaseURL(config2, basePath, request, loadEnv, trustedProxyHeaders);
+  if (typeof config3 === "string")
+    return getBaseURL(config3, basePath, request, loadEnv, trustedProxyHeaders);
   return getBaseURL(undefined, basePath, request, loadEnv, trustedProxyHeaders);
 }
 
@@ -34523,7 +34522,7 @@ async function scryptAsync(password, salt, opts) {
 }
 
 // ../../node_modules/.bun/better-auth@1.5.5+20acb14380c76176/node_modules/better-auth/dist/crypto/password.mjs
-var config2 = {
+var config3 = {
   N: 16384,
   r: 16,
   p: 1,
@@ -34531,11 +34530,11 @@ var config2 = {
 };
 async function generateKey(password, salt) {
   return await scryptAsync(password.normalize("NFKC"), salt, {
-    N: config2.N,
-    p: config2.p,
-    r: config2.r,
-    dkLen: config2.dkLen,
-    maxmem: 128 * config2.N * config2.r * 2
+    N: config3.N,
+    p: config3.p,
+    r: config3.r,
+    dkLen: config3.dkLen,
+    maxmem: 128 * config3.N * config3.r * 2
   });
 }
 var hashPassword = async (password) => {
@@ -35697,7 +35696,7 @@ __export(exports_zod, {
   cuid2: () => cuid22,
   cuid: () => cuid3,
   core: () => exports_core2,
-  config: () => config3,
+  config: () => config4,
   coerce: () => exports_coerce,
   codec: () => codec,
   clone: () => clone,
@@ -35938,7 +35937,7 @@ __export(exports_external, {
   cuid2: () => cuid22,
   cuid: () => cuid3,
   core: () => exports_core2,
-  config: () => config3,
+  config: () => config4,
   coerce: () => exports_coerce,
   codec: () => codec,
   clone: () => clone,
@@ -36077,7 +36076,7 @@ __export(exports_core2, {
   decode: () => decode2,
   createToJSONSchemaMethod: () => createToJSONSchemaMethod,
   createStandardJSONSchemaMethod: () => createStandardJSONSchemaMethod,
-  config: () => config3,
+  config: () => config4,
   clone: () => clone,
   _xor: () => _xor,
   _xid: () => _xid,
@@ -36387,7 +36386,7 @@ class $ZodEncodeError extends Error {
   }
 }
 var globalConfig = {};
-function config3(newConfig) {
+function config4(newConfig) {
   if (newConfig)
     Object.assign(globalConfig, newConfig);
   return globalConfig;
@@ -36957,10 +36956,10 @@ function prefixIssues(path, issues) {
 function unwrapMessage(message2) {
   return typeof message2 === "string" ? message2 : message2?.message;
 }
-function finalizeIssue(iss, ctx, config4) {
+function finalizeIssue(iss, ctx, config5) {
   const full = { ...iss, path: iss.path ?? [] };
   if (!iss.message) {
-    const message2 = unwrapMessage(iss.inst?._zod.def?.error?.(iss)) ?? unwrapMessage(ctx?.error?.(iss)) ?? unwrapMessage(config4.customError?.(iss)) ?? unwrapMessage(config4.localeError?.(iss)) ?? "Invalid input";
+    const message2 = unwrapMessage(iss.inst?._zod.def?.error?.(iss)) ?? unwrapMessage(ctx?.error?.(iss)) ?? unwrapMessage(config5.customError?.(iss)) ?? unwrapMessage(config5.localeError?.(iss)) ?? "Invalid input";
     full.message = message2;
   }
   delete full.inst;
@@ -37211,7 +37210,7 @@ var _parse = (_Err) => (schema2, value, _ctx, _params) => {
     throw new $ZodAsyncError;
   }
   if (result.issues.length) {
-    const e = new (_params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config3())));
+    const e = new (_params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config4())));
     captureStackTrace(e, _params?.callee);
     throw e;
   }
@@ -37224,7 +37223,7 @@ var _parseAsync = (_Err) => async (schema2, value, _ctx, params) => {
   if (result instanceof Promise)
     result = await result;
   if (result.issues.length) {
-    const e = new (params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config3())));
+    const e = new (params?.Err ?? _Err)(result.issues.map((iss) => finalizeIssue(iss, ctx, config4())));
     captureStackTrace(e, params?.callee);
     throw e;
   }
@@ -37239,7 +37238,7 @@ var _safeParse = (_Err) => (schema2, value, _ctx) => {
   }
   return result.issues.length ? {
     success: false,
-    error: new (_Err ?? $ZodError)(result.issues.map((iss) => finalizeIssue(iss, ctx, config3())))
+    error: new (_Err ?? $ZodError)(result.issues.map((iss) => finalizeIssue(iss, ctx, config4())))
   } : { success: true, data: result.value };
 };
 var safeParse = /* @__PURE__ */ _safeParse($ZodRealError);
@@ -37250,7 +37249,7 @@ var _safeParseAsync = (_Err) => async (schema2, value, _ctx) => {
     result = await result;
   return result.issues.length ? {
     success: false,
-    error: new _Err(result.issues.map((iss) => finalizeIssue(iss, ctx, config3())))
+    error: new _Err(result.issues.map((iss) => finalizeIssue(iss, ctx, config4())))
   } : { success: true, data: result.value };
 };
 var safeParseAsync = /* @__PURE__ */ _safeParseAsync($ZodRealError);
@@ -38919,7 +38918,7 @@ function handleUnionResults(results, final, inst, ctx) {
     code: "invalid_union",
     input: final.value,
     inst,
-    errors: results.map((result) => result.issues.map((iss) => finalizeIssue(iss, ctx, config3())))
+    errors: results.map((result) => result.issues.map((iss) => finalizeIssue(iss, ctx, config4())))
   });
   return final;
 }
@@ -38980,7 +38979,7 @@ function handleExclusiveUnionResults(results, final, inst, ctx) {
       code: "invalid_union",
       input: final.value,
       inst,
-      errors: results.map((result) => result.issues.map((iss) => finalizeIssue(iss, ctx, config3())))
+      errors: results.map((result) => result.issues.map((iss) => finalizeIssue(iss, ctx, config4())))
     });
   } else {
     final.issues.push({
@@ -39339,7 +39338,7 @@ var $ZodRecord = /* @__PURE__ */ $constructor("$ZodRecord", (inst, def) => {
             payload.issues.push({
               code: "invalid_key",
               origin: "record",
-              issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config3())),
+              issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config4())),
               input: key,
               path: [key],
               inst
@@ -39410,7 +39409,7 @@ function handleMapResult(keyResult, valueResult, final, key, input, inst, ctx) {
         origin: "map",
         input,
         inst,
-        issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config3()))
+        issues: keyResult.issues.map((iss) => finalizeIssue(iss, ctx, config4()))
       });
     }
   }
@@ -39424,7 +39423,7 @@ function handleMapResult(keyResult, valueResult, final, key, input, inst, ctx) {
         input,
         inst,
         key,
-        issues: valueResult.issues.map((iss) => finalizeIssue(iss, ctx, config3()))
+        issues: valueResult.issues.map((iss) => finalizeIssue(iss, ctx, config4()))
       });
     }
   }
@@ -39694,7 +39693,7 @@ var $ZodCatch = /* @__PURE__ */ $constructor("$ZodCatch", (inst, def) => {
           payload.value = def.catchValue({
             ...payload,
             error: {
-              issues: result2.issues.map((iss) => finalizeIssue(iss, ctx, config3()))
+              issues: result2.issues.map((iss) => finalizeIssue(iss, ctx, config4()))
             },
             input: payload.value
           });
@@ -39708,7 +39707,7 @@ var $ZodCatch = /* @__PURE__ */ $constructor("$ZodCatch", (inst, def) => {
       payload.value = def.catchValue({
         ...payload,
         error: {
-          issues: result.issues.map((iss) => finalizeIssue(iss, ctx, config3()))
+          issues: result.issues.map((iss) => finalizeIssue(iss, ctx, config4()))
         },
         input: payload.value
       });
@@ -48832,12 +48831,12 @@ var ZodIssueCode = {
   custom: "custom"
 };
 function setErrorMap(map2) {
-  config3({
+  config4({
     customError: map2
   });
 }
 function getErrorMap() {
-  return config3().customError;
+  return config4().customError;
 }
 var ZodFirstPartyTypeKind;
 (function(ZodFirstPartyTypeKind2) {})(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
@@ -49328,7 +49327,7 @@ function date5(params) {
 }
 
 // ../../node_modules/.bun/zod@4.3.6/node_modules/zod/v4/classic/external.js
-config3(en_default());
+config4(en_default());
 // ../../node_modules/.bun/zod@4.3.6/node_modules/zod/index.js
 var zod_default = exports_external;
 
@@ -51067,7 +51066,7 @@ function getResponse(responses) {
     ...responses
   };
 }
-async function generator(endpoints, config4) {
+async function generator(endpoints, config5) {
   const components = { schemas: {} };
   Object.entries(endpoints).forEach(([_, value]) => {
     const options = value.options;
@@ -51107,7 +51106,7 @@ async function generator(endpoints, config4) {
     },
     components,
     security: [{ apiKeyCookie: [] }],
-    servers: [{ url: config4?.url }],
+    servers: [{ url: config5?.url }],
     tags: [{
       name: "Default",
       description: "Default endpoints that are included with Better Auth by default. These endpoints are not part of any plugin."
@@ -51115,7 +51114,7 @@ async function generator(endpoints, config4) {
     paths
   };
 }
-var getHTML = (apiReference, config4) => `<!doctype html>
+var getHTML = (apiReference, config5) => `<!doctype html>
 <html>
   <head>
     <title>Scalar API Reference</title>
@@ -51132,11 +51131,11 @@ var getHTML = (apiReference, config4) => `<!doctype html>
     </script>
 	 <script>
       var configuration = {
-	  	favicon: ${config4?.logo ? `data:image/svg+xml;utf8,${encodeURIComponent(config4.logo)}` : undefined} ,
-	   	theme: ${config4?.theme || "saturn"},
+	  	favicon: ${config5?.logo ? `data:image/svg+xml;utf8,${encodeURIComponent(config5.logo)}` : undefined} ,
+	   	theme: ${config5?.theme || "saturn"},
         metaData: {
-			title: ${config4?.title || "Open API Reference"},
-			description: ${config4?.description || "Better Call Open API"},
+			title: ${config5?.title || "Open API Reference"},
+			description: ${config5?.description || "Better Call Open API"},
 		}
       }
       document.getElementById('api-reference').dataset.configuration =
@@ -51368,11 +51367,11 @@ function _findAll(ctx, node2, method, segments, index, matches = []) {
 }
 
 // ../../node_modules/.bun/better-call@1.3.2+3c5d820c62823f0b/node_modules/better-call/dist/router.mjs
-var createRouter$1 = (endpoints, config4) => {
-  if (!config4?.openapi?.disabled) {
+var createRouter$1 = (endpoints, config5) => {
+  if (!config5?.openapi?.disabled) {
     const openapi = {
       path: "/api/reference",
-      ...config4?.openapi
+      ...config5?.openapi
     };
     endpoints["openapi"] = createEndpoint(openapi.path, { method: "GET" }, async (c) => {
       const schema2 = await generator(endpoints);
@@ -51390,16 +51389,16 @@ var createRouter$1 = (endpoints, config4) => {
     for (const method of methods)
       addRoute(router, method, endpoint.path, endpoint);
   }
-  if (config4?.routerMiddleware?.length)
-    for (const { path, middleware } of config4.routerMiddleware)
+  if (config5?.routerMiddleware?.length)
+    for (const { path, middleware } of config5.routerMiddleware)
       addRoute(middlewareRouter, "*", path, middleware);
   const processRequest = async (request) => {
     const url2 = new URL(request.url);
     const pathname = url2.pathname;
-    const path = config4?.basePath && config4.basePath !== "/" ? pathname.split(config4.basePath).reduce((acc, curr, index) => {
+    const path = config5?.basePath && config5.basePath !== "/" ? pathname.split(config5.basePath).reduce((acc, curr, index) => {
       if (index !== 0)
         if (index > 1)
-          acc.push(`${config4.basePath}${curr}`);
+          acc.push(`${config5.basePath}${curr}`);
         else
           acc.push(curr);
       return acc;
@@ -51415,7 +51414,7 @@ var createRouter$1 = (endpoints, config4) => {
         statusText: "Not Found"
       });
     const route = findRoute(router, request.method, path);
-    if (path.endsWith("/") !== route?.data?.path?.endsWith("/") && !config4?.skipTrailingSlashes)
+    if (path.endsWith("/") !== route?.data?.path?.endsWith("/") && !config5?.skipTrailingSlashes)
       return new Response(null, {
         status: 404,
         statusText: "Not Found"
@@ -51437,7 +51436,7 @@ var createRouter$1 = (endpoints, config4) => {
     });
     const handler = route.data;
     try {
-      const allowedMediaTypes = handler.options.metadata?.allowedMediaTypes || config4?.allowedMediaTypes;
+      const allowedMediaTypes = handler.options.metadata?.allowedMediaTypes || config5?.allowedMediaTypes;
       const context = {
         path,
         method: request.method,
@@ -51448,7 +51447,7 @@ var createRouter$1 = (endpoints, config4) => {
         query,
         _flag: "router",
         asResponse: true,
-        context: config4?.routerContext
+        context: config5?.routerContext
       };
       const middlewareRoutes = findAllRoutes(middlewareRouter, "*", path);
       if (middlewareRoutes?.length)
@@ -51463,9 +51462,9 @@ var createRouter$1 = (endpoints, config4) => {
         }
       return await handler(context);
     } catch (error48) {
-      if (config4?.onError)
+      if (config5?.onError)
         try {
-          const errorResponse = await config4.onError(error48, request);
+          const errorResponse = await config5.onError(error48, request);
           if (errorResponse instanceof Response)
             return toResponse(errorResponse);
         } catch (error49) {
@@ -51473,7 +51472,7 @@ var createRouter$1 = (endpoints, config4) => {
             return toResponse(error49);
           throw error49;
         }
-      if (config4?.throwError)
+      if (config5?.throwError)
         throw error48;
       if (isAPIError(error48))
         return toResponse(error48);
@@ -51486,12 +51485,12 @@ var createRouter$1 = (endpoints, config4) => {
   };
   return {
     handler: async (request) => {
-      const onReq = await config4?.onRequest?.(request);
+      const onReq = await config5?.onRequest?.(request);
       if (onReq instanceof Response)
         return onReq;
       const req = isRequest(onReq) ? onReq : request;
       const res = await processRequest(req);
-      const onRes = await config4?.onResponse?.(res, req);
+      const onRes = await config5?.onResponse?.(res, req);
       if (onRes instanceof Response)
         return onRes;
       return res;
@@ -51974,10 +51973,10 @@ async function resolveRateLimitConfig(req, ctx) {
 async function onRequestRateLimit(req, ctx) {
   if (!ctx.rateLimit.enabled)
     return;
-  const config4 = await resolveRateLimitConfig(req, ctx);
-  if (!config4)
+  const config5 = await resolveRateLimitConfig(req, ctx);
+  if (!config5)
     return;
-  const { key, currentWindow, currentMax } = config4;
+  const { key, currentWindow, currentMax } = config5;
   const data = await getRateLimitStorage(ctx, { window: currentWindow }).get(key);
   if (data && shouldRateLimit(currentMax, currentWindow, data))
     return rateLimitResponse(getRetryAfter(data.lastRequest, currentWindow));
@@ -51985,10 +51984,10 @@ async function onRequestRateLimit(req, ctx) {
 async function onResponseRateLimit(req, ctx) {
   if (!ctx.rateLimit.enabled)
     return;
-  const config4 = await resolveRateLimitConfig(req, ctx);
-  if (!config4)
+  const config5 = await resolveRateLimitConfig(req, ctx);
+  if (!config5)
     return;
-  const { key, currentWindow } = config4;
+  const { key, currentWindow } = config5;
   const storage = getRateLimitStorage(ctx, { window: currentWindow });
   const data = await storage.get(key);
   const now2 = Date.now();
@@ -52065,8 +52064,8 @@ var __copyProps = (to, from, except2, desc2) => {
 var __reExport = (target, mod, secondTarget) => (__copyProps(target, mod, "default"), secondTarget && __copyProps(secondTarget, mod, "default"));
 
 // ../../node_modules/.bun/better-auth@1.5.5+20acb14380c76176/node_modules/better-auth/dist/db/get-schema.mjs
-function getSchema(config4) {
-  const tables = getAuthTables(config4);
+function getSchema(config5) {
+  const tables = getAuthTables(config5);
   const schema2 = {};
   for (const key in tables) {
     const table = tables[key];
@@ -52307,18 +52306,18 @@ async function processIdentifier(identifier, option) {
     return option.hash(identifier);
   return identifier;
 }
-function getStorageOption(identifier, config4) {
-  if (!config4)
+function getStorageOption(identifier, config5) {
+  if (!config5)
     return;
-  if (typeof config4 === "object" && "default" in config4) {
-    if (config4.overrides) {
-      for (const [prefix, option] of Object.entries(config4.overrides))
+  if (typeof config5 === "object" && "default" in config5) {
+    if (config5.overrides) {
+      for (const [prefix, option] of Object.entries(config5.overrides))
         if (identifier.startsWith(prefix))
           return option;
     }
-    return config4.default;
+    return config5.default;
   }
-  return config4;
+  return config5;
 }
 
 // ../../node_modules/.bun/better-auth@1.5.5+20acb14380c76176/node_modules/better-auth/dist/db/internal-adapter.mjs
@@ -53300,7 +53299,7 @@ var getSession = () => createAuthEndpoint("/get-session", {
     throw APIError2.from("INTERNAL_SERVER_ERROR", BASE_ERROR_CODES.FAILED_TO_GET_SESSION);
   }
 });
-var getSessionFromCtx = async (ctx, config4) => {
+var getSessionFromCtx = async (ctx, config5) => {
   if (ctx.context.session)
     return ctx.context.session;
   const session = await getSession()({
@@ -53311,7 +53310,7 @@ var getSessionFromCtx = async (ctx, config4) => {
     returnHeaders: false,
     returnStatus: false,
     query: {
-      ...config4,
+      ...config5,
       ...ctx.query
     }
   }).catch((e) => {
@@ -60687,10 +60686,10 @@ async function getPostgresSchema(db3) {
   } catch {}
   return "public";
 }
-async function getMigrations(config4) {
-  const betterAuthSchema = getSchema(config4);
-  const logger2 = createLogger(config4.logger);
-  let { kysely: db3, databaseType: dbType } = await createKyselyAdapter(config4);
+async function getMigrations(config5) {
+  const betterAuthSchema = getSchema(config5);
+  const logger2 = createLogger(config5.logger);
+  let { kysely: db3, databaseType: dbType } = await createKyselyAdapter(config5);
   if (!dbType) {
     logger2.warn("Could not determine database type, defaulting to sqlite. Please provide a type in the database options to avoid this.");
     dbType = "sqlite";
@@ -60775,8 +60774,8 @@ async function getMigrations(config4) {
       });
   }
   const migrations = [];
-  const useUUIDs = config4.advanced?.database?.generateId === "uuid";
-  const useNumberId = config4.advanced?.database?.generateId === "serial";
+  const useUUIDs = config5.advanced?.database?.generateId === "uuid";
+  const useNumberId = config5.advanced?.database?.generateId === "serial";
   function getType(field, fieldName) {
     const type = field.type;
     const provider = dbType || "sqlite";
@@ -60848,11 +60847,11 @@ async function getMigrations(config4) {
     return typeMap[type][provider];
   }
   const getModelName = initGetModelName({
-    schema: getAuthTables(config4),
+    schema: getAuthTables(config5),
     usePlural: false
   });
   const getFieldName = initGetFieldName({
-    schema: getAuthTables(config4),
+    schema: getAuthTables(config5),
     usePlural: false
   });
   function getReferencePath(model, field) {
@@ -61595,15 +61594,15 @@ Most of the features of Better Auth will not work correctly.`);
   const cookies = getCookies(options);
   const tables = getAuthTables(options);
   const providers = (await Promise.all(Object.entries(options.socialProviders || {}).map(async ([key, originalConfig]) => {
-    const config4 = typeof originalConfig === "function" ? await originalConfig() : originalConfig;
-    if (config4 == null)
+    const config5 = typeof originalConfig === "function" ? await originalConfig() : originalConfig;
+    if (config5 == null)
       return null;
-    if (config4.enabled === false)
+    if (config5.enabled === false)
       return null;
-    if (!config4.clientId)
+    if (!config5.clientId)
       logger2.warn(`Social provider ${key} is missing clientId or clientSecret`);
-    const provider = socialProviders[key](config4);
-    provider.disableImplicitSignUp = config4.disableImplicitSignUp;
+    const provider = socialProviders[key](config5);
+    provider.disableImplicitSignUp = config5.disableImplicitSignUp;
     return provider;
   }))).filter((x) => x !== null);
   const generateIdFunc = ({ model, size: size2 }) => {
@@ -61834,11 +61833,11 @@ init_json();
 init_adapter();
 init_env();
 init_error2();
-var drizzleAdapter = (db4, config4) => {
+var drizzleAdapter = (db4, config5) => {
   let lazyOptions = null;
   const createCustomAdapter = (db5) => ({ getFieldName, getDefaultFieldName, options }) => {
     function getSchema2(model) {
-      const schema4 = config4.schema || db5._.fullSchema;
+      const schema4 = config5.schema || db5._.fullSchema;
       if (!schema4)
         throw new BetterAuthError("Drizzle adapter failed to initialize. Schema not found. Please provide a schema object in the adapter options object.");
       const schemaModel = schema4[model];
@@ -61847,7 +61846,7 @@ var drizzleAdapter = (db4, config4) => {
       return schemaModel;
     }
     const withReturning = async (model, builder, data, where) => {
-      if (config4.provider !== "mysql")
+      if (config5.provider !== "mysql")
         return (await builder.returning())[0];
       await builder.execute();
       const schemaModel = getSchema2(model);
@@ -62012,13 +62011,13 @@ var drizzleAdapter = (db4, config4) => {
     function getQueryModel(model) {
       if (db5.query[model])
         return model;
-      if (config4.usePlural) {
+      if (config5.usePlural) {
         const plural = `${model}s`;
         if (db5.query[plural])
           return plural;
       }
-      if (config4.schema) {
-        const targetTable = config4.schema[model];
+      if (config5.schema) {
+        const targetTable = config5.schema[model];
         if (targetTable) {
           const fullSchema = db5._.fullSchema;
           if (fullSchema) {
@@ -62053,7 +62052,7 @@ var drizzleAdapter = (db4, config4) => {
               for (const [model2, joinAttr] of joinEntries) {
                 const limit = joinAttr.limit ?? options.advanced?.database?.defaultFindManyLimit ?? 100;
                 const isUnique = joinAttr.relation === "one-to-one";
-                const pluralSuffix = isUnique || config4.usePlural ? "" : "s";
+                const pluralSuffix = isUnique || config5.usePlural ? "" : "s";
                 includes[`${model2}${pluralSuffix}`] = isUnique ? true : { limit };
                 if (!isUnique)
                   pluralJoinResults.push(`${model2}${pluralSuffix}`);
@@ -62072,7 +62071,7 @@ var drizzleAdapter = (db4, config4) => {
             });
             if (res2)
               for (const pluralJoinResult of pluralJoinResults) {
-                const singularKey = !config4.usePlural ? pluralJoinResult.slice(0, -1) : pluralJoinResult;
+                const singularKey = !config5.usePlural ? pluralJoinResult.slice(0, -1) : pluralJoinResult;
                 res2[singularKey] = res2[pluralJoinResult];
                 if (pluralJoinResult !== singularKey)
                   delete res2[pluralJoinResult];
@@ -62112,7 +62111,7 @@ var drizzleAdapter = (db4, config4) => {
               for (const [model2, joinAttr] of joinEntries) {
                 const isUnique = joinAttr.relation === "one-to-one";
                 const limit2 = joinAttr.limit ?? options.advanced?.database?.defaultFindManyLimit ?? 100;
-                const pluralSuffix = isUnique || config4.usePlural ? "" : "s";
+                const pluralSuffix = isUnique || config5.usePlural ? "" : "s";
                 includes[`${model2}${pluralSuffix}`] = isUnique ? true : { limit: limit2 };
                 if (!isUnique)
                   pluralJoinResults.push(`${model2}${pluralSuffix}`);
@@ -62141,7 +62140,7 @@ var drizzleAdapter = (db4, config4) => {
             if (res)
               for (const item of res)
                 for (const pluralJoinResult of pluralJoinResults) {
-                  const singularKey = !config4.usePlural ? pluralJoinResult.slice(0, -1) : pluralJoinResult;
+                  const singularKey = !config5.usePlural ? pluralJoinResult.slice(0, -1) : pluralJoinResult;
                   if (singularKey === pluralJoinResult)
                     continue;
                   item[singularKey] = item[pluralJoinResult];
@@ -62212,7 +62211,7 @@ var drizzleAdapter = (db4, config4) => {
           });
         return count2;
       },
-      options: config4
+      options: config5
     };
   };
   let adapterOptions = null;
@@ -62220,11 +62219,11 @@ var drizzleAdapter = (db4, config4) => {
     config: {
       adapterId: "drizzle",
       adapterName: "Drizzle Adapter",
-      usePlural: config4.usePlural ?? false,
-      debugLogs: config4.debugLogs ?? false,
-      supportsUUIDs: config4.provider === "pg" ? true : false,
-      supportsJSON: config4.provider === "pg" ? true : false,
-      supportsArrays: config4.provider === "pg" ? true : false,
+      usePlural: config5.usePlural ?? false,
+      debugLogs: config5.debugLogs ?? false,
+      supportsUUIDs: config5.provider === "pg" ? true : false,
+      supportsJSON: config5.provider === "pg" ? true : false,
+      supportsArrays: config5.provider === "pg" ? true : false,
       customTransformOutput: ({ data, fieldAttributes }) => {
         if (fieldAttributes.type === "date") {
           if (data === null || data === undefined)
@@ -62233,7 +62232,7 @@ var drizzleAdapter = (db4, config4) => {
         }
         return data;
       },
-      transaction: config4.transaction ?? false ? (cb) => db4.transaction((tx) => {
+      transaction: config5.transaction ?? false ? (cb) => db4.transaction((tx) => {
         return cb(createAdapterFactory({
           config: adapterOptions.config,
           adapter: createCustomAdapter(tx)
@@ -62339,7 +62338,6 @@ authRouter.all("/*", (c) => auth.handler(c.req.raw));
 var auth_default = authRouter;
 
 // src/index.ts
-import_dotenv.config();
 var app = new Hono2;
 app.use("/api/*", cors());
 app.onError((error50, context) => {

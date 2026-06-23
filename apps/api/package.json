@@ -13,7 +13,7 @@
 		"check": "biome check"
 	},
 	"dependencies": {
-		"@chess/db": "workspace:*",
+		"@chess/database": "workspace:*",
 		"@chess/types": "workspace:*",
 		"bcryptjs": "^3.0.3",
 		"better-auth": "^1.5.5",

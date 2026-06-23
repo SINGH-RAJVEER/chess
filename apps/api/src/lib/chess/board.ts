@@ -1,4 +1,4 @@
-import type { Piece } from "@chess/db/schema";
+import type { Piece } from "@chess/database/schema";
 
 export function getRow(square: number): number {
 	return Math.floor(square / 8);

@@ -1,4 +1,4 @@
-import { db, schema } from "@chess/db";
+import { db, schema } from "@chess/database";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
