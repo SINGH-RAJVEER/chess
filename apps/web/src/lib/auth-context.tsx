@@ -9,6 +9,7 @@ type AuthState = {
 	signUp: (email: string, password: string, name: string) => Promise<void>;
 	signInWithGoogle: () => Promise<void>;
 	signOut: () => Promise<void>;
+	updateProfileImage: (image: string) => void;
 };
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -17,6 +18,15 @@ function isAuthResponse(value: unknown): value is AuthResponse {
 	if (!value || typeof value !== "object") return false;
 	const candidate = value as Partial<AuthResponse>;
 	return Boolean(candidate.user?.id && candidate.session?.id);
+}
+
+function getProfileImageKey(userId: string) {
+	return `chess_profile_image_${userId}`;
+}
+
+function applyProfileImageOverride(user: AuthResponse["user"]) {
+	const storedImage = localStorage.getItem(getProfileImageKey(user.id));
+	return storedImage ? { ...user, image: storedImage } : user;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -32,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				const storedUser = localStorage.getItem("chess_user");
 				const storedSession = localStorage.getItem("chess_session");
 				if (storedUser && storedSession) {
-					setUser(JSON.parse(storedUser));
+					setUser(applyProfileImageOverride(JSON.parse(storedUser)));
 					setSession(JSON.parse(storedSession));
 				}
 			} catch {
@@ -48,9 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				});
 				const data = response.ok ? await response.json() : null;
 				if (isMounted && isAuthResponse(data)) {
-					setUser(data.user);
+					const userWithImage = applyProfileImageOverride(data.user);
+					setUser(userWithImage);
 					setSession(data.session);
-					localStorage.setItem("chess_user", JSON.stringify(data.user));
+					localStorage.setItem("chess_user", JSON.stringify(userWithImage));
 					localStorage.setItem("chess_session", JSON.stringify(data.session));
 					return;
 				}
@@ -83,9 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		}
 
 		const data = (await response.json()) as AuthResponse;
-		setUser(data.user);
+		const userWithImage = applyProfileImageOverride(data.user);
+		setUser(userWithImage);
 		setSession(data.session);
-		localStorage.setItem("chess_user", JSON.stringify(data.user));
+		localStorage.setItem("chess_user", JSON.stringify(userWithImage));
 		localStorage.setItem("chess_session", JSON.stringify(data.session));
 	};
 
@@ -103,9 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		}
 
 		const data = (await response.json()) as AuthResponse;
-		setUser(data.user);
+		const userWithImage = applyProfileImageOverride(data.user);
+		setUser(userWithImage);
 		setSession(data.session);
-		localStorage.setItem("chess_user", JSON.stringify(data.user));
+		localStorage.setItem("chess_user", JSON.stringify(userWithImage));
 		localStorage.setItem("chess_session", JSON.stringify(data.session));
 	};
 
@@ -144,9 +157,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		localStorage.removeItem("chess_session");
 	};
 
+	const updateProfileImage = (image: string) => {
+		setUser((currentUser) => {
+			if (!currentUser) return currentUser;
+			const updatedUser = { ...currentUser, image };
+			localStorage.setItem(getProfileImageKey(currentUser.id), image);
+			localStorage.setItem("chess_user", JSON.stringify(updatedUser));
+			return updatedUser;
+		});
+	};
+
 	return (
 		<AuthContext.Provider
-			value={{ user, session, isLoading, signIn, signUp, signInWithGoogle, signOut }}
+			value={{
+				user,
+				session,
+				isLoading,
+				signIn,
+				signUp,
+				signInWithGoogle,
+				signOut,
+				updateProfileImage,
+			}}
 		>
 			{children}
 		</AuthContext.Provider>

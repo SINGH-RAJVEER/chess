@@ -89,7 +89,7 @@ export default function ComputerGameView({
 				currentTimeControl={boardData?.timeControl}
 			/>
 
-			<div className="flex-1 min-h-0 flex overflow-hidden">
+			<div className="flex-1 min-h-0 flex flex-col overflow-hidden md:flex-row">
 				<div className="flex-1 min-h-0 flex flex-col p-4 gap-3 relative">
 					{errorMsg && (
 						<div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 rounded bg-red-900/80 px-4 py-1.5 text-xs font-medium text-red-100 backdrop-blur-sm flex items-center gap-2">
@@ -114,8 +114,8 @@ export default function ComputerGameView({
 						}
 					/>
 
-					<div className="flex-1 min-h-0 flex items-center justify-center">
-						<div className="h-full aspect-square max-w-full">
+					<div className="chess-board-area flex-1 min-h-0 flex items-center justify-center">
+						<div className="chess-board-shell">
 							<ChessBoard
 								pieces={pieces}
 								boardData={boardData}
@@ -144,7 +144,7 @@ export default function ComputerGameView({
 					/>
 				</div>
 
-				<div className="w-72 shrink-0 flex flex-col border-l border-zinc-800">
+				<div className="h-44 w-full shrink-0 flex flex-col border-t border-zinc-800 md:h-auto md:w-72 md:border-t-0 md:border-l">
 					<MoveHistory moves={boardData?.moves ?? []} />
 
 					<div className="shrink-0 border-t border-zinc-800 p-4 flex flex-col gap-2">
@@ -167,16 +167,27 @@ export default function ComputerGameView({
 								</Button>
 							</div>
 						) : (
-							<Button
-								variant="ghost"
-								className="w-full text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
-								onClick={onTakeback}
-								disabled={isUndoPending || (boardData?.moves.length || 0) === 0}
-							>
-								Takeback
-							</Button>
+							<div className="flex gap-2 md:flex-col">
+								<Button
+									variant="ghost"
+									className="flex-1 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 md:w-full"
+									onClick={onTakeback}
+									disabled={isUndoPending || (boardData?.moves.length || 0) === 0}
+								>
+									Takeback
+								</Button>
+								{boardData?.status === "Ongoing" && (
+									<Button
+										variant="ghost"
+										className="flex-1 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 md:w-full"
+										onClick={onResign}
+									>
+										Resign
+									</Button>
+								)}
+							</div>
 						)}
-						{boardData?.status === "Ongoing" && (
+						{turn === "White" && pendingMove && boardData?.status === "Ongoing" && (
 							<Button
 								variant="ghost"
 								className="w-full text-zinc-400 hover:text-red-400 hover:bg-zinc-800"

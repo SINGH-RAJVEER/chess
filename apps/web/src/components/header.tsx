@@ -1,5 +1,5 @@
-import { ChevronDown, Cpu, LogOut, Settings, Trophy, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Camera, ChevronDown, Cpu, LogOut, Settings, Trophy, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,7 +72,9 @@ export default function Header(props: HeaderProps) {
 	const [selectedTime, setSelectedTime] = useState(10);
 	const [selectedIncrement, setSelectedIncrement] = useState(0);
 	const [settingsOpen, setSettingsOpen] = useState(false);
-	const { user, signOut } = useAuth();
+	const [profileImageError, setProfileImageError] = useState(false);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const { user, signOut, updateProfileImage } = useAuth();
 	const navigate = useNavigate();
 
 	useEffect(() => {
@@ -86,6 +88,11 @@ export default function Header(props: HeaderProps) {
 
 	const currentTab = props.activeTab || "vs_player";
 	const currentMode = currentTab === "vs_computer" ? "vs_computer" : "vs_player";
+	const profileImage = user?.image && !profileImageError ? user.image : null;
+
+	useEffect(() => {
+		setProfileImageError(false);
+	}, [user?.image]);
 
 	const handleSelect = (option: TimeOption) => {
 		setSelectedTime(option.minutes);
@@ -106,6 +113,15 @@ export default function Header(props: HeaderProps) {
 		}
 		if (currentTab === "vs_player") return "New Game";
 		return "New Game";
+	};
+
+	const handleProfileImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
+		event.target.value = "";
+		if (!file || !file.type.startsWith("image/")) return;
+
+		const image = await resizeProfileImage(file);
+		updateProfileImage(image);
 	};
 
 	return (
@@ -235,15 +251,38 @@ export default function Header(props: HeaderProps) {
 
 					{user ? (
 						<DropdownMenu>
-							<DropdownMenuTrigger className="cursor-pointer flex items-center h-8 text-xs font-medium bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:text-zinc-100 rounded-md px-3">
-								<User className="mr-2 size-3" />
-								{user.name}
+							<DropdownMenuTrigger className="cursor-pointer flex h-8 shrink-0 items-center text-xs font-medium bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:text-zinc-100 rounded-md px-1.5 md:px-3">
+								<ProfileAvatar
+									image={profileImage}
+									name={user.name}
+									onImageError={() => setProfileImageError(true)}
+								/>
+								<span className="ml-2 hidden max-w-24 truncate md:inline">{user.name}</span>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent className="w-48 bg-zinc-900 border-zinc-800 text-zinc-300">
-								<DropdownMenuLabel className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase px-2 py-1.5">
-									{user.email}
+								<DropdownMenuLabel className="flex items-center gap-2 px-2 py-2">
+									<ProfileAvatar
+										image={profileImage}
+										name={user.name}
+										onImageError={() => setProfileImageError(true)}
+									/>
+									<span className="min-w-0">
+										<span className="block truncate text-xs font-medium normal-case tracking-normal text-zinc-100">
+											{user.name}
+										</span>
+										<span className="block truncate text-[10px] font-medium normal-case tracking-normal text-zinc-500">
+											{user.email}
+										</span>
+									</span>
 								</DropdownMenuLabel>
 								<DropdownMenuSeparator className="bg-zinc-800" />
+								<DropdownMenuItem
+									onClick={() => fileInputRef.current?.click()}
+									className="justify-start text-xs font-medium focus:bg-zinc-100 focus:text-zinc-900 cursor-pointer"
+								>
+									<Camera className="mr-2 size-3" />
+									Upload Photo
+								</DropdownMenuItem>
 								<DropdownMenuItem
 									onClick={async () => {
 										await signOut();
@@ -259,16 +298,81 @@ export default function Header(props: HeaderProps) {
 					) : (
 						<Link
 							to="/sign-in"
-							className="flex items-center rounded-md px-3 h-8 text-xs font-medium bg-zinc-900 border border-zinc-800 text-zinc-100 hover:bg-zinc-800 transition-colors"
+							className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-zinc-900 border border-zinc-800 text-zinc-100 hover:bg-zinc-800 transition-colors sm:w-auto sm:px-3"
+							aria-label="Sign in"
 						>
-							<User className="mr-2 size-3" />
-							Sign In
+							<User className="size-3 sm:mr-2" />
+							<span className="hidden text-xs font-medium sm:inline">Sign In</span>
 						</Link>
 					)}
 				</div>
 			</header>
+			<input
+				ref={fileInputRef}
+				type="file"
+				accept="image/*"
+				className="hidden"
+				onChange={(event) => void handleProfileImageChange(event)}
+			/>
 
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 		</>
 	);
+}
+
+function ProfileAvatar({
+	image,
+	name,
+	onImageError,
+}: {
+	image: string | null;
+	name: string;
+	onImageError: () => void;
+}) {
+	if (image) {
+		return (
+			<img
+				src={image}
+				alt=""
+				className="size-5 rounded-full object-cover"
+				onError={onImageError}
+			/>
+		);
+	}
+
+	return (
+		<span className="flex size-5 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-semibold uppercase text-zinc-200">
+			{name.trim().charAt(0) || <User className="size-3" />}
+		</span>
+	);
+}
+
+async function resizeProfileImage(file: File) {
+	const dataUrl = await new Promise<string>((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(String(reader.result));
+		reader.onerror = () => reject(new Error("Could not read image"));
+		reader.readAsDataURL(file);
+	});
+
+	const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+		const img = new Image();
+		img.onload = () => resolve(img);
+		img.onerror = () => reject(new Error("Could not load image"));
+		img.src = dataUrl;
+	});
+
+	const size = 160;
+	const canvas = document.createElement("canvas");
+	canvas.width = size;
+	canvas.height = size;
+	const context = canvas.getContext("2d");
+	if (!context) return dataUrl;
+
+	const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+	const sourceX = (image.naturalWidth - sourceSize) / 2;
+	const sourceY = (image.naturalHeight - sourceSize) / 2;
+	context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
+
+	return canvas.toDataURL("image/jpeg", 0.85);
 }

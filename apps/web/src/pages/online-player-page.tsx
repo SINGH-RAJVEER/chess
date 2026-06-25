@@ -381,7 +381,7 @@ export default function OnlinePlayerPage() {
 				queueStatus={queueStatus.status}
 			/>
 
-			<div className="flex-1 min-h-0 flex overflow-hidden">
+			<div className="flex-1 min-h-0 flex flex-col overflow-hidden md:flex-row">
 				{/* Center: opponent → board → you */}
 				<div className="flex-1 min-h-0 flex flex-col p-4 gap-3 relative">
 					{errorMsg && (
@@ -407,8 +407,8 @@ export default function OnlinePlayerPage() {
 					/>
 
 					{/* Board — fills remaining height */}
-					<div className="flex-1 min-h-0 flex items-center justify-center">
-						<div className="h-full aspect-square max-w-full">
+					<div className="chess-board-area flex-1 min-h-0 flex items-center justify-center">
+						<div className="chess-board-shell">
 							<ChessBoard
 								pieces={pieces}
 								boardData={boardData}
@@ -436,7 +436,7 @@ export default function OnlinePlayerPage() {
 				</div>
 
 				{/* Right sidebar: move history + controls */}
-				<div className="w-72 shrink-0 flex flex-col border-l border-zinc-800">
+				<div className="h-44 w-full shrink-0 flex flex-col border-t border-zinc-800 md:h-auto md:w-72 md:border-t-0 md:border-l">
 					<MoveHistory moves={boardData?.moves ?? []} />
 
 					{hasActiveGame && userColor !== "Spectator" && (

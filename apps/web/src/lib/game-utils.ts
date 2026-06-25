@@ -21,6 +21,26 @@ export function getPreviewPieces(
 ): BoardPiece[] {
 	const basePieces = pieces ?? [];
 	if (!pendingMove) return basePieces;
+
+	const movingPiece = basePieces.find((piece) => piece.square === pendingMove.from);
+	const isCastle =
+		movingPiece?.piece_type === "King" && Math.abs(pendingMove.to - pendingMove.from) === 2;
+
+	if (isCastle) {
+		const rowStart = Math.floor(pendingMove.from / 8) * 8;
+		const isKingside = pendingMove.to > pendingMove.from;
+		const rookFrom = rowStart + (isKingside ? 7 : 0);
+		const rookTo = rowStart + (isKingside ? 5 : 3);
+
+		return basePieces.map((piece) => {
+			if (piece.square === pendingMove.from) return { ...piece, square: pendingMove.to };
+			if (piece.square === rookFrom && piece.piece_type === "Rook") {
+				return { ...piece, square: rookTo };
+			}
+			return piece;
+		});
+	}
+
 	return basePieces
 		.filter((piece) => piece.square !== pendingMove.to)
 		.map((piece) =>

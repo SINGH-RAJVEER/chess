@@ -7,3 +7,5 @@ AGENTS.md
 .devenv/
 .nx/cache/
 .nx/workspace-data/
+.codex
+.tmp-runtime

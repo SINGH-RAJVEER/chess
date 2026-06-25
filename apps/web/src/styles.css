@@ -20,6 +20,14 @@ body {
 		-ms-overflow-style: none;
 		scrollbar-width: none;
 	}
+	.chess-board-area {
+		container-type: size;
+	}
+	.chess-board-shell {
+		aspect-ratio: 1 / 1;
+		height: min(100cqh, 100cqw);
+		width: min(100cqh, 100cqw);
+	}
 }
 
 :root {
