@@ -109,6 +109,7 @@ api.post("/move", async (context) => {
 			to: body.to,
 			gameId: body.gameId,
 			promotion: body.promotion,
+			opponent: body.opponent,
 		}),
 	);
 });

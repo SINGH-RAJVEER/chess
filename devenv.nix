@@ -23,6 +23,8 @@ let
   '';
 in
 {
+  nixpkgs.config.allowUnfree = true;
+
   packages = with pkgs; [
     bun
     postgresql_16
@@ -35,7 +37,17 @@ in
     openssl
     nil
     nixd
-  ];
+  ] ++ lib.optionals pkgs.stdenv.isLinux (with pkgs.cudaPackages; [
+    cudatoolkit
+    cudnn
+  ]);
+
+  env = lib.optionalAttrs pkgs.stdenv.isLinux {
+    LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs.cudaPackages; [
+      cudatoolkit
+      cudnn
+    ]) + ":/run/opengl-driver/lib";
+  };
 
   services.postgres = {
     enable = true;

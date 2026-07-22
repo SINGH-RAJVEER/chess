@@ -1,20 +1,40 @@
+mod neural;
+
+use std::sync::Mutex;
+
 use actix_cors::Cors;
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
 
-use shakmaty::{CastlingMode, Chess, Position, Move, Role, Color};
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
+use shakmaty::{CastlingMode, Chess, Color, Move, Position, Role};
 
 #[derive(Deserialize, Serialize)]
 struct EngineRequest {
     fen: String,
+    #[serde(default)]
+    opponent: Opponent,
+}
+
+#[derive(Clone, Copy, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum Opponent {
+    #[default]
+    Minimax,
+    Dqn,
 }
 
 #[derive(Serialize, Deserialize)]
 struct EngineResponse {
     best_move: Option<String>,
     error: Option<String>,
+    engine: String,
+    execution_provider: Option<String>,
+}
+
+struct EngineState {
+    neural: Option<Mutex<neural::NeuralEngine>>,
 }
 
 fn evaluate(pos: &Chess) -> i32 {
@@ -113,25 +133,62 @@ fn find_best_move(pos: &Chess, depth: i32) -> Option<Move> {
 }
 
 #[post("/api/engine-move")]
-async fn get_engine_move(req: web::Json<EngineRequest>) -> impl Responder {
+async fn get_engine_move(
+    req: web::Json<EngineRequest>,
+    state: web::Data<EngineState>,
+) -> impl Responder {
     let fen_str = &req.fen;
     let setup: Fen = match fen_str.parse() {
         Ok(f) => f,
-        Err(_) => return HttpResponse::BadRequest().json(EngineResponse {
-            best_move: None,
-            error: Some("Invalid FEN".to_string()),
-        }),
+        Err(_) => {
+            return HttpResponse::BadRequest().json(EngineResponse {
+                best_move: None,
+                error: Some("Invalid FEN".to_string()),
+                engine: "none".to_string(),
+                execution_provider: None,
+            })
+        }
     };
 
     let position: Chess = match setup.into_position(CastlingMode::Standard) {
         Ok(p) => p,
-        Err(_) => return HttpResponse::BadRequest().json(EngineResponse {
-            best_move: None,
-            error: Some("Invalid Position".to_string()),
-        }),
+        Err(_) => {
+            return HttpResponse::BadRequest().json(EngineResponse {
+                best_move: None,
+                error: Some("Invalid Position".to_string()),
+                engine: "none".to_string(),
+                execution_provider: None,
+            })
+        }
     };
 
-    let best_move = find_best_move(&position, 5);
+    let (best_move, engine, execution_provider) = match req.opponent {
+        Opponent::Dqn => match &state.neural {
+            Some(neural) => {
+                let mut neural = match neural.lock() {
+                    Ok(neural) => neural,
+                    Err(_) => {
+                        return HttpResponse::InternalServerError().json(EngineResponse {
+                            best_move: None,
+                            error: Some("DQN engine lock failed".to_string()),
+                            engine: "dqn".to_string(),
+                            execution_provider: None,
+                        });
+                    }
+                };
+                let provider = neural.provider().to_string();
+                match neural.best_move(&position) {
+                    Ok(best_move) => (best_move, "dqn", Some(provider)),
+                    Err(error) => {
+                        eprintln!("[engine] DQN inference failed ({error}); using minimax");
+                        (find_best_move(&position, 5), "minimax_fallback", None)
+                    }
+                }
+            }
+            None => (find_best_move(&position, 5), "minimax_fallback", None),
+        },
+        Opponent::Minimax => (find_best_move(&position, 5), "minimax", None),
+    };
 
     match best_move {
         Some(m) => {
@@ -139,17 +196,29 @@ async fn get_engine_move(req: web::Json<EngineRequest>) -> impl Responder {
             HttpResponse::Ok().json(EngineResponse {
                 best_move: Some(uci.to_string()),
                 error: None,
+                engine: engine.to_string(),
+                execution_provider,
             })
         }
         _none => HttpResponse::Ok().json(EngineResponse {
             best_move: None,
             error: Some("No legal moves".to_string()),
+            engine: engine.to_string(),
+            execution_provider,
         }),
     }
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let neural = match neural::NeuralEngine::load() {
+        Ok(engine) => Some(Mutex::new(engine)),
+        Err(error) => {
+            eprintln!("[engine] DQN disabled: {error}");
+            None
+        }
+    };
+    let state = web::Data::new(EngineState { neural });
     println!("Starting engine server at http://0.0.0.0:8080");
 
     HttpServer::new(move || {
@@ -160,6 +229,7 @@ async fn main() -> std::io::Result<()> {
             .max_age(3600);
 
         App::new()
+            .app_data(state.clone())
             .wrap(cors)
             .service(get_engine_move)
     })

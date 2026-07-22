@@ -634,6 +634,7 @@ export async function makeMove({
 	to,
 	gameId,
 	promotion,
+	opponent = "minimax",
 }: MakeMoveRequest): Promise<MakeMoveResponse> {
 	const currentGame = await db.query.games.findFirst({
 		where: eq(schema.games.id, gameId),
@@ -787,7 +788,7 @@ export async function makeMove({
 		fetch(`${engineUrl}/api/engine-move`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ fen }),
+			body: JSON.stringify({ fen, opponent }),
 		})
 			.then(async (response) => {
 				if (!response.ok) return;

@@ -7,6 +7,7 @@ A full-stack chess application.
 - `apps/web` — React web UI served by Vite/Bun
 - `apps/api` — Hono API app for game state, queueing, and engine orchestration
 - `apps/engine` — Rust chess engine service
+- `apps/dqn` — Neural opponent model, inference support, and training pipeline
 - `packages/types` — Shared TypeScript types (Color, PieceType, GameStatus, etc.)
 - `packages/database` — Database schema, migrations, and Drizzle ORM client
 
@@ -67,6 +68,7 @@ bun run database:studio    # Open Drizzle Studio UI
 .
 ├── apps/
 │   ├── api/                  # Hono API app
+│   ├── dqn/                  # Neural model and training pipeline
 │   ├── web/                  # React web app
 │   └── engine/               # Rust chess engine
 ├── packages/
@@ -95,6 +97,7 @@ bun run database:studio    # Open Drizzle Studio UI
 - **Web App**: A client-side React app that calls the Hono API over HTTP
 - **API App**: Owns queueing, game mutation/query logic, DB access, and engine requests
 - **Engine**: Pure Rust, no direct dependencies on other workspace packages (uses HTTP API)
+- **DQN Opponent**: Optional ONNX policy/value search with automatic NVIDIA CUDA detection and CPU fallback. See [`docs/dqn.md`](docs/dqn.md)
 
 ## Local Dev Stack (devenv)
 

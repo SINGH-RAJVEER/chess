@@ -29769,7 +29769,8 @@ async function makeMove({
   from,
   to,
   gameId,
-  promotion
+  promotion,
+  opponent = "minimax"
 }) {
   const currentGame = await db.query.games.findFirst({
     where: eq(exports_schema.games.id, gameId)
@@ -29875,7 +29876,7 @@ async function makeMove({
     fetch(`${engineUrl}/api/engine-move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fen })
+      body: JSON.stringify({ fen, opponent })
     }).then(async (response) => {
       if (!response.ok)
         return;
@@ -62399,7 +62400,8 @@ api2.post("/move", async (context) => {
     from: body.from,
     to: body.to,
     gameId: body.gameId,
-    promotion: body.promotion
+    promotion: body.promotion,
+    opponent: body.opponent
   }));
 });
 api2.post("/undo", async (context) => {

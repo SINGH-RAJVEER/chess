@@ -17,6 +17,8 @@ export type GameStatus =
 
 export type GameMode = "vs_player" | "vs_computer";
 
+export type ComputerOpponent = "minimax" | "dqn";
+
 export type QueueStatus = "idle" | "queued" | "matched";
 
 export type UserColor = Color | "Spectator";

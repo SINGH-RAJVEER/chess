@@ -1,4 +1,4 @@
-import type { BoardResponse, PromotionPiece } from "@chess/types";
+import type { BoardResponse, ComputerOpponent, PromotionPiece } from "@chess/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ComputerGameView, { type PromotionState } from "@/components/computer-game-view";
 import { getBoard, getMoves, makeMove, resetGame, resignGame, undoMove } from "@/lib/api";
@@ -24,6 +24,9 @@ export default function ComputerPage() {
 	const [isUndoPending, setIsUndoPending] = useState(false);
 	const [isResetPending, setIsResetPending] = useState(false);
 	const [promotionState, setPromotionState] = useState<PromotionState | null>(null);
+	const [opponent, setOpponent] = useState<ComputerOpponent>(() => {
+		return localStorage.getItem("chess_computer_opponent") === "dqn" ? "dqn" : "minimax";
+	});
 	const prevMoveCountRef = useRef(0);
 
 	const fetchBoard = useCallback(async () => {
@@ -154,7 +157,7 @@ export default function ComputerPage() {
 
 		try {
 			setIsMovePending(true);
-			await makeMove({ ...move, gameId: boardData.id, promotion });
+			await makeMove({ ...move, gameId: boardData.id, promotion, opponent });
 			setPendingMove(null);
 			setPromotionState(null);
 			await fetchBoard();
@@ -182,6 +185,11 @@ export default function ComputerPage() {
 	const handleCancelMove = () => {
 		setPendingMove(null);
 		setPromotionState(null);
+	};
+
+	const handleOpponentChange = (nextOpponent: ComputerOpponent) => {
+		setOpponent(nextOpponent);
+		localStorage.setItem("chess_computer_opponent", nextOpponent);
 	};
 
 	const handleTakeback = async () => {
@@ -281,6 +289,7 @@ export default function ComputerPage() {
 			isResetPending={isResetPending}
 			isGameOver={isGameOver}
 			gameOverMessage={getGameOverMessage()}
+			opponent={opponent}
 			onRestart={() => void handleReset()}
 			onSquareClick={(square) => void handleSquareClick(square)}
 			onConfirmMove={(promotion) => void handleConfirmMove(promotion)}
@@ -288,6 +297,7 @@ export default function ComputerPage() {
 			onPromotionSelect={handlePromotionSelect}
 			onTakeback={() => void handleTakeback()}
 			onResign={() => void handleResign()}
+			onOpponentChange={handleOpponentChange}
 		/>
 	);
 }

@@ -1,0 +1,3 @@
+training/.venv/
+training/__pycache__/
+training/checkpoints/

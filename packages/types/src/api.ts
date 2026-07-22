@@ -1,5 +1,13 @@
 import type { BoardResponse } from "./board";
-import type { Color, GameMode, GameStatus, PieceType, PromotionPiece, QueueStatus } from "./chess";
+import type {
+	Color,
+	ComputerOpponent,
+	GameMode,
+	GameStatus,
+	PieceType,
+	PromotionPiece,
+	QueueStatus,
+} from "./chess";
 
 export type GetBoardParams = {
 	mode?: GameMode;
@@ -33,6 +41,7 @@ export type MakeMoveRequest = {
 	to: number;
 	gameId: number;
 	promotion?: PromotionPiece;
+	opponent?: ComputerOpponent;
 };
 
 export type UndoMoveRequest = {

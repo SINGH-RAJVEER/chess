@@ -1,5 +1,11 @@
-import type { BoardPiece, BoardResponse, Color, PromotionPiece } from "@chess/types";
-import { AlertCircle, Cpu, User } from "lucide-react";
+import type {
+	BoardPiece,
+	BoardResponse,
+	Color,
+	ComputerOpponent,
+	PromotionPiece,
+} from "@chess/types";
+import { AlertCircle, BrainCircuit, Cpu, User } from "lucide-react";
 import ChessBoard from "@/components/chess-board";
 import Header from "@/components/header";
 import MoveHistory from "@/components/move-history";
@@ -42,6 +48,7 @@ type ComputerGameViewProps = {
 	isResetPending: boolean;
 	isGameOver: boolean;
 	gameOverMessage: string;
+	opponent: ComputerOpponent;
 	onRestart: () => void;
 	onSquareClick: (square: number) => void;
 	onConfirmMove: (promotion?: PromotionPiece) => void;
@@ -49,6 +56,7 @@ type ComputerGameViewProps = {
 	onPromotionSelect: (piece: PromotionPiece) => void;
 	onTakeback: () => void;
 	onResign: () => void;
+	onOpponentChange: (opponent: ComputerOpponent) => void;
 };
 
 export default function ComputerGameView({
@@ -70,6 +78,7 @@ export default function ComputerGameView({
 	isResetPending,
 	isGameOver,
 	gameOverMessage,
+	opponent,
 	onRestart,
 	onSquareClick,
 	onConfirmMove,
@@ -77,6 +86,7 @@ export default function ComputerGameView({
 	onPromotionSelect,
 	onTakeback,
 	onResign,
+	onOpponentChange,
 }: ComputerGameViewProps) {
 	const hasClock = boardData?.timeControl !== 0;
 
@@ -99,7 +109,7 @@ export default function ComputerGameView({
 					)}
 
 					<PlayerCard
-						label="Engine"
+						label={opponent === "dqn" ? "DQN" : "Engine"}
 						color="Black"
 						time={formatGameTime(blackTime, hasClock)}
 						isActive={turn === "Black"}
@@ -144,7 +154,38 @@ export default function ComputerGameView({
 					/>
 				</div>
 
-				<div className="h-44 w-full shrink-0 flex flex-col border-t border-zinc-800 md:h-auto md:w-72 md:border-t-0 md:border-l">
+				<div className="h-auto min-h-44 w-full shrink-0 flex flex-col border-t border-zinc-800 md:w-72 md:border-t-0 md:border-l">
+					<div className="shrink-0 border-b border-zinc-800 p-4">
+						<div className="mb-2 flex items-center justify-between gap-3">
+							<div className="flex items-center gap-2 text-xs font-medium text-zinc-200">
+								<BrainCircuit className="size-3.5" />
+								DQN opponent
+							</div>
+							<button
+								type="button"
+								role="switch"
+								aria-checked={opponent === "dqn"}
+								aria-label="Use DQN opponent"
+								onClick={() => onOpponentChange(opponent === "dqn" ? "minimax" : "dqn")}
+								className={`relative h-5 w-9 rounded-full border transition-colors ${
+									opponent === "dqn"
+										? "border-violet-400/60 bg-violet-500/80"
+										: "border-zinc-700 bg-zinc-800"
+								}`}
+							>
+								<span
+									className={`absolute top-0.5 size-3.5 rounded-full bg-white transition-transform ${
+										opponent === "dqn" ? "translate-x-4" : "translate-x-0.5"
+									}`}
+								/>
+							</button>
+						</div>
+						<p className="text-[11px] leading-relaxed text-zinc-500">
+							{opponent === "dqn"
+								? "Neural policy search. Uses NVIDIA CUDA when available."
+								: "Classic depth-five minimax search."}
+						</p>
+					</div>
 					<MoveHistory moves={boardData?.moves ?? []} />
 
 					<div className="shrink-0 border-t border-zinc-800 p-4 flex flex-col gap-2">
