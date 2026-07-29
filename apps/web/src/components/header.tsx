@@ -72,7 +72,7 @@ export default function Header(props: HeaderProps) {
 	const [selectedTime, setSelectedTime] = useState(10);
 	const [selectedIncrement, setSelectedIncrement] = useState(0);
 	const [settingsOpen, setSettingsOpen] = useState(false);
-	const [profileImageError, setProfileImageError] = useState(false);
+	const [failedProfileImage, setFailedProfileImage] = useState<string | null>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const { user, signOut, updateProfileImage } = useAuth();
 	const navigate = useNavigate();
@@ -88,11 +88,7 @@ export default function Header(props: HeaderProps) {
 
 	const currentTab = props.activeTab || "vs_player";
 	const currentMode = currentTab === "vs_computer" ? "vs_computer" : "vs_player";
-	const profileImage = user?.image && !profileImageError ? user.image : null;
-
-	useEffect(() => {
-		setProfileImageError(false);
-	}, [user?.image]);
+	const profileImage = user?.image && user.image !== failedProfileImage ? user.image : null;
 
 	const handleSelect = (option: TimeOption) => {
 		setSelectedTime(option.minutes);
@@ -255,7 +251,7 @@ export default function Header(props: HeaderProps) {
 								<ProfileAvatar
 									image={profileImage}
 									name={user.name}
-									onImageError={() => setProfileImageError(true)}
+									onImageError={() => setFailedProfileImage(user.image ?? null)}
 								/>
 								<span className="ml-2 hidden max-w-24 truncate md:inline">{user.name}</span>
 							</DropdownMenuTrigger>
@@ -264,7 +260,7 @@ export default function Header(props: HeaderProps) {
 									<ProfileAvatar
 										image={profileImage}
 										name={user.name}
-										onImageError={() => setProfileImageError(true)}
+										onImageError={() => setFailedProfileImage(user.image ?? null)}
 									/>
 									<span className="min-w-0">
 										<span className="block truncate text-xs font-medium normal-case tracking-normal text-zinc-100">
@@ -331,12 +327,7 @@ function ProfileAvatar({
 }) {
 	if (image) {
 		return (
-			<img
-				src={image}
-				alt=""
-				className="size-5 rounded-full object-cover"
-				onError={onImageError}
-			/>
+			<img src={image} alt="" className="size-5 rounded-full object-cover" onError={onImageError} />
 		);
 	}
 

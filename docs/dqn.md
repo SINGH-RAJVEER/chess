@@ -7,6 +7,8 @@ The vs computer page supports two opponents:
 
 The toggle is stored in browser local storage and is sent with every player move. If the DQN model cannot be loaded or inference fails, the engine logs the error and safely uses minimax for that move.
 
+The Rust engine exposes `POST /api/engine-move` through Axum on port `8080`. The endpoint accepts the current FEN and opponent selection, then returns the selected move in UCI notation.
+
 ## Model Files
 
 - `apps/dqn/model.onnx` is the model loaded by the Rust engine.
@@ -25,6 +27,8 @@ The engine attempts to create an ONNX Runtime CUDA session first. Successful CUD
 nvidia-smi
 devenv up
 ```
+
+The `just dev` recipe enables the unfree CUDA packages through an impure devenv evaluation. On multi-user Nix installations, the account running `devenv` must be listed in `nix.settings.trusted-users` because devenv supplies restricted Nix evaluation settings. Do not run the stack with `sudo`: PostgreSQL refuses to run as root.
 
 The engine startup log reports the active provider:
 

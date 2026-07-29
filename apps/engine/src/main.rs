@@ -1,10 +1,15 @@
 mod neural;
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-use actix_cors::Cors;
-use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::routing::post;
+use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
+use tokio::net::TcpListener;
+use tower_http::cors::{Any, CorsLayer};
 
 use shakmaty::fen::Fen;
 use shakmaty::uci::Uci;
@@ -132,33 +137,38 @@ fn find_best_move(pos: &Chess, depth: i32) -> Option<Move> {
     best_move
 }
 
-#[post("/api/engine-move")]
 async fn get_engine_move(
-    req: web::Json<EngineRequest>,
-    state: web::Data<EngineState>,
-) -> impl Responder {
+    State(state): State<Arc<EngineState>>,
+    Json(req): Json<EngineRequest>,
+) -> (StatusCode, Json<EngineResponse>) {
     let fen_str = &req.fen;
     let setup: Fen = match fen_str.parse() {
         Ok(f) => f,
         Err(_) => {
-            return HttpResponse::BadRequest().json(EngineResponse {
-                best_move: None,
-                error: Some("Invalid FEN".to_string()),
-                engine: "none".to_string(),
-                execution_provider: None,
-            })
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(EngineResponse {
+                    best_move: None,
+                    error: Some("Invalid FEN".to_string()),
+                    engine: "none".to_string(),
+                    execution_provider: None,
+                }),
+            )
         }
     };
 
     let position: Chess = match setup.into_position(CastlingMode::Standard) {
         Ok(p) => p,
         Err(_) => {
-            return HttpResponse::BadRequest().json(EngineResponse {
-                best_move: None,
-                error: Some("Invalid Position".to_string()),
-                engine: "none".to_string(),
-                execution_provider: None,
-            })
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(EngineResponse {
+                    best_move: None,
+                    error: Some("Invalid Position".to_string()),
+                    engine: "none".to_string(),
+                    execution_provider: None,
+                }),
+            )
         }
     };
 
@@ -168,12 +178,15 @@ async fn get_engine_move(
                 let mut neural = match neural.lock() {
                     Ok(neural) => neural,
                     Err(_) => {
-                        return HttpResponse::InternalServerError().json(EngineResponse {
-                            best_move: None,
-                            error: Some("DQN engine lock failed".to_string()),
-                            engine: "dqn".to_string(),
-                            execution_provider: None,
-                        });
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(EngineResponse {
+                                best_move: None,
+                                error: Some("DQN engine lock failed".to_string()),
+                                engine: "dqn".to_string(),
+                                execution_provider: None,
+                            }),
+                        );
                     }
                 };
                 let provider = neural.provider().to_string();
@@ -191,25 +204,28 @@ async fn get_engine_move(
     };
 
     match best_move {
-        Some(m) => {
-            let uci = Uci::from_move(&m, CastlingMode::Standard);
-            HttpResponse::Ok().json(EngineResponse {
-                best_move: Some(uci.to_string()),
+        Some(m) => (
+            StatusCode::OK,
+            Json(EngineResponse {
+                best_move: Some(Uci::from_move(&m, CastlingMode::Standard).to_string()),
                 error: None,
                 engine: engine.to_string(),
                 execution_provider,
-            })
-        }
-        _none => HttpResponse::Ok().json(EngineResponse {
-            best_move: None,
-            error: Some("No legal moves".to_string()),
-            engine: engine.to_string(),
-            execution_provider,
-        }),
+            }),
+        ),
+        _none => (
+            StatusCode::OK,
+            Json(EngineResponse {
+                best_move: None,
+                error: Some("No legal moves".to_string()),
+                engine: engine.to_string(),
+                execution_provider,
+            }),
+        ),
     }
 }
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> std::io::Result<()> {
     let neural = match neural::NeuralEngine::load() {
         Ok(engine) => Some(Mutex::new(engine)),
@@ -218,22 +234,18 @@ async fn main() -> std::io::Result<()> {
             None
         }
     };
-    let state = web::Data::new(EngineState { neural });
+    let state = Arc::new(EngineState { neural });
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .max_age(Duration::from_secs(3600));
+    let app = Router::new()
+        .route("/api/engine-move", post(get_engine_move))
+        .layer(cors)
+        .with_state(state);
+    let listener = TcpListener::bind("0.0.0.0:8080").await?;
+
     println!("Starting engine server at http://0.0.0.0:8080");
-
-    HttpServer::new(move || {
-        let cors = Cors::default()
-            .allow_any_origin()
-            .allow_any_method()
-            .allow_any_header()
-            .max_age(3600);
-
-        App::new()
-            .app_data(state.clone())
-            .wrap(cors)
-            .service(get_engine_move)
-    })
-    .bind("0.0.0.0:8080")?
-    .run()
-    .await
+    axum::serve(listener, app).await
 }

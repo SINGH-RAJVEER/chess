@@ -23,8 +23,6 @@ let
   '';
 in
 {
-  nixpkgs.config.allowUnfree = true;
-
   packages = with pkgs; [
     bun
     postgresql_16
@@ -71,13 +69,13 @@ in
 
   processes = {
     api.exec = ''
-      bash -lc 'set -e; ${loadRootEnv} until ${pkgs.postgresql_16}/bin/pg_isready -h "''${PGHOST:-localhost}" -p "''${PGPORT:-5432}" -U "''${PGUSER:-postgres}"; do sleep 1; done; ${pkgs.postgresql_16}/bin/createdb -h "''${PGHOST:-localhost}" -p "''${PGPORT:-5432}" -U "''${PGUSER:-postgres}" "''${PGDATABASE:-chess}" 2>/dev/null || true; (cd packages/database && bun run database:migrate); cd apps/api; exec bun run dev'
+      bash -c 'set -e; ${loadRootEnv} until ${pkgs.postgresql_16}/bin/pg_isready -h "''${PGHOST:-localhost}" -p "''${PGPORT:-5432}" -U "''${PGUSER:-postgres}"; do sleep 1; done; ${pkgs.postgresql_16}/bin/createdb -h "''${PGHOST:-localhost}" -p "''${PGPORT:-5432}" -U "''${PGUSER:-postgres}" "''${PGDATABASE:-chess}" 2>/dev/null || true; (cd packages/database && bun run database:migrate); cd apps/api; exec bun run dev'
     '';
     engine.exec = ''
-      bash -lc '${loadRootEnv} cd apps/engine; exec bun run dev'
+      bash -c '${loadRootEnv} cd apps/engine; exec bun run dev'
     '';
     web.exec = ''
-      bash -lc '${loadRootEnv} cd apps/web; exec bun run dev'
+      bash -c '${loadRootEnv} cd apps/web; exec bun run dev'
     '';
   };
 

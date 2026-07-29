@@ -20,7 +20,12 @@ dev:
       echo "chess: devenv is required. Install it, then run 'just dev' again." >&2
       exit 1
     fi
-    exec devenv up --tui=false
+    if [ "$EUID" -eq 0 ]; then
+      echo "chess: do not run 'just dev' with sudo; PostgreSQL refuses to run as root." >&2
+      echo "chess: add your user to nix.settings.trusted-users, rebuild NixOS, then run 'just dev'." >&2
+      exit 1
+    fi
+    NIXPKGS_ALLOW_UNFREE=1 exec devenv --impure up --tui=false
 
 # Build all workspaces
 build:
