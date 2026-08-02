@@ -1,115 +1,73 @@
-# Chess Monorepo (Nx)
+# Chess
 
-A full-stack chess application.
+Chess is a full-stack chess application with local games, online matchmaking, authentication, computer opponents, and a browser-based interface.
 
-## Workspace Packages
+## What Is Included
 
-- `apps/web` — React web UI served by Vite/Bun
-- `apps/api` - Go API app for game state, authentication, queueing, and engine orchestration
-- `apps/engine` — Rust chess engine service
-- `apps/dqn` — Neural opponent model, inference support, and training pipeline
-- `packages/types` — Shared TypeScript types (Color, PieceType, GameStatus, etc.)
+- `apps/web`: React and Vite browser application.
+- `apps/api`: Go HTTP API for authentication, game state, matchmaking, clocks, migrations, and engine orchestration.
+- `apps/engine`: Rust service that selects computer moves with minimax or DQN.
+- `apps/dqn`: ONNX model, inference support, and Python training pipeline.
+- `packages/types`: Shared TypeScript domain and API types.
+- `docs`: Detailed architecture, development, API, operations, data model, and security documentation.
 
-## Prerequisites
+## How It Works
 
-- Nix
-- devenv
+The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API sends the current position to the Rust engine. The engine uses the bundled ONNX model for DQN games and falls back to minimax when necessary.
 
-## Install dependencies
+The local stack uses these ports:
+
+| Service | Port |
+| --- | --- |
+| Web | `3000` |
+| API | `4000` |
+| Engine | `8080` |
+| PostgreSQL | `5432` |
+
+## Quick Start
+
+Prerequisites: Nix, devenv, and Bun.
 
 ```bash
 bun install
+just dev
 ```
 
-## Environment
+Open `http://localhost:3000`. The local stack starts PostgreSQL, the API, the engine, and the web application. Configuration is loaded from a root `.env` file; `DATABASE_URL` is required by the API.
 
-Use a single `.env` file at the repository root. The API, DB tooling, web dev server, engine process, and `devenv` all load variables from that file.
-
-## Run from root
+## Common Commands
 
 ```bash
-devenv up          # Start PostgreSQL, web, api, and engine
-bun run dev        # Start workspace dev tasks without managed services
-bun run build      # Build all packages
-bun run test       # Test all packages
-bun run lint       # Lint all packages
-bun run format     # Format all packages
-bun run typecheck  # Check types
-bun run check      # Biome check
-bun run clean      # Clean all output
-bun run affected:build  # Build only affected projects
+bun run build       # Build all projects
+bun run test        # Test all projects
+bun run lint        # Lint all projects
+bun run typecheck   # Typecheck TypeScript projects
+bun run check       # Run project checks
+bun run format      # Format project files
+bun run clean       # Remove build outputs
+just api-migrate    # Apply PostgreSQL migrations
 ```
 
-## Run a single workspace package
+Run one project with Nx:
 
 ```bash
 bunx nx run web:dev
 bunx nx run api:dev
 bunx nx run engine:dev
-bunx nx run api:test
 ```
 
-## Database Management
+## Documentation
 
-The API owns its PostgreSQL connection, queries, and embedded migrations under `apps/api/internal/database`.
+The detailed documentation is split by audience and concern:
 
-Run from the repo root:
+- [Architecture](docs/architecture.md): services, ownership, and request flows.
+- [Development](docs/development.md): setup, local workflows, checks, and training.
+- [Configuration](docs/configuration.md): environment variables and defaults.
+- [API reference](docs/api-reference.md): HTTP routes and payloads.
+- [Data model](docs/data-model.md): PostgreSQL tables and migrations.
+- [Operations](docs/operations.md): release, deployment, health, and incidents.
+- [Security](docs/security.md): authentication, trust boundaries, and hardening.
+- [API implementation notes](docs/api.md): Go API structure and compatibility details.
+- [Computer opponent notes](docs/dqn.md): DQN inference, GPU fallback, and model training.
 
-```bash
-bun run api:migrate
-just api-migrate
-```
-
-## Project Layout
-
-```text
-.
-├── apps/
-│   ├── api/                  # Go API app
-│   ├── dqn/                  # Neural model and training pipeline
-│   ├── web/                  # React web app
-│   └── engine/               # Rust chess engine
-├── packages/
-│   └── types/               # Shared types (@chess/types)
-│       └── src/
-│           ├── board.ts     # Board types
-│           ├── chess.ts     # Game types
-│           └── index.ts     # Main export
-├── package.json             # Root workspace config
-├── nx.json                  # Nx task graph, cache, and input configuration
-├── justfile                 # Dev task runner
-└── devenv.nix               # devenv shell, services, and processes
-```
-
-## Architecture
-
-- **Shared Types Package**: All domain types (Color, PieceType, GameStatus, etc.) are defined in `@chess/types` and imported across projects
-- **Web App**: A client-side React app that calls the Go API over HTTP
-- **API App**: Owns HTTP transport, authentication, queueing, game mutation/query logic, direct PostgreSQL access, app-local migrations, and engine requests. See [`docs/api.md`](docs/api.md)
-- **Engine**: Pure Rust, no direct dependencies on other workspace packages (uses HTTP API)
-- **DQN Opponent**: Optional ONNX policy/value search with automatic NVIDIA CUDA detection and CPU fallback. See [`docs/dqn.md`](docs/dqn.md)
-
-## Local Dev Stack (devenv)
-
-`devenv.nix` defines the local shell with Bun, Go, Rust, PostgreSQL, Nix LSPs, and the project process graph. It loads variables from the root `.env` when entering the shell and before starting each process. Start the local stack with `devenv up`. The API process applies the migrations embedded in `apps/api` before starting.
-
-All services run on:
-
-- `web` → port `3000`
-- `api` → port `4000`
-- `engine` → port `8080`
-- `db` (PostgreSQL) → port `5432`
-
-Run the full local stack with a single command:
-
-```bash
-just dev
-```
-
-Database-only maintenance commands are still available:
-
-```bash
-just database-start
-just database-stop
-just api-migrate
-```
+Production deployment guidance and known implementation gaps are documented in the operations and security guides. The repository does not include a reverse proxy, container image, deployment manifest, backup system, or monitoring stack.

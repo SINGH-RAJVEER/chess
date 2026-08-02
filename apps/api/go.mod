@@ -1,12 +1,13 @@
 module github.com/rajveer/chess/apps/api
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/notnil/chess v1.10.0
 	golang.org/x/crypto v0.40.0
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/text v0.27.0
 )
 

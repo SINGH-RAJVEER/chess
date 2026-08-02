@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -53,9 +54,8 @@ func (app *App) handler() http.Handler {
 	mux.HandleFunc("GET /api/auth/get-session", app.getSession)
 	mux.HandleFunc("GET /api/auth/session", app.getSession)
 	mux.HandleFunc("POST /api/auth/sign-out", app.signOut)
-	mux.HandleFunc("POST /api/auth/sign-in/social", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "Google social authentication is not configured in the Go API"})
-	})
+	mux.HandleFunc("POST /api/auth/sign-in/social", app.signInSocial)
+	mux.HandleFunc("GET /api/auth/callback/google", app.googleCallback)
 	return recoverMiddleware(corsMiddleware(mux, app.corsOrigin))
 }
 
@@ -302,6 +302,11 @@ type authRequest struct {
 	SessionID string `json:"sessionId"`
 }
 
+type socialAuthRequest struct {
+	Provider    string `json:"provider"`
+	CallbackURL string `json:"callbackURL"`
+}
+
 func (app *App) signUp(w http.ResponseWriter, r *http.Request) {
 	var body authRequest
 	if decode(r, &body) != nil {
@@ -371,4 +376,47 @@ func (app *App) signOut(w http.ResponseWriter, r *http.Request) {
 	}
 	app.auth.ClearSessionCookie(w)
 	writeJSON(w, 200, map[string]bool{"success": true})
+}
+
+func (app *App) signInSocial(w http.ResponseWriter, r *http.Request) {
+	var body socialAuthRequest
+	if decode(r, &body) != nil || body.Provider != "google" {
+		writeJSON(w, 400, map[string]string{"error": "provider must be google"})
+		return
+	}
+	redirectURL, err := app.auth.BeginGoogle(w, body.CallbackURL)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, auth.ErrGoogleNotConfigured) {
+			status = http.StatusServiceUnavailable
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, map[string]string{"url": redirectURL})
+}
+
+func (app *App) googleCallback(w http.ResponseWriter, r *http.Request) {
+	app.auth.ClearGoogleStateCookie(w)
+	if oauthError := r.URL.Query().Get("error"); oauthError != "" {
+		writeJSON(w, 400, map[string]string{"error": "Google authorization failed: " + oauthError})
+		return
+	}
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+	if code == "" || state == "" {
+		writeJSON(w, 400, map[string]string{"error": "code and state are required"})
+		return
+	}
+	result, callbackURL, err := app.auth.CompleteGoogle(r.Context(), r, code, state)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, auth.ErrGoogleNotConfigured) {
+			status = http.StatusServiceUnavailable
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+	app.auth.SetSessionCookie(w, result.Session.Token)
+	http.Redirect(w, r, callbackURL, http.StatusFound)
 }

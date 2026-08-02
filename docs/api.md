@@ -48,6 +48,9 @@ Set `AUTO_MIGRATE=true` to apply pending app-local migrations when the server st
 - `CHESS_ENGINE_URL`: engine base URL, default `http://127.0.0.1:8080`
 - `WEB_ORIGIN`: allowed credentialed browser origin, default `http://localhost:3000`
 - `BETTER_AUTH_SECRET`: session-cookie signing secret
+- `AUTH_BASE_URL`: public auth URL, default `http://localhost:4000/api/auth`
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
 - `AUTO_MIGRATE`: set to `true` to migrate during startup
 
 The process uses the repository's existing auth, game, queue, piece, and move tables. Its embedded migration can initialize an empty database and can also adopt a database previously migrated by Drizzle.
@@ -58,4 +61,10 @@ The Go app implements health, board, legal move, game mutation, matchmaking, dra
 
 Both Vite development and preview proxy `/api` to `VITE_API_PROXY_TARGET`. Production deployments must provide the same routing when Vite is not serving the frontend.
 
-Google social sign-in is not implemented in the Go app. `POST /api/auth/sign-in/social` returns `501` with a clear error; email/password authentication and the web client's session flow are supported.
+Google OAuth starts at `POST /api/auth/sign-in/social` and completes at `GET /api/auth/callback/google`. Configure the Google OAuth client with this authorized redirect URI:
+
+```text
+${AUTH_BASE_URL}/callback/google
+```
+
+For local development this is `http://localhost:4000/api/auth/callback/google`. OAuth callback redirects are restricted to `WEB_ORIGIN`; Google accounts are linked to existing users only by a Google-verified email address.

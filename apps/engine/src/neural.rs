@@ -40,8 +40,8 @@ impl NeuralEngine {
             }
         };
 
-        let simulations = read_env("DQN_SIMULATIONS", 200_u32);
-        let move_time = Duration::from_millis(read_env("DQN_MOVE_TIME_MS", 1500_u64));
+        let simulations = read_env("DQN_SIMULATIONS", 20000_u32);
+        let move_time = Duration::from_millis(read_env("DQN_MOVE_TIME_MS", 500000_u64));
         eprintln!(
             "[engine] DQN model loaded from {} with {provider} provider",
             model_path.display()

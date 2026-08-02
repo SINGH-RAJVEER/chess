@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rajveer/chess/apps/api/internal/auth"
 	"github.com/rajveer/chess/apps/api/internal/httpapi"
 )
 
@@ -61,8 +62,9 @@ func TestValidationContracts(t *testing.T) {
 func TestUnsupportedGoogleAuth(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/api/auth/sign-in/social", strings.NewReader(`{"provider":"google"}`))
 	response := httptest.NewRecorder()
-	httpapi.NewHandler(nil, nil).ServeHTTP(response, request)
-	if response.Code != http.StatusNotImplemented || !strings.Contains(response.Body.String(), "not configured") {
+	authService := auth.NewService(nil, "secret", auth.GoogleConfig{WebOrigin: "http://localhost:3000"})
+	httpapi.NewHandler(authService, nil).ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "not configured") {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }

@@ -36,7 +36,12 @@ func main() {
 	if *migrateOnly {
 		return
 	}
-	authService := auth.NewService(db, config.AuthSecret)
+	authService := auth.NewService(db, config.AuthSecret, auth.GoogleConfig{
+		ClientID:     config.GoogleClientID,
+		ClientSecret: config.GoogleClientSecret,
+		AuthBaseURL:  config.AuthBaseURL,
+		WebOrigin:    config.WebOrigin,
+	})
 	gameService := game.NewService(db, config.EngineURL)
 	server := &http.Server{
 		Addr:              net.JoinHostPort(config.Host, config.Port),

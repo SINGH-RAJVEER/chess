@@ -45,8 +45,8 @@ The engine reads these optional environment variables:
 - `ENGINE_HOST`: engine bind host, default `0.0.0.0`.
 - `ENGINE_PORT`: engine port, default `8080`.
 - `CHESS_MODEL_PATH`: absolute or working-directory-relative ONNX model path. The default is `apps/dqn/model.onnx` in the workspace.
-- `DQN_SIMULATIONS`: maximum policy-guided search simulations per move. The default is `200`.
-- `DQN_MOVE_TIME_MS`: maximum neural search time per move in milliseconds. The default is `1500`.
+- `DQN_SIMULATIONS`: maximum policy-guided search simulations per move. The default is `20000`.
+- `DQN_MOVE_TIME_MS`: maximum neural search time per move in milliseconds. The default is `500000` (500 seconds).
 
 Add overrides to the root `.env`, which is loaded by `devenv` and the workspace processes.
 

@@ -18,18 +18,47 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/scrypt"
+	"golang.org/x/oauth2"
 	"golang.org/x/text/unicode/norm"
 )
 
 const sessionCookie = "better-auth.session_token"
 
 type Service struct {
-	db     *pgxpool.Pool
-	secret string
+	db        *pgxpool.Pool
+	secret    string
+	webOrigin string
+	google    *oauth2.Config
+	secure    bool
 }
 
-func NewService(db *pgxpool.Pool, secret string) *Service {
-	return &Service{db: db, secret: secret}
+type GoogleConfig struct {
+	ClientID     string
+	ClientSecret string
+	AuthBaseURL  string
+	WebOrigin    string
+}
+
+func NewService(db *pgxpool.Pool, secret string, googleConfig GoogleConfig) *Service {
+	service := &Service{
+		db:        db,
+		secret:    secret,
+		webOrigin: strings.TrimRight(googleConfig.WebOrigin, "/"),
+		secure:    strings.HasPrefix(googleConfig.AuthBaseURL, "https://"),
+	}
+	if googleConfig.ClientID != "" && googleConfig.ClientSecret != "" {
+		service.google = &oauth2.Config{
+			ClientID:     googleConfig.ClientID,
+			ClientSecret: googleConfig.ClientSecret,
+			RedirectURL:  strings.TrimRight(googleConfig.AuthBaseURL, "/") + "/callback/google",
+			Scopes:       []string{"openid", "email", "profile"},
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
+				TokenURL: "https://oauth2.googleapis.com/token",
+			},
+		}
+	}
+	return service
 }
 
 func hashPassword(password string) (string, error) {
@@ -151,14 +180,14 @@ func unsignedCookieToken(value string) string {
 	}
 	return value
 }
-func setSessionCookie(writer http.ResponseWriter, token, secret string) {
+func setSessionCookie(writer http.ResponseWriter, token, secret string, secure bool) {
 	digest := hmac.New(sha256.New, []byte(secret))
 	_, _ = digest.Write([]byte(token))
 	signed := token + "." + base64.StdEncoding.EncodeToString(digest.Sum(nil))
-	http.SetCookie(writer, &http.Cookie{Name: sessionCookie, Value: url.QueryEscape(signed), Path: "/", MaxAge: 7 * 24 * 60 * 60, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(writer, &http.Cookie{Name: sessionCookie, Value: url.QueryEscape(signed), Path: "/", MaxAge: 7 * 24 * 60 * 60, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
 }
-func clearSessionCookie(writer http.ResponseWriter) {
-	http.SetCookie(writer, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+func clearSessionCookie(writer http.ResponseWriter, secure bool) {
+	http.SetCookie(writer, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode})
 }
 func requestToken(request *http.Request) string {
 	for _, name := range []string{sessionCookie, "__Secure-" + sessionCookie, "session_token"} {
@@ -170,11 +199,11 @@ func requestToken(request *http.Request) string {
 }
 
 func (auth *Service) SetSessionCookie(writer http.ResponseWriter, token string) {
-	setSessionCookie(writer, token, auth.secret)
+	setSessionCookie(writer, token, auth.secret, auth.secure)
 }
 
 func (auth *Service) ClearSessionCookie(writer http.ResponseWriter) {
-	clearSessionCookie(writer)
+	clearSessionCookie(writer, auth.secure)
 }
 
 func (auth *Service) RequestToken(request *http.Request) string {
