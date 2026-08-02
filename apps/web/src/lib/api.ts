@@ -109,17 +109,6 @@ export function respondToDraw(gameId: number, accept: boolean): Promise<DrawResp
 	});
 }
 
-export type SignUpRequest = {
-	email: string;
-	password: string;
-	name: string;
-};
-
-export type SignInRequest = {
-	email: string;
-	password: string;
-};
-
 export type AuthResponse = {
 	user: {
 		id: string;
@@ -141,24 +130,3 @@ export type AuthResponse = {
 		userId: string;
 	};
 };
-
-export function signUp(body: SignUpRequest): Promise<AuthResponse> {
-	return apiRequest<AuthResponse>("/api/auth/sign-up", {
-		method: "POST",
-		body: JSON.stringify(body),
-	});
-}
-
-export function signIn(body: SignInRequest): Promise<AuthResponse> {
-	return apiRequest<AuthResponse>("/api/auth/sign-in", {
-		method: "POST",
-		body: JSON.stringify(body),
-	});
-}
-
-export function signOut(sessionId: string): Promise<{ success: boolean }> {
-	return apiRequest<{ success: boolean }>("/api/auth/sign-out", {
-		method: "POST",
-		body: JSON.stringify({ sessionId }),
-	});
-}

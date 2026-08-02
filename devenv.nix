@@ -25,6 +25,7 @@ in
 {
   packages = with pkgs; [
     bun
+    go
     postgresql_16
     just
     cargo
@@ -69,10 +70,10 @@ in
 
   processes = {
     api.exec = ''
-      bash -c 'set -e; ${loadRootEnv} until ${pkgs.postgresql_16}/bin/pg_isready -h "''${PGHOST:-localhost}" -p "''${PGPORT:-5432}" -U "''${PGUSER:-postgres}"; do sleep 1; done; ${pkgs.postgresql_16}/bin/createdb -h "''${PGHOST:-localhost}" -p "''${PGPORT:-5432}" -U "''${PGUSER:-postgres}" "''${PGDATABASE:-chess}" 2>/dev/null || true; (cd packages/database && bun run database:migrate); cd apps/api; exec bun run dev'
+      bash -c 'set -e; ${loadRootEnv} export CGO_ENABLED=0 AUTO_MIGRATE=true; until ${pkgs.postgresql_16}/bin/pg_isready -h "''${PGHOST:-localhost}" -p "''${PGPORT:-5432}" -U "''${PGUSER:-postgres}"; do sleep 1; done; ${pkgs.postgresql_16}/bin/createdb -h "''${PGHOST:-localhost}" -p "''${PGPORT:-5432}" -U "''${PGUSER:-postgres}" "''${PGDATABASE:-chess}" 2>/dev/null || true; cd apps/api; exec go run ./cmd/api'
     '';
     engine.exec = ''
-      bash -c '${loadRootEnv} cd apps/engine; exec bun run dev'
+      bash -c '${loadRootEnv} cd apps/engine; exec cargo run'
     '';
     web.exec = ''
       bash -c '${loadRootEnv} cd apps/web; exec bun run dev'

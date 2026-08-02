@@ -91,6 +91,34 @@ web-typecheck:
 web-clean:
     bunx nx run web:clean
 
+# Start the API
+api-dev:
+    bunx nx run api:dev
+
+# Build the API
+api-build:
+    bunx nx run api:build
+
+# Start the built API
+api-start:
+    bunx nx run api:start
+
+# Test the API
+api-test:
+    bunx nx run api:test
+
+# Apply the API's app-local migrations
+api-migrate: database-start
+    #!/usr/bin/env bash
+    set -e
+    if [ -f .env ]; then
+      set -a
+      source .env
+      set +a
+    fi
+    cd apps/api
+    CGO_ENABLED=0 go run ./cmd/api -migrate
+
 # Ensure PostgreSQL is running (init cluster on first run)
 database-start:
     #!/usr/bin/env bash
@@ -145,18 +173,6 @@ database-stop:
       echo "chess: stopping PostgreSQL..."
       pg_ctl stop -D "$PGDATA" -m fast
     fi
-
-# Generate Drizzle migrations
-database-generate: database-start
-    bunx nx run database:database:generate
-
-# Apply pending Drizzle migrations
-database-migrate: database-start
-    bunx nx run database:database:migrate
-
-# Open Drizzle Studio
-database-studio:
-    bunx nx run database:database:studio
 
 # Start only the Rust engine
 engine-dev:

@@ -8,5 +8,5 @@
 	"git": true,
 	"version": 1,
 	"framework": "solid",
-	"chosenAddOns": ["biome", "nitro", "start", "better-auth", "tanstack-query"]
+	"chosenAddOns": ["biome", "nitro", "start", "tanstack-query"]
 }

@@ -42,6 +42,8 @@ If the driver, CUDA libraries, or GPU are unavailable, it instead reports the CU
 
 The engine reads these optional environment variables:
 
+- `ENGINE_HOST`: engine bind host, default `0.0.0.0`.
+- `ENGINE_PORT`: engine port, default `8080`.
 - `CHESS_MODEL_PATH`: absolute or working-directory-relative ONNX model path. The default is `apps/dqn/model.onnx` in the workspace.
 - `DQN_SIMULATIONS`: maximum policy-guided search simulations per move. The default is `200`.
 - `DQN_MOVE_TIME_MS`: maximum neural search time per move in milliseconds. The default is `1500`.
@@ -66,3 +68,5 @@ curl -X POST http://127.0.0.1:8080/api/engine-move \
 ```
 
 The response contains `engine: "dqn"` and `execution_provider: "CUDA"` when GPU inference is active.
+
+`GET /api/health` reports whether DQN loaded and the active execution provider. If DQN is unavailable, DQN move requests remain serviceable through the minimax fallback.

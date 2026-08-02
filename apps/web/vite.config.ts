@@ -10,6 +10,12 @@ export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, workspaceRoot, "");
 	const apiProxyTarget =
 		env.VITE_API_PROXY_TARGET || process.env.VITE_API_PROXY_TARGET || "http://127.0.0.1:4000";
+	const apiProxy = {
+		"/api": {
+			target: apiProxyTarget,
+			changeOrigin: true,
+		},
+	};
 
 	return {
 		envDir: workspaceRoot,
@@ -23,12 +29,10 @@ export default defineConfig(({ mode }) => {
 			fs: {
 				allow: [searchForWorkspaceRoot(process.cwd())],
 			},
-			proxy: {
-				"/api": {
-					target: apiProxyTarget,
-					changeOrigin: true,
-				},
-			},
+			proxy: apiProxy,
+		},
+		preview: {
+			proxy: apiProxy,
 		},
 	};
 });

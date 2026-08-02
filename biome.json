@@ -16,8 +16,6 @@
 				"target/**",
 				".turbo/**",
 				".nx/**",
-				"drizzle/meta/**",
-				"packages/database/drizzle/meta/**",
 				".vercel/**"
 			],
 			"linter": {

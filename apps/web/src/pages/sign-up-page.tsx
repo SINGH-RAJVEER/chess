@@ -11,8 +11,7 @@ export default function SignUpPage() {
 	const [name, setName] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
-	const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-	const { signUp, signInWithGoogle } = useAuth();
+	const { signUp } = useAuth();
 	const navigate = useNavigate();
 
 	const handleSubmit = async (e: React.FormEvent) => {
@@ -27,18 +26,6 @@ export default function SignUpPage() {
 			setError(err instanceof Error ? err.message : "Failed to sign up");
 		} finally {
 			setIsLoading(false);
-		}
-	};
-
-	const handleGoogleSignIn = async () => {
-		setError(null);
-		setIsGoogleLoading(true);
-
-		try {
-			await signInWithGoogle();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to continue with Google");
-			setIsGoogleLoading(false);
 		}
 	};
 
@@ -101,27 +88,10 @@ export default function SignUpPage() {
 						</div>
 						<Button
 							type="submit"
-							disabled={isLoading || isGoogleLoading}
+							disabled={isLoading}
 							className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
 						>
 							{isLoading ? "Creating account..." : "Sign Up"}
-						</Button>
-						<div className="relative py-1">
-							<div className="absolute inset-0 flex items-center">
-								<span className="w-full border-t border-zinc-800" />
-							</div>
-							<div className="relative flex justify-center text-xs uppercase">
-								<span className="bg-zinc-900 px-2 text-zinc-500">Or</span>
-							</div>
-						</div>
-						<Button
-							type="button"
-							variant="outline"
-							disabled={isLoading || isGoogleLoading}
-							onClick={handleGoogleSignIn}
-							className="w-full border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
-						>
-							{isGoogleLoading ? "Redirecting..." : "Continue with Google"}
 						</Button>
 						<p className="text-center text-sm text-zinc-400">
 							Already have an account?{" "}

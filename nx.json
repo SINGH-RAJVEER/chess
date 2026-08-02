@@ -54,18 +54,6 @@
 		},
 		"clean": {
 			"cache": false
-		},
-		"database:generate": {
-			"cache": false,
-			"inputs": ["default", "^production"],
-			"outputs": ["{projectRoot}/drizzle"]
-		},
-		"database:migrate": {
-			"cache": false
-		},
-		"database:studio": {
-			"cache": false,
-			"continuous": true
 		}
 	},
 	"parallel": 4

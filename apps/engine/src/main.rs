@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
@@ -40,6 +40,19 @@ struct EngineResponse {
 
 struct EngineState {
     neural: Option<Mutex<neural::NeuralEngine>>,
+}
+
+async fn health(State(state): State<Arc<EngineState>>) -> Json<serde_json::Value> {
+    let execution_provider = state
+        .neural
+        .as_ref()
+        .and_then(|neural| neural.lock().ok())
+        .map(|neural| neural.provider().to_string());
+    Json(serde_json::json!({
+        "ok": true,
+        "dqn_available": execution_provider.is_some(),
+        "execution_provider": execution_provider,
+    }))
 }
 
 fn evaluate(pos: &Chess) -> i32 {
@@ -241,11 +254,15 @@ async fn main() -> std::io::Result<()> {
         .allow_headers(Any)
         .max_age(Duration::from_secs(3600));
     let app = Router::new()
+        .route("/api/health", get(health))
         .route("/api/engine-move", post(get_engine_move))
         .layer(cors)
         .with_state(state);
-    let listener = TcpListener::bind("0.0.0.0:8080").await?;
+    let host = std::env::var("ENGINE_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = std::env::var("ENGINE_PORT").unwrap_or_else(|_| "8080".to_string());
+    let address = format!("{host}:{port}");
+    let listener = TcpListener::bind(&address).await?;
 
-    println!("Starting engine server at http://0.0.0.0:8080");
+    println!("Starting engine server at http://{address}");
     axum::serve(listener, app).await
 }

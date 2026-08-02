@@ -7,7 +7,6 @@ type AuthState = {
 	isLoading: boolean;
 	signIn: (email: string, password: string) => Promise<void>;
 	signUp: (email: string, password: string, name: string) => Promise<void>;
-	signInWithGoogle: () => Promise<void>;
 	signOut: () => Promise<void>;
 	updateProfileImage: (image: string) => void;
 };
@@ -122,30 +121,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		localStorage.setItem("chess_session", JSON.stringify(data.session));
 	};
 
-	const signInWithGoogle = async () => {
-		const response = await fetch("/api/auth/sign-in/social", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			credentials: "include",
-			body: JSON.stringify({
-				provider: "google",
-				callbackURL: window.location.origin,
-			}),
-		});
-
-		if (!response.ok) {
-			const error = await response.json().catch(() => ({ error: "Failed to sign in with Google" }));
-			throw new Error(error.error || error.message || "Failed to sign in with Google");
-		}
-
-		const data = (await response.json()) as { url?: string };
-		if (!data.url) {
-			throw new Error("Google sign-in did not return a redirect URL");
-		}
-
-		window.location.href = data.url;
-	};
-
 	const signOut = async () => {
 		await fetch("/api/auth/sign-out", {
 			method: "POST",
@@ -175,7 +150,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				isLoading,
 				signIn,
 				signUp,
-				signInWithGoogle,
 				signOut,
 				updateProfileImage,
 			}}
