@@ -9,15 +9,14 @@ apps/api/
 ├── cmd/api/                  # Process entry point and dependency wiring
 ├── internal/auth/            # Email/password auth, sessions, cookies, and auth SQL
 ├── internal/config/          # Environment configuration and defaults
-├── internal/database/        # PostgreSQL connection and migration runner
+├── internal/database/        # PostgreSQL connection, runner, and embedded migrations
 ├── internal/game/            # Chess rules, game services, queueing, and game SQL
 ├── internal/httpapi/         # Router, middleware, validation, and JSON handlers
-├── migrations/               # Ordered, embedded PostgreSQL migrations
 ├── go.mod
 └── project.json
 ```
 
-The database is owned by this app. `internal/database` opens PostgreSQL and applies the SQL files in `migrations`; auth and game queries remain close to their features. Nothing is exported as a shared monorepo database package.
+The database is owned by this app. `internal/database` opens PostgreSQL and applies its embedded, ordered SQL migrations; auth and game queries remain close to their features. Nothing is exported as a shared monorepo database package.
 
 ## Commands
 

@@ -29,7 +29,7 @@
         },
         "format": {
             "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "gofmt -w ./cmd ./internal ./migrations" }
+            "options": { "cwd": "apps/api", "command": "gofmt -w ./cmd ./internal" }
         },
         "clean": {
             "executor": "nx:run-commands",
@@ -37,7 +37,7 @@
         },
         "check": {
             "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "test -z \"$(gofmt -l ./cmd ./internal ./migrations)\" && CGO_ENABLED=0 go test ./... && CGO_ENABLED=0 go vet ./..." }
+            "options": { "cwd": "apps/api", "command": "test -z \"$(gofmt -l ./cmd ./internal)\" && CGO_ENABLED=0 go test ./... && CGO_ENABLED=0 go vet ./..." }
         },
         "migrate": {
             "executor": "nx:run-commands",

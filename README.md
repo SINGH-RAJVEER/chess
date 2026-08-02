@@ -51,7 +51,7 @@ bunx nx run api:test
 
 ## Database Management
 
-The API owns its PostgreSQL connection, queries, and embedded migrations under `apps/api/internal/database` and `apps/api/migrations`.
+The API owns its PostgreSQL connection, queries, and embedded migrations under `apps/api/internal/database`.
 
 Run from the repo root:
 

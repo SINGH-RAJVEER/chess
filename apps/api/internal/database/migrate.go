@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rajveer/chess/apps/api/migrations"
 )
 
 const migrationLockID int64 = 7152252406762703649
@@ -77,7 +76,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 }
 
 func loadMigrations() ([]migration, error) {
-	entries, err := fs.ReadDir(migrations.Files, ".")
+	entries, err := fs.ReadDir(migrationFiles, "migrations")
 	if err != nil {
 		return nil, fmt.Errorf("read migrations: %w", err)
 	}
@@ -95,7 +94,7 @@ func loadMigrations() ([]migration, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse migration %q: %w", entry.Name(), err)
 		}
-		contents, err := fs.ReadFile(migrations.Files, entry.Name())
+		contents, err := fs.ReadFile(migrationFiles, "migrations/"+entry.Name())
 		if err != nil {
 			return nil, fmt.Errorf("read migration %q: %w", entry.Name(), err)
 		}
