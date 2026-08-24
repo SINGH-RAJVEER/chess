@@ -129,7 +129,7 @@ export default function HomePage() {
 	const handleSquareClick = async (squareIndex: number) => {
 		resumeAudioContext();
 		if (takebackRequestedBy || boardData?.drawOfferedBy) return;
-		if (!boardData || boardData.status !== "Ongoing" || pendingMove) return;
+		if (boardData?.status !== "Ongoing" || pendingMove) return;
 
 		const clickedPiece = pieces.find((p) => p.square === squareIndex);
 

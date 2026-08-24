@@ -114,7 +114,7 @@ export default function Header(props: HeaderProps) {
 	const handleProfileImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
 		event.target.value = "";
-		if (!file || !file.type.startsWith("image/")) return;
+		if (!file?.type.startsWith("image/")) return;
 
 		const image = await resizeProfileImage(file);
 		updateProfileImage(image);

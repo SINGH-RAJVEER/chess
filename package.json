@@ -23,7 +23,7 @@
 		"clean": "nx run-many -t clean --all"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.4.7",
-		"nx": "^23.0.0"
+		"@biomejs/biome": "^2.5.10",
+		"nx": "^23.1.1"
 	}
 }

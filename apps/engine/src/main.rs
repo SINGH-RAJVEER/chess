@@ -12,7 +12,7 @@ use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 
 use shakmaty::fen::Fen;
-use shakmaty::uci::Uci;
+use shakmaty::uci::UciMove;
 use shakmaty::{CastlingMode, Chess, Color, Move, Position, Role};
 
 #[derive(Deserialize, Serialize)]
@@ -89,7 +89,7 @@ fn minimax(pos: &Chess, depth: i32, mut alpha: i32, mut beta: i32, maximizing: b
         let mut max_eval = i32::MIN;
         for m in legals {
             let mut new_pos = pos.clone();
-            new_pos.play_unchecked(&m);
+            new_pos.play_unchecked(m);
             let eval = minimax(&new_pos, depth - 1, alpha, beta, false);
             max_eval = max_eval.max(eval);
             alpha = alpha.max(eval);
@@ -102,7 +102,7 @@ fn minimax(pos: &Chess, depth: i32, mut alpha: i32, mut beta: i32, maximizing: b
         let mut min_eval = i32::MAX;
         for m in legals {
             let mut new_pos = pos.clone();
-            new_pos.play_unchecked(&m);
+            new_pos.play_unchecked(m);
             let eval = minimax(&new_pos, depth - 1, alpha, beta, true);
             min_eval = min_eval.min(eval);
             beta = beta.min(eval);
@@ -127,7 +127,7 @@ fn find_best_move(pos: &Chess, depth: i32) -> Option<Move> {
         let mut max_eval = i32::MIN;
         for m in legals {
             let mut new_pos = pos.clone();
-            new_pos.play_unchecked(&m);
+            new_pos.play_unchecked(m);
             let eval = minimax(&new_pos, depth - 1, i32::MIN, i32::MAX, false);
             if eval > max_eval {
                 max_eval = eval;
@@ -138,7 +138,7 @@ fn find_best_move(pos: &Chess, depth: i32) -> Option<Move> {
         let mut min_eval = i32::MAX;
         for m in legals {
             let mut new_pos = pos.clone();
-            new_pos.play_unchecked(&m);
+            new_pos.play_unchecked(m);
             let eval = minimax(&new_pos, depth - 1, i32::MIN, i32::MAX, true);
             if eval < min_eval {
                 min_eval = eval;
@@ -220,7 +220,7 @@ async fn get_engine_move(
         Some(m) => (
             StatusCode::OK,
             Json(EngineResponse {
-                best_move: Some(Uci::from_move(&m, CastlingMode::Standard).to_string()),
+                best_move: Some(UciMove::from_standard(m).to_string()),
                 error: None,
                 engine: engine.to_string(),
                 execution_provider,

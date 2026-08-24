@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use ort::ep::ExecutionProviderDispatch;
 use ort::session::Session;
 use ort::value::Tensor;
-use shakmaty::{Chess, Color, EnPassantMode, Move, Outcome, Position, Role, Square};
+use shakmaty::{Chess, Color, EnPassantMode, KnownOutcome, Move, Outcome, Position, Role, Square};
 
 const INPUT_PLANES: usize = 14;
 const POLICY_SIZE: usize = 4672;
@@ -195,7 +195,7 @@ fn expand(arena: &mut Vec<Node>, index: usize, session: &mut Session) -> Result<
             continue;
         };
         let mut child_position = parent_position.clone();
-        child_position.play_unchecked(&chess_move);
+        child_position.play_unchecked(chess_move);
         let child_index = arena.len();
         arena[index].children.push(child_index);
         arena.push(Node::new(
@@ -223,8 +223,8 @@ fn backpropagate(arena: &mut [Node], mut index: usize, mut value: f32) {
 
 fn terminal_value(position: &Chess) -> f32 {
     match position.outcome() {
-        Some(Outcome::Decisive { winner }) if winner == position.turn() => 1.0,
-        Some(Outcome::Decisive { .. }) => -1.0,
+        Outcome::Known(KnownOutcome::Decisive { winner }) if winner == position.turn() => 1.0,
+        Outcome::Known(KnownOutcome::Decisive { .. }) => -1.0,
         _ => 0.0,
     }
 }
@@ -366,7 +366,7 @@ fn castle_destination(chess_move: &Move) -> Option<Square> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shakmaty::{fen::Fen, uci::Uci, CastlingMode};
+    use shakmaty::{fen::Fen, uci::UciMove, CastlingMode};
 
     #[test]
     fn initial_board_encoding_matches_training_layout() {
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn move_encoding_matches_training_layout() {
         let position = Chess::default();
-        let chess_move = Uci::from_ascii(b"g1f3")
+        let chess_move = UciMove::from_ascii(b"g1f3")
             .unwrap()
             .to_move(&position)
             .unwrap();
@@ -394,7 +394,7 @@ mod tests {
     fn castling_uses_the_king_destination() {
         let fen: Fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1".parse().unwrap();
         let position: Chess = fen.into_position(CastlingMode::Standard).unwrap();
-        let chess_move = Uci::from_ascii(b"e1g1")
+        let chess_move = UciMove::from_ascii(b"e1g1")
             .unwrap()
             .to_move(&position)
             .unwrap();

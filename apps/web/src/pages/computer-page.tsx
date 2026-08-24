@@ -43,8 +43,7 @@ export default function ComputerPage() {
 
 	useEffect(() => {
 		if (
-			!boardData ||
-			boardData.mode !== "vs_computer" ||
+			boardData?.mode !== "vs_computer" ||
 			boardData.turn !== "Black" ||
 			boardData.status !== "Ongoing"
 		) {
@@ -107,7 +106,7 @@ export default function ComputerPage() {
 
 	const handleSquareClick = async (squareIndex: number) => {
 		resumeAudioContext();
-		if (!boardData || boardData.status !== "Ongoing") return;
+		if (boardData?.status !== "Ongoing") return;
 		if (turn !== "White" || pendingMove) return;
 
 		const clickedPiece = pieces.find((p) => p.square === squareIndex);

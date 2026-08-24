@@ -1,47 +1,56 @@
 {
-    "name": "api",
-    "$schema": "../../node_modules/nx/schemas/project-schema.json",
-    "projectType": "application",
-    "root": "apps/api",
-    "sourceRoot": "apps/api",
-    "tags": ["scope:api", "type:app", "language:go"],
-    "targets": {
-        "dev": {
-            "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "AUTO_MIGRATE=true CGO_ENABLED=0 go run ./cmd/api" }
-        },
-        "build": {
-            "executor": "nx:run-commands",
-            "outputs": ["{projectRoot}/dist"],
-            "options": { "cwd": "apps/api", "command": "mkdir -p dist && CGO_ENABLED=0 go build -o dist/api ./cmd/api" }
-        },
-        "start": {
-            "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "AUTO_MIGRATE=true CGO_ENABLED=0 ./dist/api" }
-        },
-        "test": {
-            "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "CGO_ENABLED=0 go test ./..." }
-        },
-        "lint": {
-            "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "CGO_ENABLED=0 go vet ./..." }
-        },
-        "format": {
-            "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "gofmt -w ./cmd ./internal" }
-        },
-        "clean": {
-            "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "rm -rf dist" }
-        },
-        "check": {
-            "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "test -z \"$(gofmt -l ./cmd ./internal)\" && CGO_ENABLED=0 go test ./... && CGO_ENABLED=0 go vet ./..." }
-        },
-        "migrate": {
-            "executor": "nx:run-commands",
-            "options": { "cwd": "apps/api", "command": "CGO_ENABLED=0 go run ./cmd/api -migrate" }
-        }
-    }
+	"name": "api",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"projectType": "application",
+	"root": "apps/api",
+	"sourceRoot": "apps/api",
+	"tags": ["scope:api", "type:app", "language:go"],
+	"targets": {
+		"dev": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/api",
+				"command": "AUTO_MIGRATE=true CGO_ENABLED=0 go run ./cmd/api"
+			}
+		},
+		"build": {
+			"executor": "nx:run-commands",
+			"outputs": ["{projectRoot}/dist"],
+			"options": {
+				"cwd": "apps/api",
+				"command": "mkdir -p dist && CGO_ENABLED=0 go build -o dist/api ./cmd/api"
+			}
+		},
+		"start": {
+			"executor": "nx:run-commands",
+			"options": { "cwd": "apps/api", "command": "AUTO_MIGRATE=true CGO_ENABLED=0 ./dist/api" }
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"options": { "cwd": "apps/api", "command": "CGO_ENABLED=0 go test ./..." }
+		},
+		"lint": {
+			"executor": "nx:run-commands",
+			"options": { "cwd": "apps/api", "command": "CGO_ENABLED=0 go vet ./..." }
+		},
+		"format": {
+			"executor": "nx:run-commands",
+			"options": { "cwd": "apps/api", "command": "gofmt -w ./cmd ./internal" }
+		},
+		"clean": {
+			"executor": "nx:run-commands",
+			"options": { "cwd": "apps/api", "command": "rm -rf dist" }
+		},
+		"check": {
+			"executor": "nx:run-commands",
+			"options": {
+				"cwd": "apps/api",
+				"command": "test -z \"$(gofmt -l ./cmd ./internal)\" && CGO_ENABLED=0 go test ./... && CGO_ENABLED=0 go vet ./..."
+			}
+		},
+		"migrate": {
+			"executor": "nx:run-commands",
+			"options": { "cwd": "apps/api", "command": "CGO_ENABLED=0 go run ./cmd/api -migrate" }
+		}
+	}
 }
