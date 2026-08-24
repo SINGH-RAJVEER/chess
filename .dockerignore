@@ -1,0 +1,12 @@
+.jj
+.git
+node_modules
+target
+dist
+**/node_modules
+**/dist
+**/target
+apps/api/dist
+apps/web/node_modules
+apps/dqn/model.onnx
+.env

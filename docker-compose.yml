@@ -1,0 +1,73 @@
+services:
+    db:
+        image: postgres:17-alpine
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: chess
+            POSTGRES_PASSWORD: chess
+            POSTGRES_DB: chess
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U chess"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+
+    engine:
+        build:
+            context: apps/engine
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        volumes:
+            - ./apps/dqn/model.onnx:/models/model.onnx:ro
+        expose:
+            - "8080"
+
+    api:
+        build:
+            context: apps/api
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        depends_on:
+            db:
+                condition: service_healthy
+            engine:
+                condition: service_started
+        environment:
+            DATABASE_URL: postgres://chess:chess@db:5432/chess?sslmode=disable
+            CHESS_ENGINE_URL: http://engine:8080
+            WEB_ORIGIN: http://localhost:3000
+            AUTH_BASE_URL: http://localhost:4000/api/auth
+            BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-in-production}
+            GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+            GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+            AUTO_MIGRATE: ${AUTO_MIGRATE:-true}
+        ports:
+            - "4000:4000"
+
+    web:
+        build:
+            context: .
+            dockerfile: apps/web/Dockerfile
+        restart: unless-stopped
+        depends_on:
+            - api
+        ports:
+            - "3000:3000"
+
+    train:
+        build:
+            context: apps/dqn
+            dockerfile: Dockerfile
+        profiles: ["train"]
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
+
+volumes:
+    pgdata:
