@@ -58,11 +58,16 @@ Do not run `just dev` with `sudo`; PostgreSQL refuses to run as root.
 bunx nx run web:dev
 bunx nx run api:dev
 bunx nx run engine:dev
+bunx nx run desktop:dev
 ```
 
 The web server proxies `/api` to `http://127.0.0.1:4000` by default. Set
 `VITE_API_PROXY_TARGET` in the root `.env` to point to another API during local
 development.
+
+The desktop target opens a native Tauri window that loads the web dev server at
+`http://localhost:3000`; start `web:dev` first. See
+[desktop.md](desktop.md) for build modes and Linux system dependencies.
 
 ## Checks and Builds
 
@@ -87,7 +92,8 @@ bunx nx run api:migrate
 ```
 
 The API build is a CGO-free Go binary. The engine release build is produced by
-Cargo. The web production output is written to `apps/web/dist`.
+Cargo. The web production output is written to `apps/web/dist`, which the
+desktop release build embeds into the native binary.
 
 ## Training the Computer Opponent
 

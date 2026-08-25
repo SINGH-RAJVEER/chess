@@ -5,6 +5,7 @@ Chess is a full-stack chess application with local games, online matchmaking, au
 ## What Is Included
 
 - `apps/web`: React and Vite browser application.
+- `apps/desktop`: Tauri desktop shell around the web application.
 - `apps/api`: Go HTTP API for authentication, game state, matchmaking, clocks, migrations, and engine orchestration.
 - `apps/engine`: Rust service that selects computer moves with minimax, a custom alpha-beta engine, or DQN.
 - `apps/dqn`: ONNX model, inference support, and Python training pipeline.
@@ -54,6 +55,7 @@ Run one project with Nx:
 bunx nx run web:dev
 bunx nx run api:dev
 bunx nx run engine:dev
+bunx nx run desktop:dev
 ```
 
 ## Documentation
@@ -69,5 +71,6 @@ The detailed documentation is split by audience and concern:
 - [Security](docs/security.md): authentication, trust boundaries, and hardening.
 - [API implementation notes](docs/api.md): Go API structure and compatibility details.
 - [Computer opponent notes](docs/dqn.md): DQN inference, GPU fallback, and model training.
+- [Desktop](docs/desktop.md): Tauri desktop shell, build modes, and system dependencies.
 
 Production deployment guidance and known implementation gaps are documented in the operations and security guides. The repository does not include a reverse proxy, container image, deployment manifest, backup system, or monitoring stack.

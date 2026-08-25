@@ -42,6 +42,15 @@ session in memory but does not persist games.
   state; there is no WebSocket transport.
 - Shared request and domain types come from `packages/types`.
 
+### Desktop client: `apps/desktop`
+
+- Tauri 2 shell that renders the web client in a native window without
+  duplicating UI code.
+- Development loads the Vite dev server at `http://localhost:3000`, so the API
+  proxy and hot reload behave as in the browser.
+- Release builds embed the static output of `apps/web/dist` into the binary.
+- See [desktop.md](desktop.md) for build modes and system dependencies.
+
 ### API: `apps/api`
 
 - Go `net/http` server assembled in `cmd/api/main.go`.

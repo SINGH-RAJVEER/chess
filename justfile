@@ -202,6 +202,34 @@ engine-check:
 engine-clean:
     bunx nx run engine:clean
 
+# Start the desktop app (requires the web dev server on port 3000)
+desktop-dev:
+    devenv shell -- bash -c 'exec bunx nx run desktop:dev'
+
+# Build and bundle the desktop app
+desktop-build:
+    devenv shell -- bash -c 'exec bunx nx run desktop:build'
+
+# Test the desktop Rust crate
+desktop-test:
+    devenv shell -- bash -c 'exec bunx nx run desktop:test'
+
+# Lint the desktop Rust crate with clippy
+desktop-lint:
+    devenv shell -- bash -c 'exec bunx nx run desktop:lint'
+
+# Format the desktop Rust crate
+desktop-format:
+    devenv shell -- bash -c 'exec bunx nx run desktop:format'
+
+# Run cargo check for the desktop crate
+desktop-check:
+    devenv shell -- bash -c 'exec bunx nx run desktop:check'
+
+# Clean desktop build artifacts
+desktop-clean:
+    devenv shell -- bash -c 'exec bunx nx run desktop:clean'
+
 # Run an Nx target for a project, e.g. `just nx-target build web`
 nx-target target project:
     bunx nx run {{project}}:{{target}}

@@ -36,7 +36,17 @@ in
     openssl
     nil
     nixd
-  ] ++ lib.optionals pkgs.stdenv.isLinux (with pkgs.cudaPackages; [
+  ] ++ lib.optionals pkgs.stdenv.isLinux (with pkgs; [
+    glib
+    gtk3
+    webkitgtk_4_1
+    libsoup_3
+    cairo
+    pango
+    gdk-pixbuf
+    gobject-introspection
+    dbus
+  ]) ++ lib.optionals pkgs.stdenv.isLinux (with pkgs.cudaPackages; [
     cudatoolkit
     cudnn
   ]);
