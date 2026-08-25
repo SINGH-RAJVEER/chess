@@ -3,7 +3,7 @@
 //! Tables are written from White's point of view with index 0 = a8.
 //! See https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function
 
-use shakmaty::{Board, Chess, Color, Position, Role, Square};
+use shakmaty::{Bitboard, Board, Chess, Color, File, Position, Rank, Role, Square};
 
 /// Material values in centipawns (midgame, endgame).
 const MG_MATERIAL: [i32; 6] = [82, 337, 365, 477, 1025, 0];
@@ -108,7 +108,25 @@ const EG_TABLES: [Table; 6] = [
 ];
 
 /// Tempo bonus for the side to move, in centipawns.
-pub const TEMPO_BONUS: i32 = 10;
+pub const TEMPO_BONUS: i32 = 20;
+
+/// Midgame/endgame score pair.
+#[derive(Clone, Copy)]
+struct Score {
+    mg: i32,
+    eg: i32,
+}
+
+impl Score {
+    const fn new(mg: i32, eg: i32) -> Self {
+        Self { mg, eg }
+    }
+
+    fn add(&mut self, other: Score, sign: i32) {
+        self.mg += sign * other.mg;
+        self.eg += sign * other.eg;
+    }
+}
 
 pub fn role_index(role: Role) -> usize {
     match role {
@@ -147,24 +165,300 @@ fn turn_sign(turn: Color) -> i32 {
     }
 }
 
-/// Tapered material + piece-square evaluation from White's point of view.
+/// Tapered evaluation from White's point of view: PeSTO material and piece
+/// squares plus pawn structure, bishop pair, rook placement, mobility, and a
+/// simple king pawn shield.
 fn evaluate_board(board: &Board) -> i32 {
     let mut mg_score = 0;
     let mut eg_score = 0;
-    let mut phase = 0;
 
-    for (square, piece) in board.clone() {
-        let idx = role_index(piece.role);
-        let table_sq = table_square(square, piece.color);
-        let sign = if piece.color == Color::White { 1 } else { -1 };
-
-        mg_score += sign * (MG_MATERIAL[idx] + MG_TABLES[idx][table_sq]);
-        eg_score += sign * (EG_MATERIAL[idx] + EG_TABLES[idx][table_sq]);
-        phase += PHASE_WEIGHTS[idx];
+    for color in [Color::White, Color::Black] {
+        let sign = if color == Color::White { 1 } else { -1 };
+        for role in [
+            Role::Pawn,
+            Role::Knight,
+            Role::Bishop,
+            Role::Rook,
+            Role::Queen,
+            Role::King,
+        ] {
+            let idx = role_index(role);
+            let pieces = board.by_color(color) & board.by_role(role);
+            for square in pieces {
+                let table_sq = table_square(square, color);
+                mg_score += sign * (MG_MATERIAL[idx] + MG_TABLES[idx][table_sq]);
+                eg_score += sign * (EG_MATERIAL[idx] + EG_TABLES[idx][table_sq]);
+            }
+        }
     }
+
+    let mut phase = game_phase(board);
+
+    // Positional terms, each symmetric so colors cancel on mirrored boards.
+    let mut extra = Score::new(0, 0);
+    extra.add(pawn_structure(board), 1);
+    extra.add(bishop_pair(board), 1);
+    extra.add(rook_files(board), 1);
+    extra.add(mobility(board), 1);
+    extra.add(king_shield(board), 1);
+
+    mg_score += extra.mg;
+    eg_score += extra.eg;
 
     phase = phase.min(MAX_PHASE);
     (mg_score * phase + eg_score * (MAX_PHASE - phase)) / MAX_PHASE
+}
+
+/// Game phase from non-pawn material of both sides combined: 24 = pure
+/// middlegame, 0 = pure endgame.
+pub fn game_phase(board: &Board) -> i32 {
+    let mut phase = 0;
+    for color in [Color::White, Color::Black] {
+        for role in [Role::Knight, Role::Bishop, Role::Rook, Role::Queen] {
+            let count = (board.by_color(color) & board.by_role(role)).count();
+            phase += PHASE_WEIGHTS[role_index(role)] * i32::try_from(count).unwrap_or(0);
+        }
+    }
+    phase.min(MAX_PHASE)
+}
+
+/// Precomputed per-file bitboards and passed-pawn masks. Built once on first
+/// use; every later access is a table lookup.
+static FILE_BBS: std::sync::OnceLock<[Bitboard; 8]> = std::sync::OnceLock::new();
+static PASSED_MASKS: std::sync::OnceLock<[Bitboard; 128]> = std::sync::OnceLock::new();
+
+fn tables() -> (&'static [Bitboard; 8], &'static [Bitboard; 128]) {
+    let files = FILE_BBS.get_or_init(|| {
+        let mut bbs = [Bitboard::EMPTY; 8];
+        for f in 0..8u32 {
+            for r in 0..8u32 {
+                bbs[f as usize] ^= Bitboard::from(Square::from_coords(File::new(f), Rank::new(r)));
+            }
+        }
+        bbs
+    });
+    // Index 0..63: White masks (squares ahead on same and adjacent files).
+    // Index 64..127: Black masks (squares behind on same and adjacent files).
+    let passed = PASSED_MASKS.get_or_init(|| {
+        let mut masks = [Bitboard::EMPTY; 128];
+        for sq in Square::ALL {
+            let f = usize::from(sq.file());
+            let r = usize::from(sq.rank());
+            let mut white_mask = Bitboard::EMPTY;
+            let mut black_mask = Bitboard::EMPTY;
+            for df in [-1i32, 0, 1] {
+                let nf = f as i32 + df;
+                if !(0..8).contains(&nf) {
+                    continue;
+                }
+                for nr in 0..8 {
+                    if nr > r {
+                        white_mask ^= Bitboard::from(Square::from_coords(
+                            File::new(nf as u32),
+                            Rank::new(nr as u32),
+                        ));
+                    }
+                    if nr < r {
+                        black_mask ^= Bitboard::from(Square::from_coords(
+                            File::new(nf as u32),
+                            Rank::new(nr as u32),
+                        ));
+                    }
+                }
+            }
+            masks[usize::from(sq)] = white_mask;
+            masks[64 + usize::from(sq)] = black_mask;
+        }
+        masks
+    });
+    (files, passed)
+}
+
+fn file_bb_of(file: File) -> Bitboard {
+    tables().0[usize::from(file)]
+}
+
+/// Squares on `square`'s file (and adjacent files) strictly ahead of the pawn
+/// from `white`'s perspective. Used for passed-pawn detection.
+fn ahead_mask(square: Square, white: bool) -> Bitboard {
+    let (_, passed) = tables();
+    let idx = usize::from(square);
+    if white {
+        passed[idx]
+    } else {
+        passed[64 + idx]
+    }
+}
+
+/// Passed, doubled, and isolated pawn terms.
+fn pawn_structure(board: &Board) -> Score {
+    const PASSED_MG: [i32; 6] = [5, 10, 20, 35, 60, 100];
+    const PASSED_EG: [i32; 6] = [10, 20, 35, 60, 100, 150];
+
+    let mut total = Score::new(0, 0);
+
+    for color in [Color::White, Color::Black] {
+        let sign = if color == Color::White { 1 } else { -1 };
+        let ours = board.by_color(color) & board.by_role(Role::Pawn);
+        let theirs = board.by_color(!color) & board.by_role(Role::Pawn);
+        let mut per_file = [0i32; 8];
+        for sq in ours {
+            per_file[usize::from(sq.file())] += 1;
+        }
+
+        for sq in ours {
+            let white = color == Color::White;
+            let rank_idx = {
+                let r = usize::from(sq.rank());
+                if white {
+                    r - 1
+                } else {
+                    6 - r
+                }
+            };
+            // Relative rank 1..6 maps to the tables above.
+            if (1..=6).contains(&rank_idx) && (theirs & ahead_mask(sq, white)).is_empty() {
+                total.mg += sign * PASSED_MG[rank_idx - 1];
+                total.eg += sign * PASSED_EG[rank_idx - 1];
+            }
+
+            if per_file[usize::from(sq.file())] > 1 {
+                total.add(Score::new(-8, -16), sign); // doubled
+            }
+
+            let f = usize::from(sq.file());
+            let neighbors = [
+                f.checked_sub(1).filter(|&nf| nf < 8),
+                f.checked_add(1).filter(|&nf| nf < 8),
+            ];
+            let supported = neighbors.iter().flatten().any(|&nf| per_file[nf] > 0);
+            if !supported {
+                total.add(Score::new(-12, -14), sign); // isolated
+            }
+        }
+    }
+    total
+}
+
+/// Bishop pair bonus: two bishops cover both complexions.
+fn bishop_pair(board: &Board) -> Score {
+    let mut total = Score::new(0, 0);
+    for color in [Color::White, Color::Black] {
+        let bishops = board.by_color(color) & board.by_role(Role::Bishop);
+        if bishops.count() >= 2 {
+            total.add(
+                Score::new(22, 88),
+                if color == Color::White { 1 } else { -1 },
+            );
+        }
+    }
+    total
+}
+
+/// Rooks score more with fewer pawns blocking their file.
+fn rook_files(board: &Board) -> Score {
+    let mut total = Score::new(0, 0);
+    let all_pawns = board.by_role(Role::Pawn);
+    for color in [Color::White, Color::Black] {
+        let sign = if color == Color::White { 1 } else { -1 };
+        let rooks = board.by_color(color) & board.by_role(Role::Rook);
+        let ours = board.by_color(color) & all_pawns;
+        let theirs = board.by_color(!color) & all_pawns;
+        for sq in rooks {
+            let file_bb = file_bb_of(sq.file());
+            if (ours & file_bb).is_empty() {
+                if (theirs & file_bb).is_empty() {
+                    total.add(Score::new(30, 5), sign); // open file
+                } else {
+                    total.add(Score::new(12, 6), sign); // semi-open file
+                }
+            }
+        }
+    }
+    total
+}
+
+/// Attack-count mobility for knights, bishops, rooks, and queens into squares
+/// not occupied by friendly pieces or attacked by enemy pawns.
+fn mobility(board: &Board) -> Score {
+    const TERMS: [(Role, i32, i32, i32); 4] = [
+        // (role, baseline moves, mg per extra move, eg per extra move)
+        (Role::Knight, 4, 4, 4),
+        (Role::Bishop, 6, 3, 4),
+        (Role::Rook, 7, 2, 3),
+        (Role::Queen, 10, 1, 1),
+    ];
+
+    let mut total = Score::new(0, 0);
+    for color in [Color::White, Color::Black] {
+        let sign = if color == Color::White { 1 } else { -1 };
+        let ours = board.by_color(color);
+        let their_pawns = board.by_color(!color) & board.by_role(Role::Pawn);
+        let mut pawn_attacks = Bitboard::EMPTY;
+        for sq in their_pawns {
+            pawn_attacks ^= shakmaty::attacks::attacks(
+                sq,
+                shakmaty::Piece {
+                    color: !color,
+                    role: Role::Pawn,
+                },
+                board.occupied(),
+            );
+        }
+        let area = !ours & !pawn_attacks;
+
+        for (role, base, w_mg, w_eg) in TERMS {
+            for sq in board.by_color(color) & board.by_role(role) {
+                let attacks = shakmaty::attacks::attacks(
+                    sq,
+                    shakmaty::Piece { color, role },
+                    board.occupied(),
+                ) & area;
+                let count = i32::try_from(attacks.count()).unwrap_or(0);
+                total.mg += sign * (count - base) * w_mg;
+                total.eg += sign * (count - base) * w_eg;
+            }
+        }
+    }
+    total
+}
+
+/// Simple king safety: pawns shielding the king one or two ranks ahead on the
+/// king's file or adjacent files.
+fn king_shield(board: &Board) -> Score {
+    let mut total = Score::new(0, 0);
+    for color in [Color::White, Color::Black] {
+        let sign = if color == Color::White { 1 } else { -1 };
+        let kings = board.by_color(color) & board.by_role(Role::King);
+        let Some(king) = kings.first() else {
+            continue;
+        };
+        let pawns = board.by_color(color) & board.by_role(Role::Pawn);
+        let kf = usize::from(king.file());
+        let kr = i32::from(king.rank());
+        let dir = if color == Color::White { 1 } else { -1 };
+
+        let mut shield = 0;
+        for df in [-2i32, -1, 0, 1, 2] {
+            let f = kf as i32 + df;
+            if !(0..8).contains(&f) {
+                continue;
+            }
+            for dr in [1, 2] {
+                let r = kr + dr * dir;
+                if !(0..8).contains(&r) {
+                    continue;
+                }
+                let sq = Square::from_coords(File::new(f as u32), Rank::new(r as u32));
+                if pawns.contains(sq) {
+                    shield += 10;
+                    break; // nearest shield pawn per file is enough
+                }
+            }
+        }
+        total.mg += sign * shield;
+    }
+    total
 }
 
 #[cfg(test)]
@@ -245,5 +539,59 @@ mod tests {
         let good = evaluate(&pos("8/8/8/4N3/8/8/8/K6k w - - 0 1"));
         let bad = evaluate(&pos("8/8/8/8/8/8/8/NK5k w - - 0 1"));
         assert!(good > bad, "{good} should exceed {bad}");
+    }
+
+    #[test]
+    fn game_phase_counts_both_sides() {
+        // Startpos: every minor/major on the board counts, regardless of color.
+        let start = pos("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        assert_eq!(game_phase(start.board()), MAX_PHASE);
+
+        // Bare kings have no phase at all.
+        let bare = pos("7k/8/8/8/8/8/8/K7 w - - 0 1");
+        assert_eq!(game_phase(bare.board()), 0);
+    }
+
+    #[test]
+    fn advanced_passed_pawn_outscores_early_one() {
+        // Same bare-kings structure, passer on e5 versus e2: further advanced
+        // must score higher through the passed-pawn table (and PSQT).
+        let advanced = evaluate(&pos("8/8/8/4P3/8/8/8/K6k w - - 0 1"));
+        let early = evaluate(&pos("8/8/8/8/8/8/4P3/K6k w - - 0 1"));
+        assert!(advanced > early, "{advanced} should exceed {early}");
+    }
+
+    #[test]
+    fn connected_pawns_beat_isolated_ones() {
+        // Equal pawn counts: f2+g2 support each other, f2+h2 are both isolated
+        // (no friendly pawn on an adjacent file).
+        let connected = evaluate(&pos("8/8/8/8/8/8/5PP1/K6k w - - 0 1"));
+        let isolated = evaluate(&pos("8/8/8/8/8/8/5P1P/K6k w - - 0 1"));
+        assert!(connected > isolated, "{connected} should exceed {isolated}");
+    }
+}
+
+#[cfg(test)]
+mod probe {
+    use super::*;
+    use shakmaty::{fen::Fen, CastlingMode};
+    /// Ignored by default: reports nanoseconds per evaluation for speed tracking.
+    #[test]
+    #[ignore]
+    fn bench_eval() {
+        let p: Chess = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
+            .parse::<Fen>()
+            .unwrap()
+            .into_position(CastlingMode::Standard)
+            .unwrap();
+        let t = std::time::Instant::now();
+        let mut acc = 0i64;
+        for _ in 0..200_000 {
+            acc += evaluate_board(p.board()) as i64;
+        }
+        println!(
+            "eval: {:.0} ns/eval, acc {acc}",
+            t.elapsed().as_nanos() as f64 / 200_000.0
+        );
     }
 }
