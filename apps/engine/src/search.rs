@@ -97,6 +97,14 @@ fn cont_index(prev: Move, cur: Move) -> usize {
 }
 const CONT_TABLE_LEN: usize = 12 * 64 * 12 * 64;
 
+/// Flat index into the capture-history table for a capture move.
+fn cap_index(m: Move) -> usize {
+    let mover = eval::role_index(m.role());
+    let to = usize::from(m.to());
+    let captured = eval::role_index(m.capture().unwrap_or(Role::Pawn));
+    (mover * 64 + to) * 6 + captured
+}
+
 pub struct Searcher {
     tt: Vec<TtEntry>,
     tt_age: u8,
@@ -107,6 +115,8 @@ pub struct Searcher {
     cont_history: [Vec<i32>; 2],
     /// Counter-move table keyed by [previous mover piece type][previous to].
     counters: [[Option<Move>; 64]; 12],
+    /// Capture history keyed by [mover piece type][to square][captured role].
+    capture_history: Vec<i32>,
     /// Static evaluation per ply, used for the improving flag.
     evals: [i32; MAX_PLY],
     /// Move played at each ply, for one- and two-ply continuation history.
@@ -245,6 +255,7 @@ impl Searcher {
             main_history: [[0; 64]; 12],
             cont_history: [vec![0; CONT_TABLE_LEN], vec![0; CONT_TABLE_LEN]],
             counters: [[None; 64]; 12],
+            capture_history: vec![0; 12 * 64 * 6],
             evals: [0; MAX_PLY],
             move_stack: [None; MAX_PLY],
             lmr,
@@ -263,6 +274,7 @@ impl Searcher {
         self.main_history = [[0; 64]; 12];
         self.cont_history = [vec![0; CONT_TABLE_LEN], vec![0; CONT_TABLE_LEN]];
         self.counters = [[None; 64]; 12];
+        self.capture_history.iter_mut().for_each(|v| *v = 0);
     }
 
     fn tt_index(&self, key: u64) -> usize {
@@ -411,7 +423,8 @@ impl Searcher {
                 TT_MOVE_SCORE
             } else if m.is_capture() {
                 let victim = eval::role_index(m.capture().unwrap_or(Role::Pawn));
-                CAPTURE_SCORE_BASE + victim as i32 * 10 - eval::role_index(m.role()) as i32
+                let mvv_lva = victim as i32 * 10 - eval::role_index(m.role()) as i32;
+                CAPTURE_SCORE_BASE + mvv_lva + self.capture_history[cap_index(m)] / 8
             } else if m.promotion().is_some() {
                 PROMOTION_SCORE
             } else if self.killers[ply][0] == Some(m) {
@@ -438,15 +451,7 @@ impl Searcher {
         moves[start]
     }
 
-    fn store_cutoff(
-        &mut self,
-        m: Move,
-        prev: Option<Move>,
-        prev_prev: Option<Move>,
-        tried_quiets: &[Option<Move>],
-        ply: usize,
-        depth: i32,
-    ) {
+    fn store_cutoff(&mut self, m: Move, prev: Option<Move>, ply: usize) {
         if ply < MAX_PLY {
             let killers = &mut self.killers[ply];
             if killers[0] != Some(m) {
@@ -456,14 +461,6 @@ impl Searcher {
         }
         if let Some(pm) = prev {
             self.counters[eval::role_index(pm.role())][usize::from(pm.to())] = Some(m);
-        }
-
-        let bonus = stat_bonus(depth);
-        self.update_quiet_history(prev, prev_prev, m, bonus);
-        for other in tried_quiets.iter().flatten() {
-            if *other != m {
-                self.update_quiet_history(prev, prev_prev, *other, -bonus);
-            }
         }
     }
 
@@ -608,6 +605,7 @@ impl Searcher {
         let mut best_move: Option<Move> = None;
         let mut bound = Bound::Upper;
         let mut quiets: ArrayVec<Option<Move>, MAX_QUIETS> = ArrayVec::new();
+        let mut captures_tried: ArrayVec<Option<Move>, MAX_QUIETS> = ArrayVec::new();
 
         for idx in 0..moves.len() {
             let m = Self::pick_next(&mut moves, &mut scores, idx);
@@ -732,8 +730,19 @@ impl Searcher {
                         self.root_best = Some(m);
                     }
                     if alpha >= beta {
-                        if quiet {
-                            self.store_cutoff(m, prev_move, prev_prev, &quiets, ply, depth);
+                        self.store_cutoff(m, prev_move, ply);
+                        let bonus = stat_bonus(depth);
+                        self.update_quiet_history(prev_move, prev_prev, m, bonus);
+                        for other in quiets.iter().flatten() {
+                            if *other != m {
+                                self.update_quiet_history(prev_move, prev_prev, *other, -bonus);
+                            }
+                        }
+                        for other in captures_tried.iter().flatten() {
+                            if *other != m {
+                                let idx = cap_index(*other);
+                                update_history(&mut self.capture_history[idx], -bonus);
+                            }
                         }
                         bound = Bound::Lower;
                         break;
@@ -743,6 +752,8 @@ impl Searcher {
 
             if quiet && quiets.len() < MAX_QUIETS {
                 let _ = quiets.try_push(Some(m));
+            } else if !quiet && captures_tried.len() < MAX_QUIETS {
+                let _ = captures_tried.try_push(Some(m));
             }
         }
 
