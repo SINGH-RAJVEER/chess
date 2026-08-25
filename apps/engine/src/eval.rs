@@ -290,8 +290,107 @@ fn ahead_mask(square: Square, white: bool) -> Bitboard {
     }
 }
 
-/// Passed, doubled, and isolated pawn terms.
+/// Zobrist keys for the pawn-only hash, indexed `[color * 64 + square]`.
+/// Generated once from a fixed-seed splitmix64 stream so runs are
+/// reproducible.
+static PAWN_KEYS: std::sync::OnceLock<[u64; 128]> = std::sync::OnceLock::new();
+
+fn pawn_keys() -> &'static [u64; 128] {
+    PAWN_KEYS.get_or_init(|| {
+        let mut keys = [0u64; 128];
+        let mut state = 0x2545_F491_4F6C_DD1Du64;
+        for key in &mut keys {
+            state ^= state >> 30;
+            state = state.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            state ^= state >> 27;
+            state = state.wrapping_mul(0x94D0_49BB_1331_11EB);
+            state ^= state >> 31;
+            *key = state;
+        }
+        keys
+    })
+}
+
+/// Zobrist hash of the pawn placement only. Piece moves leave it untouched,
+/// which is what makes the pawn-structure cache effective.
+fn pawn_key(board: &Board) -> u64 {
+    let keys = pawn_keys();
+    let pawns = board.by_role(Role::Pawn);
+    let mut hash = 0u64;
+    for sq in pawns & board.by_color(Color::White) {
+        hash ^= keys[usize::from(sq)];
+    }
+    for sq in pawns & board.by_color(Color::Black) {
+        hash ^= keys[64 + usize::from(sq)];
+    }
+    hash
+}
+
+/// Pawn-structure terms keyed by the pawn-only Zobrist hash. Pawn moves are a
+/// small fraction of searched moves, so most evaluations reuse the previous
+/// entry instead of recomputing passed/doubled/isolated penalties.
+const PAWN_HASH_SIZE: usize = 1 << 13;
+
+struct PawnEntry {
+    /// Zero marks an unused entry; otherwise the full pawn-only key.
+    key: std::sync::atomic::AtomicU64,
+    /// Midgame score in the high 32 bits, endgame in the low 32, so one
+    /// atomic store publishes both halves together.
+    packed: std::sync::atomic::AtomicI64,
+}
+
+impl PawnEntry {
+    const fn new() -> Self {
+        Self {
+            key: std::sync::atomic::AtomicU64::new(0),
+            packed: std::sync::atomic::AtomicI64::new(0),
+        }
+    }
+}
+
+static PAWN_HASH: std::sync::OnceLock<Vec<PawnEntry>> = std::sync::OnceLock::new();
+
+fn pawn_hash() -> &'static [PawnEntry] {
+    PAWN_HASH.get_or_init(|| (0..PAWN_HASH_SIZE).map(|_| PawnEntry::new()).collect())
+}
+
+fn pack_score(score: Score) -> i64 {
+    (i64::from(score.mg) << 32) | (i64::from(score.eg) & 0xFFFF_FFFF)
+}
+
+/// Passed, doubled, and isolated pawn terms, served from the pawn hash.
+///
+/// The probe is lock-free and safe under concurrent evaluators (the test
+/// runner runs them in parallel): the key is read before and after the packed
+/// score, and the entry only counts as a hit if both reads agree. A writer
+/// always zeroes the key first, so a racing reader either sees a consistent
+/// entry or misses.
 fn pawn_structure(board: &Board) -> Score {
+    use std::sync::atomic::Ordering;
+
+    let key = pawn_key(board);
+    let idx = (key as usize) & (PAWN_HASH_SIZE - 1);
+    let entry = &pawn_hash()[idx];
+
+    let first = entry.key.load(Ordering::SeqCst);
+    let packed = entry.packed.load(Ordering::SeqCst);
+    let second = entry.key.load(Ordering::SeqCst);
+    if first == key && second == key && key != 0 {
+        return Score {
+            mg: (packed >> 32) as i32,
+            eg: packed as i32,
+        };
+    }
+
+    let total = pawn_structure_uncached(board);
+    entry.key.store(0, Ordering::SeqCst);
+    entry.packed.store(pack_score(total), Ordering::SeqCst);
+    entry.key.store(key, Ordering::SeqCst);
+    total
+}
+
+/// Passed, doubled, and isolated pawn terms, computed directly.
+fn pawn_structure_uncached(board: &Board) -> Score {
     const PASSED_MG: [i32; 6] = [5, 10, 20, 35, 60, 100];
     const PASSED_EG: [i32; 6] = [10, 20, 35, 60, 100, 150];
 
@@ -568,6 +667,66 @@ mod tests {
         let connected = evaluate(&pos("8/8/8/8/8/8/5PP1/K6k w - - 0 1"));
         let isolated = evaluate(&pos("8/8/8/8/8/8/5P1P/K6k w - - 0 1"));
         assert!(connected > isolated, "{connected} should exceed {isolated}");
+    }
+
+    #[test]
+    fn pawn_key_distinguishes_pawn_placements() {
+        let keys = [
+            pawn_key(pos("8/8/8/4p3/4P3/8/8/K6k w - - 0 1").board()),
+            pawn_key(pos("8/8/8/8/4p3/4P3/8/K6k w - - 0 1").board()),
+            pawn_key(pos("8/8/8/8/8/8/5PP1/K6k w - - 0 1").board()),
+            // Same pawns with pieces added must hash identically.
+            pawn_key(
+                pos("rnbqkbnr/8/8/4p3/4P3/8/8/R3K2R w KQkq - 0 1")
+                    .board(),
+            ),
+        ];
+        let mirrored = pos("8/8/8/4p3/4P3/8/8/K6k w - - 0 1");
+        let white_e4_black_e5 = mirrored.board();
+        assert_eq!(keys[0], pawn_key(white_e4_black_e5));
+        assert_ne!(keys[0], keys[1], "different pawn ranks must differ");
+        assert_ne!(keys[0], keys[2], "different pawn files must differ");
+        assert_eq!(
+            pawn_key(white_e4_black_e5),
+            pawn_key(
+                pos("rnbqkbnr/8/8/4p3/4P3/8/8/R3K2R w KQkq - 0 1").board()
+            ),
+            "non-pawn pieces must not affect the pawn hash"
+        );
+    }
+
+    #[test]
+    fn pawn_hash_matches_direct_computation() {
+        let fens = [
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+            "8/2p5/3p4/KP5r/1R3p1k/8/6P1/8 w - - 0 1",
+            "8/8/8/8/8/8/5PP1/K6k w - - 0 1",
+            "8/8/8/8/8/8/5P1P/K6k w - - 0 1",
+            "4k3/8/8/2ppp3/8/8/8/4K3 b - - 0 1",
+        ];
+
+        for fen in fens {
+            let game = pos(fen);
+            let board = game.board();
+            let direct = pawn_structure_uncached(board);
+            // Cold probe (store) and warm probe (hit) must both agree.
+            let stored = pawn_structure(board);
+            let hit = pawn_structure(board);
+            assert_eq!(stored.mg, direct.mg, "{fen}: cold mg");
+            assert_eq!(stored.eg, direct.eg, "{fen}: cold eg");
+            assert_eq!(hit.mg, direct.mg, "{fen}: warm mg");
+            assert_eq!(hit.eg, direct.eg, "{fen}: warm eg");
+        }
+
+        // A full board evaluation is stable across repeated calls once the
+        // cache is warm, which exercises the hit path inside evaluate_board.
+        let game = pos(fens[1]);
+        let board = game.board();
+        let first = evaluate_board(board);
+        for _ in 0..3 {
+            assert_eq!(evaluate_board(board), first);
+        }
     }
 }
 

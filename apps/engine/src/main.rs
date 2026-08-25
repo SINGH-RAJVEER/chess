@@ -273,6 +273,12 @@ async fn get_engine_move(
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    // Standalone UCI mode for engine testing tools (fastchess, cutechess,
+    // OpenBench). Everything else runs the HTTP service.
+    if std::env::args().any(|arg| arg == "--uci") {
+        return uci::run();
+    }
+
     let neural = match neural::NeuralEngine::load() {
         Ok(engine) => Some(Mutex::new(engine)),
         Err(error) => {

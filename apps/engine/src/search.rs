@@ -267,7 +267,6 @@ impl Searcher {
     }
 
     /// Clears the transposition table, killers, and all history tables.
-    #[cfg(test)]
     pub fn clear(&mut self) {
         self.tt.iter_mut().for_each(|e| *e = TtEntry::default());
         self.killers = [[None; 2]; MAX_PLY];
