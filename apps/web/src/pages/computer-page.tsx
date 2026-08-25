@@ -25,7 +25,8 @@ export default function ComputerPage() {
 	const [isResetPending, setIsResetPending] = useState(false);
 	const [promotionState, setPromotionState] = useState<PromotionState | null>(null);
 	const [opponent, setOpponent] = useState<ComputerOpponent>(() => {
-		return localStorage.getItem("chess_computer_opponent") === "dqn" ? "dqn" : "minimax";
+		const stored = localStorage.getItem("chess_computer_opponent");
+		return stored === "dqn" || stored === "custom" ? stored : "minimax";
 	});
 	const prevMoveCountRef = useRef(0);
 

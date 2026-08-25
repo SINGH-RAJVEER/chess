@@ -57,7 +57,7 @@ The process uses the repository's existing auth, game, queue, piece, and move ta
 
 ## API Compatibility
 
-The Go app implements health, board, legal move, game mutation, matchmaking, draw, resignation, and email/password session endpoints under `/api`. Computer moves use `POST {CHESS_ENGINE_URL}/api/engine-move` asynchronously. The frontend polls until the selected minimax or DQN move is persisted.
+The Go app implements health, board, legal move, game mutation, matchmaking, draw, resignation, and email/password session endpoints under `/api`. Computer moves use `POST {CHESS_ENGINE_URL}/api/engine-move` asynchronously. The frontend polls until the selected minimax, custom alpha-beta, or DQN move is persisted.
 
 Both Vite development and preview proxy `/api` to `VITE_API_PROXY_TARGET`. Production deployments must provide the same routing when Vite is not serving the frontend.
 

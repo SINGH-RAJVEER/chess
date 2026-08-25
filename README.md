@@ -6,14 +6,14 @@ Chess is a full-stack chess application with local games, online matchmaking, au
 
 - `apps/web`: React and Vite browser application.
 - `apps/api`: Go HTTP API for authentication, game state, matchmaking, clocks, migrations, and engine orchestration.
-- `apps/engine`: Rust service that selects computer moves with minimax or DQN.
+- `apps/engine`: Rust service that selects computer moves with minimax, a custom alpha-beta engine, or DQN.
 - `apps/dqn`: ONNX model, inference support, and Python training pipeline.
 - `packages/types`: Shared TypeScript domain and API types.
 - `docs`: Detailed architecture, development, API, operations, data model, and security documentation.
 
 ## How It Works
 
-The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API sends the current position to the Rust engine. The engine uses the bundled ONNX model for DQN games and falls back to minimax when necessary.
+The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API sends the current position to the Rust engine. The engine uses the bundled ONNX model for DQN games, its built-in alpha-beta engine for the custom opponent, and falls back to minimax when necessary.
 
 The local stack uses these ports:
 

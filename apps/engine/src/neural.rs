@@ -156,7 +156,7 @@ fn neural_best_move(
         .children
         .iter()
         .max_by_key(|&&child| arena[child].visits)
-        .and_then(|&child| arena[child].chess_move.clone()))
+        .and_then(|&child| arena[child].chess_move))
 }
 
 fn select(arena: &[Node]) -> usize {

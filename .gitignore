@@ -9,3 +9,5 @@ AGENTS.md
 .nx/workspace-data/
 .codex
 .tmp-runtime
+tsbuildinfo
+*.tsbuildinfo

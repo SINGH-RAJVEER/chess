@@ -50,7 +50,7 @@ Request:
 ```
 
 `promotion` is optional and may be `Queen`, `Rook`, `Bishop`, or `Knight`.
-`opponent` is optional and may be `minimax` or `dqn`; it is used for computer
+`opponent` is optional and may be `minimax`, `custom`, or `dqn`; it is used for computer
 games. The API validates the position and move server-side.
 
 Response fields include `success`, `nextTurn`, `status`, `captured`, `isCheck`,
@@ -151,5 +151,7 @@ Request:
 ```
 
 The response contains `best_move` in UCI notation, `engine`, and optional
-`execution_provider`. Invalid FEN or positions return 400. A DQN inference
-failure reports `minimax_fallback` and returns the fallback move.
+`execution_provider`. Invalid FEN or positions return 400. For the custom
+opponent, `execution_provider` carries reached depth, score, and node count
+instead of an ONNX provider name. A DQN inference failure reports
+`minimax_fallback` and returns the fallback move.

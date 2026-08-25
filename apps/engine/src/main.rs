@@ -1,4 +1,6 @@
+mod eval;
 mod neural;
+mod search;
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -28,6 +30,7 @@ enum Opponent {
     #[default]
     Minimax,
     Dqn,
+    Custom,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -40,6 +43,24 @@ struct EngineResponse {
 
 struct EngineState {
     neural: Option<Mutex<neural::NeuralEngine>>,
+    searcher: Mutex<search::Searcher>,
+}
+
+/// Time budget per custom-engine move, in milliseconds.
+fn custom_movetime() -> Duration {
+    let ms = std::env::var("ENGINE_CUSTOM_MOVETIME_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1000);
+    Duration::from_millis(ms)
+}
+
+/// Depth ceiling per custom-engine move.
+fn custom_max_depth() -> i32 {
+    std::env::var("ENGINE_CUSTOM_MAX_DEPTH")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(64)
 }
 
 async fn health(State(state): State<Arc<EngineState>>) -> Json<serde_json::Value> {
@@ -213,6 +234,18 @@ async fn get_engine_move(
             }
             None => (find_best_move(&position, 5), "minimax_fallback", None),
         },
+        Opponent::Custom => {
+            let mut searcher = state.searcher.lock().expect("searcher poisoned");
+            let result = searcher.search(&position, custom_movetime(), custom_max_depth());
+            (
+                result.best_move,
+                "custom",
+                Some(format!(
+                    "depth {} score {} {} nodes",
+                    result.depth, result.score, result.nodes
+                )),
+            )
+        }
         Opponent::Minimax => (find_best_move(&position, 5), "minimax", None),
     };
 
@@ -247,7 +280,10 @@ async fn main() -> std::io::Result<()> {
             None
         }
     };
-    let state = Arc::new(EngineState { neural });
+    let state = Arc::new(EngineState {
+        neural,
+        searcher: Mutex::new(search::Searcher::new()),
+    });
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)

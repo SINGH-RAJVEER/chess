@@ -1,11 +1,12 @@
 # DQN Computer Opponent
 
-The vs computer page supports two opponents:
+The vs computer page supports three opponents:
 
 - Minimax runs the existing depth-five material search.
+- Custom runs the built-in iterative-deepening alpha-beta engine (see docs/engine.md).
 - DQN runs the ONNX neural policy/value model with policy-guided tree search.
 
-The toggle is stored in browser local storage and is sent with every player move. If the DQN model cannot be loaded or inference fails, the engine logs the error and safely uses minimax for that move.
+The opponent is stored in browser local storage and is sent with every player move. If the DQN model cannot be loaded or inference fails, the engine logs the error and safely uses minimax for that move.
 
 The Rust engine exposes `POST /api/engine-move` through Axum on port `8080`. The endpoint accepts the current FEN and opponent selection, then returns the selected move in UCI notation.
 

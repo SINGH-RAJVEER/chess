@@ -57,8 +57,11 @@ session in memory but does not persist games.
 ### Engine: `apps/engine`
 
 - Rust service using Axum and `shakmaty`.
-- `POST /api/engine-move` accepts FEN plus `minimax` or `dqn` opponent choice.
+- `POST /api/engine-move` accepts FEN plus a `minimax`, `custom`, or `dqn`
+  opponent choice.
 - Minimax uses alpha-beta search at depth five and material evaluation.
+- Custom runs an iterative-deepening alpha-beta search with quiescence,
+  transposition table, and PeSTO evaluation (see docs/engine.md).
 - DQN loads the ONNX model once at startup and uses policy-guided tree search.
 - CUDA is attempted first; CPU is used when CUDA initialization fails.
 - DQN inference failure falls back to minimax for that request.

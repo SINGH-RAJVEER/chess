@@ -42,7 +42,7 @@ func TestValidationContracts(t *testing.T) {
 		{http.MethodPost, "/api/join-queue", `{}`, "playerId and timeControl are required"},
 		{http.MethodPost, "/api/auth/sign-up", `{}`, "Email, password, and name are required"},
 		{http.MethodPost, "/api/auth/sign-in", `{}`, "Email and password are required"},
-		{http.MethodPost, "/api/move", `{"from":52,"to":36,"gameId":1,"opponent":"unknown"}`, "opponent must be minimax or dqn"},
+		{http.MethodPost, "/api/move", `{"from":52,"to":36,"gameId":1,"opponent":"unknown"}`, "opponent must be minimax, custom, or dqn"},
 	}
 	handler := httpapi.NewHandler(nil, nil)
 	for _, test := range tests {

@@ -215,8 +215,8 @@ func (app *App) move(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "from, to, and gameId are required"})
 		return
 	}
-	if body.Opponent != "" && body.Opponent != "minimax" && body.Opponent != "dqn" {
-		writeJSON(w, 400, map[string]string{"error": "opponent must be minimax or dqn"})
+	if body.Opponent != "" && body.Opponent != "minimax" && body.Opponent != "custom" && body.Opponent != "dqn" {
+		writeJSON(w, 400, map[string]string{"error": "opponent must be minimax, custom, or dqn"})
 		return
 	}
 	result, err := app.service.MakeMove(r.Context(), *body.GameID, *body.From, *body.To, body.Promotion, body.Opponent)
