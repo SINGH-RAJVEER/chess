@@ -2,7 +2,7 @@
 
 ## Overview
 
-The repository is an Nx monorepo with four runtime or buildable areas:
+The repository is a Bun-workspace monorepo with four runtime or buildable areas:
 
 ```text
 Browser
@@ -15,19 +15,16 @@ Web client (React 19 + Vite, port 3000)
   v
 Go API (port 4000) ---- PostgreSQL (port 5432)
   |
-  | asynchronous POST /api/engine-move
+  | in-process CGO call into the Rust static library
   v
-Rust engine (Axum, port 8080)
-  |
-  | optional ONNX Runtime CUDA provider
-  v
-apps/dqn/model.onnx
+Engine library (minimax + custom alpha-beta, no network hop)
 ```
 
 The web application does not connect directly to PostgreSQL or the engine.
-The API owns game state, authentication, migrations, and calls to the engine.
-The engine is an internal stateless move-selection service. It keeps the ONNX
-session in memory but does not persist games.
+The API owns game state, authentication, migrations, and computer moves.
+The engine is linked into the API process as a static library; it keeps no
+persistent state between moves (a fresh searcher is constructed per call)
+and never touches the network or the database.
 
 ## Components
 
@@ -40,7 +37,7 @@ session in memory but does not persist games.
   preview. A production reverse proxy must provide equivalent routing.
 - The client polls the API once per second for active boards and matchmaking
   state; there is no WebSocket transport.
-- Shared request and domain types come from `packages/types`.
+- Shared request and domain types come from `libs/types`.
 
 ### Desktop client: `apps/desktop`
 
@@ -65,15 +62,15 @@ session in memory but does not persist games.
 
 ### Engine: `apps/engine`
 
-- Rust service using Axum and `shakmaty`.
-- `POST /api/engine-move` accepts FEN plus a `minimax`, `custom`, or `dqn`
-  opponent choice.
+- Rust library using `shakmaty`, linked into the Go API via CGO
+  (`apps/api/internal/engine`, C symbol `engine_best_move`).
+- Accepts a FEN plus a `minimax` or `custom` opponent choice; legacy `dqn`
+  requests map to `custom`.
 - Minimax uses alpha-beta search at depth five and material evaluation.
 - Custom runs an iterative-deepening alpha-beta search with quiescence,
   transposition table, and PeSTO evaluation (see docs/engine.md).
-- DQN loads the ONNX model once at startup and uses policy-guided tree search.
-- CUDA is attempted first; CPU is used when CUDA initialization fails.
-- DQN inference failure falls back to minimax for that request.
+- No HTTP server, no GPU dependency, no model files. A semaphore in the Go
+  wrapper bounds concurrent searches so computer games cannot starve the API.
 
 ### Training: `apps/dqn/training`
 
@@ -83,7 +80,7 @@ session in memory but does not persist games.
 - The Rust input and move encodings must remain aligned with `encode.py` and
   the training model.
 
-### Shared types: `packages/types`
+### Shared types: `libs/types`
 
 The package defines the TypeScript representation of colors, pieces, game
 statuses, modes, queue states, board responses, and API request/response
@@ -118,7 +115,7 @@ own runtime types and does not import this package.
    clock (`timeControl: 0`).
 2. The human move is committed by the API.
 3. If the game remains active and it is Black's turn, the API starts a
-   background engine request with the current position encoded as FEN.
+   background in-process engine call with the current position encoded as FEN.
 4. The engine returns UCI notation, such as `e7e5` or `e1g1`.
 5. The API validates and commits the engine move as a normal game mutation.
 6. The client discovers the move through polling.
@@ -130,11 +127,12 @@ own runtime types and does not import this package.
 - Game moves use row-level locking to serialize concurrent updates to one game.
 - Queue matching uses a table lock to prevent two matchers from consuming the
   same queue entry.
-- Engine calls are bounded by a 30-second Go HTTP client timeout. A failed or
-  malformed engine response is logged and leaves the game unchanged.
-- The engine's DQN path can fall back to minimax, but an unavailable engine
-  does not automatically recover a pending computer move; operators should
-  monitor engine availability and users may need to retry or reset a game.
+- Engine calls run in-process behind a semaphore sized to `NumCPU - 1`. A
+  saturated engine reports `engine busy`, which is logged and leaves the game
+  unchanged, exactly like a failed remote call used to.
+- An unavailable or panicking engine call does not automatically recover a
+  pending computer move; operators should monitor API logs and users may need
+  to retry or reset a game.
 - Polling is intentionally simple but creates repeated read traffic. A
   production deployment should size API and database capacity for the number
   of active games.

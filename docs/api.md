@@ -10,10 +10,10 @@ apps/api/
 ├── internal/auth/            # Email/password auth, sessions, cookies, and auth SQL
 ├── internal/config/          # Environment configuration and defaults
 ├── internal/database/        # PostgreSQL connection, runner, and embedded migrations
+├── internal/engine/          # CGO bridge to the Rust engine static library
 ├── internal/game/            # Chess rules, game services, queueing, and game SQL
 ├── internal/httpapi/         # Router, middleware, validation, and JSON handlers
-├── go.mod
-└── project.json
+└── go.mod
 ```
 
 The database is owned by this app. `internal/database` opens PostgreSQL and applies its embedded, ordered SQL migrations; auth and game queries remain close to their features. Nothing is exported as a shared monorepo database package.
@@ -23,10 +23,10 @@ The database is owned by this app. `internal/database` opens PostgreSQL and appl
 Run from the repository root:
 
 ```bash
-bunx nx run api:dev
-bunx nx run api:build
-bunx nx run api:test
-bunx nx run api:lint
+just api-dev
+just api-build
+just api-test
+just api-lint
 just api-migrate
 ```
 
@@ -40,12 +40,16 @@ CGO_ENABLED=0 go test ./...
 
 Set `AUTO_MIGRATE=true` to apply pending app-local migrations when the server starts. `devenv up` runs migrations explicitly before starting the API.
 
+Computer moves are computed in-process: `internal/engine` calls
+`engine_best_move` in the Rust static library (`apps/engine`, built by
+`just engine-lib`) over CGO. Builds require a C toolchain and
+`CGO_ENABLED=1`. Legacy `dqn` opponent values map to the custom engine.
+
 ## Configuration
 
 - `DATABASE_URL`: required PostgreSQL connection string
 - `HOST`: HTTP bind host, default `0.0.0.0`
 - `PORT`: HTTP port, default `4000`
-- `CHESS_ENGINE_URL`: engine base URL, default `http://127.0.0.1:8080`
 - `WEB_ORIGIN`: allowed credentialed browser origin, default `http://localhost:3000`
 - `BETTER_AUTH_SECRET`: session-cookie signing secret
 - `AUTH_BASE_URL`: public auth URL, default `http://localhost:4000/api/auth`
@@ -57,7 +61,7 @@ The process uses the repository's existing auth, game, queue, piece, and move ta
 
 ## API Compatibility
 
-The Go app implements health, board, legal move, game mutation, matchmaking, draw, resignation, and email/password session endpoints under `/api`. Computer moves use `POST {CHESS_ENGINE_URL}/api/engine-move` asynchronously. The frontend polls until the selected minimax, custom alpha-beta, or DQN move is persisted.
+The Go app implements health, board, legal move, game mutation, matchmaking, draw, resignation, and email/password session endpoints under `/api`. Computer moves are selected in-process by the linked Rust engine (minimax or custom alpha-beta) on a background goroutine. The frontend polls until the engine move is persisted.
 
 Both Vite development and preview proxy `/api` to `VITE_API_PROXY_TARGET`. Production deployments must provide the same routing when Vite is not serving the frontend.
 

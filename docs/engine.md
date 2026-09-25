@@ -1,8 +1,11 @@
-# Custom Alpha-Beta Engine
+# Classical Chess Engine
 
-The `custom` opponent is a self-contained classical chess engine inside the Rust
-engine service (`apps/engine/src/search.rs`, `apps/engine/src/eval.rs`). It
-requires no model files, no GPU, and no network access.
+The `custom` opponent is a self-contained classical chess engine
+(`apps/engine/src/search.rs`, `apps/engine/src/eval.rs`). It requires no
+model files, no GPU, and no network access. The same crate also provides the
+`minimax` opponent and is linked directly into the Go API as a static
+library (C symbol `engine_best_move` in `src/lib.rs`); there is no engine
+HTTP server.
 
 The design follows the published architecture of strong hobby engines
 (Berserk 12, Ethereal, Viridithas): a selective alpha-beta search over a
@@ -14,7 +17,9 @@ tapered handcrafted evaluation.
   blended by game phase (non-pawn material of both sides, 24 = pure
   middlegame, 0 = bare endgame).
 - Passed pawns scored by relative rank (midgame and endgame tables).
-- Doubled and isolated pawn penalties.
+- Doubled and isolated pawn penalties. These pawn-structure terms are cached
+  in an 8K-entry pawn hash table keyed by a pawn-only Zobrist hash, so
+  non-pawn moves reuse the previous score instead of recomputing it.
 - Bishop pair bonus.
 - Rook bonuses for open and semi-open files.
 - Mobility: attack counts for knights, bishops, rooks, and queens into squares
@@ -23,7 +28,8 @@ tapered handcrafted evaluation.
 - Flat tempo bonus (20 cp) added after tapering from the side to move's
   perspective.
 - Per-file bitboards and passed-pawn masks are precomputed once (OnceLock
-  tables); evaluation runs in roughly 250 nanoseconds per position.
+  tables); evaluation runs in roughly 170 nanoseconds per position with a
+  warm pawn cache.
 
 ## Search
 
@@ -63,10 +69,15 @@ unpruned search — strength must be judged by play quality, not raw depth.
 
 ## API Integration
 
-`POST /api/engine-move` accepts `"opponent": "custom"` alongside `minimax`
-and `dqn`. The response's `engine` field is `custom`, and its
-`execution_provider` field carries a diagnostic string with reached depth,
-search score in centipawns, and node count instead of an ONNX provider name.
+The Go API calls `engine_best_move(fen, opponent, ...)` in-process through
+`apps/api/internal/engine` (CGO). The opponent selector is `0` for minimax
+(depth five, time budgets ignored) or `1` for custom; the Go bridge maps
+legacy `dqn` requests to custom. A `0` movetime or depth selects the
+`ENGINE_CUSTOM_MOVETIME_MS` / `ENGINE_CUSTOM_MAX_DEPTH` defaults. The call
+writes the best move as UCI text into the caller buffer and optionally
+returns `engine=custom depth .. score .. .. nodes` diagnostics. A fresh
+`Searcher` is constructed per call, so concurrent games never share mutable
+search state; a Go-side semaphore bounds parallel searches.
 
 ## Configuration
 
@@ -79,7 +90,7 @@ Optional environment variables loaded from the root `.env`:
 ## Verification
 
 ```bash
-bunx nx run engine:test
+just engine-test
 ```
 
 Tests cover evaluation symmetry and each positional term (passed pawns,
@@ -97,15 +108,50 @@ cargo test bench_middlegame --release -- --nocapture --ignored
 cargo test bench_eval --release -- --nocapture --ignored
 ```
 
-For rigorous strength measurement, self-play SPRT testing with fastchess or
-OpenBench and a varied opening book is the recommended next step; tactical
-suites alone cannot prove Elo gains.
+## Strength Measurement (SPRT)
+
+Tactical suites cannot prove Elo gains. Self-play SPRT against the previous
+revision is the required check before claiming a strength improvement.
+
+The engine speaks UCI in two forms. `chess --uci` (see `src/uci.rs`) is the
+full frontend for match runners such as fastchess or cutechess: worker-thread
+search with `stop`/`ponderhit`, streaming `info`, node limits, and time
+management. `src/bin/uci.rs` is a minimal driver kept deliberately small so
+it also compiles against old revisions, where the newer search APIs do not
+exist yet; the `just sprt-baseline` recipe overlays it onto a baseline
+checkout to build a cross-revision opponent without patching old code.
+
+`src/bin/sprt.rs` is a concurrent SPRT referee. It plays opening pairs from
+`book/openings.book` (24 balanced lines, each with colors swapped) at fixed
+movetime, adjudicates mates, stalemates, threefold repetition, the
+fifty-move rule, insufficient material, resigns, and overruns, then runs a
+trinomial Wald SPRT on game scores and prints `PASSED`, `FAILED`, or
+`INCONCLUSIVE` with an Elo estimate.
+
+Compare two ready-made binaries (positional arguments after `--`):
+
+```bash
+just sprt -- --engine-a ./apps/engine/target/release/uci \
+    --engine-b /tmp/chess-baseline/uci \
+    --book apps/engine/book/openings.book \
+    --movetime 100 --elo0 0 --elo1 10 --max-games 5000 --concurrency 8
+```
+
+Compare the working copy against a baseline revision in one command
+(arguments are positional):
+
+```bash
+just sprt-baseline bcfa3bba9059 100 0 10 0.05 0.05 5000 8
+```
+
+`just sprt-baseline` exits 0 only when the match log contains `sprt:
+PASSED`. Long matches print progress every 10 games; the full transcript
+goes to `sprt-<baseline>.log` in the repo root.
 
 ## Future Work
 
 - Texel tuning of the evaluation weights against self-play game results.
 - Singular extensions, probcut, and capture history.
-- A pawn-hash table caching pawn-structure terms.
 - Phase 4 (optional): efficiently updatable NNUE evaluation trained on
   self-play data. The seam is already isolated: `eval::evaluate` is the only
   function the search calls for static evaluation.

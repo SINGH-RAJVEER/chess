@@ -10,10 +10,9 @@ message and operators should treat unexpected 500 responses as actionable.
 ### `GET /api/health`
 
 Returns `{"ok":true}` when the API process is serving. This endpoint does not
-verify PostgreSQL or engine reachability at request time.
-
-The engine separately exposes `GET /api/health`, which includes `ok`,
-`dqn_available`, and `execution_provider`.
+verify PostgreSQL reachability at request time. Computer moves are served
+in-process by the linked Rust engine; there is no separate engine service or
+engine health endpoint.
 
 ## Board and Moves
 
@@ -45,13 +44,14 @@ Request:
     "from": 52,
     "to": 36,
     "promotion": "Queen",
-    "opponent": "dqn"
+    "opponent": "custom"
 }
 ```
 
 `promotion` is optional and may be `Queen`, `Rook`, `Bishop`, or `Knight`.
-`opponent` is optional and may be `minimax`, `custom`, or `dqn`; it is used for computer
-games. The API validates the position and move server-side.
+`opponent` is optional and may be `minimax` or `custom`; legacy `dqn` values
+are accepted and play as `custom`. It is used for computer games. The API
+validates the position and move server-side.
 
 Response fields include `success`, `nextTurn`, `status`, `captured`, `isCheck`,
 `isCheckmate`, and `isCastle`, with `promotion` when applicable.
@@ -135,23 +135,14 @@ Google authorization URL. Google redirects to
 `WEB_ORIGIN`. Configure `${AUTH_BASE_URL}/callback/google` in the Google OAuth
 client.
 
-## Engine API
+## Engine Selection
 
-The engine is an internal service and should not be publicly exposed.
+Computer moves are computed in-process by the Rust engine static library
+(`apps/engine`, bridged through `apps/api/internal/engine`); there is no
+engine HTTP service.
 
-### `POST /api/engine-move`
-
-Request:
-
-```json
-{
-    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-    "opponent": "minimax"
-}
-```
-
-The response contains `best_move` in UCI notation, `engine`, and optional
-`execution_provider`. Invalid FEN or positions return 400. For the custom
-opponent, `execution_provider` carries reached depth, score, and node count
-instead of an ONNX provider name. A DQN inference failure reports
-`minimax_fallback` and returns the fallback move.
+The Go bridge accepts a FEN plus `minimax` or `custom` (legacy `dqn` maps to
+`custom`), selects the move, and returns UCI notation such as `e7e5`. Invalid
+or illegal positions surface as engine errors and leave the game unchanged.
+For the custom opponent, the API log records reached depth, score, and node
+count as diagnostics.

@@ -13,7 +13,7 @@ The desktop application is a native shell around the web application built with 
 ## Modes
 
 - Development (`tauri dev`): the window loads `http://localhost:3000`, so the Vite dev server, its `/api` proxy to the Go API, and hot reload all work exactly as in the browser. The web dev server must already be running.
-- Production (`tauri build`): Vite builds `apps/web/dist` first (the Nx `build` target depends on `web:build`), and Tauri embeds those static assets into the binary.
+- Production (`tauri build`): build `apps/web/dist` first with `just web-build`, and Tauri embeds those static assets into the binary.
 
 ## API access
 
@@ -32,9 +32,7 @@ just desktop-format  # rustfmt
 just desktop-clean   # remove target/
 ```
 
-The `desktop-*` recipes run through `devenv shell` automatically, so they work from any shell with the system libraries present.
-
-Nx equivalents are `bunx nx run desktop:<target>`, but those require the devenv environment when they invoke Cargo; plain `cargo`/`bunx tauri` invocations outside the devenv shell fail at `pkg-config` with missing `dbus-1` or WebKitGTK.
+The `desktop-*` recipes run through `devenv shell` automatically, so they work from any shell with the system libraries present. Plain `cargo`/`bunx tauri` invocations outside the devenv shell fail at `pkg-config` with missing `dbus-1` or WebKitGTK.
 
 ## System dependencies
 

@@ -6,9 +6,11 @@
   value.
 - The API is the trust boundary for game rules and authentication.
 - PostgreSQL is private infrastructure and must not be browser-accessible.
-- The engine accepts FEN and opponent values from the API and should be private;
-  its current CORS policy allows any origin.
-- The ONNX model and training checkpoints are release artifacts, not secrets.
+- The engine is a static library linked into the API process: it accepts FEN
+  and opponent values only across the in-process CGO boundary and is never
+  reachable over the network, so it needs no CORS policy or firewall rule.
+- The retired ONNX model and training checkpoints are inert research
+  artifacts, not secrets.
 
 ## Implemented Controls
 
@@ -30,7 +32,8 @@ Before exposing the application publicly:
   acceptable outside local development.
 - Use HTTPS for the web, API, and OAuth callback, and set exact production
   `WEB_ORIGIN` and `AUTH_BASE_URL` values.
-- Keep PostgreSQL and the engine on private networks with firewall rules.
+- Keep PostgreSQL on a private network with firewall rules. The engine needs
+  no network rule: it runs inside the API process.
 - Store OAuth credentials and database credentials in a secret manager.
 - Add TLS, request limits, rate limiting, abuse detection, and centralized
   audit logging at the edge or service layer.
@@ -47,8 +50,7 @@ the API must enforce authorization independently. Treat this as a release
 blocker for a public deployment.
 
 The API CORS middleware allows wildcard origins when no configured origin is
-provided, while the engine permits any origin. Set explicit origins and place
-the engine behind a private network or authenticated internal channel.
+provided. Set an explicit origin before treating the API as internet-facing.
 
 The API has no built-in rate limiting, CSRF token, account lockout, password
 reset, email verification workflow, or security event audit trail. Add these

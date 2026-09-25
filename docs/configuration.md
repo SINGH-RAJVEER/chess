@@ -12,7 +12,6 @@ the web build output.
 | `DATABASE_URL` | Yes | None | PostgreSQL connection string. The API fails startup when absent or unreachable. |
 | `HOST` | No | `0.0.0.0` | API bind host. |
 | `PORT` | No | `4000` | API listen port. |
-| `CHESS_ENGINE_URL` | No | `http://127.0.0.1:8080` | Base URL used for asynchronous engine requests. |
 | `WEB_ORIGIN` | No | `http://localhost:3000` | Credentialed browser origin allowed by API CORS and OAuth callback validation. |
 | `BETTER_AUTH_SECRET` | No | `default-secret-change-me` | HMAC secret used to sign the session cookie. Replace in every non-local environment. |
 | `AUTH_BASE_URL` | No | `http://localhost:4000/api/auth` | Public API auth base URL and Google OAuth redirect base. |
@@ -22,17 +21,21 @@ the web build output.
 
 ## Engine Variables
 
+Computer moves are served in-process by the API through the Rust static
+library, so there is no engine host, port, or model path to configure.
+
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `ENGINE_HOST` | No | `0.0.0.0` | Engine bind host. |
-| `ENGINE_PORT` | No | `8080` | Engine listen port. |
-| `CHESS_MODEL_PATH` | No | `apps/dqn/model.onnx` | ONNX model path. Relative paths are resolved from the engine process working directory. |
-| `DQN_SIMULATIONS` | No | `20000` | Maximum policy-guided simulations for one DQN move. |
-| `DQN_MOVE_TIME_MS` | No | `500000` | Maximum DQN search duration in milliseconds. |
+| `ENGINE_CUSTOM_MOVETIME_MS` | No | `1000` | Time budget per custom-engine move in milliseconds. |
+| `ENGINE_CUSTOM_MAX_DEPTH` | No | `64` | Maximum custom-engine search depth. |
 
-The engine attempts CUDA and falls back to CPU. `DQN_SIMULATIONS` and
-`DQN_MOVE_TIME_MS` can make DQN requests expensive; set deployment-specific
-limits rather than accepting the development defaults without measurement.
+Longer `ENGINE_CUSTOM_MOVETIME_MS` values make computer moves stronger but
+hold a search slot longer; size deployment CPU for the number of concurrent
+computer games rather than accepting the development defaults without
+measurement. The DQN variables (`CHESS_MODEL_PATH`, `DQN_SIMULATIONS`,
+`DQN_MOVE_TIME_MS`) and `CHESS_ENGINE_URL` were removed with the standalone
+engine server; the training code in `apps/dqn/training` is retained for
+research but no longer serves traffic.
 
 ## Web Variables
 
@@ -51,9 +54,7 @@ DATABASE_URL=postgres://postgres@localhost:5432/chess
 WEB_ORIGIN=http://localhost:3000
 AUTH_BASE_URL=http://localhost:4000/api/auth
 VITE_API_PROXY_TARGET=http://127.0.0.1:4000
-CHESS_ENGINE_URL=http://127.0.0.1:8080
 ```
 
 For production, use HTTPS URLs, a generated high-entropy
-`BETTER_AUTH_SECRET`, a managed PostgreSQL connection string, and a private
-engine address.
+`BETTER_AUTH_SECRET`, and a managed PostgreSQL connection string.

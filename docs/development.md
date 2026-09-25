@@ -33,14 +33,15 @@ The recommended local path is:
 just dev
 ```
 
-This runs `devenv up`, which provides PostgreSQL and starts the web, API, and
-engine processes. The local service ports are:
+This runs `devenv up`, which provides PostgreSQL and starts the web and API
+processes. Computer moves are served in-process by the API through the Rust
+engine static library (built automatically before the API starts), so there
+is no separate engine process. The local service ports are:
 
 | Service | Address |
 | --- | --- |
 | Web | `http://localhost:3000` |
 | API | `http://localhost:4000` |
-| Engine | `http://localhost:8080` |
 | PostgreSQL | `localhost:5432` |
 
 The API process can apply migrations before serving when `AUTO_MIGRATE=true`.
@@ -55,11 +56,14 @@ Do not run `just dev` with `sudo`; PostgreSQL refuses to run as root.
 ## Run Services Separately
 
 ```bash
-bunx nx run web:dev
-bunx nx run api:dev
-bunx nx run engine:dev
-bunx nx run desktop:dev
+just web-dev
+just api-dev
+just engine-dev     # UCI probe on stdin, not a server
+just desktop-dev
 ```
+
+API recipes build the engine static library first and require a C toolchain
+(`gcc` is provided by the devenv shell) with `CGO_ENABLED=1`.
 
 The web server proxies `/api` to `http://127.0.0.1:4000` by default. Set
 `VITE_API_PROXY_TARGET` in the root `.env` to point to another API during local
@@ -71,7 +75,8 @@ The desktop target opens a native Tauri window that loads the web dev server at
 
 ## Checks and Builds
 
-Run the repository-wide Nx targets from the root:
+Run the repository-wide targets from the root (implemented as
+direct `bun`, `go`, and `cargo` invocations via `package.json` and `just`):
 
 ```bash
 bun run build
@@ -85,35 +90,30 @@ bun run format
 Useful focused targets include:
 
 ```bash
-bunx nx run api:test
-bunx nx run engine:test
-bunx nx run web:typecheck
-bunx nx run api:migrate
+just api-test
+just engine-test
+just web-typecheck
+just api-migrate
 ```
 
-The API build is a CGO-free Go binary. The engine release build is produced by
-Cargo. The web production output is written to `apps/web/dist`, which the
+The API build is a CGO-enabled Go binary linked against the Rust engine
+static library (`just engine-lib` builds `apps/engine/target/release/libchess.a`
+first). The web production output is written to `apps/web/dist`, which the
 desktop release build embeds into the native binary.
 
-## Training the Computer Opponent
+## Computer Opponent Training (Retired)
+
+The DQN opponent was removed when the standalone engine server was replaced
+by the in-process library: only minimax and the custom alpha-beta engine
+serve traffic. The Python training pipeline in `apps/dqn/training` and the
+exported `apps/dqn/model.onnx` are retained for research but are no longer
+loaded at runtime.
+
+Validate the engine after changing search or evaluation:
 
 ```bash
-cd apps/dqn/training
-uv sync
-uv run python train.py --device cpu
-```
-
-For CUDA-enabled PyTorch, install the matching wheel as described in
-`apps/dqn/training/train.py`. The convenience script `train.sh` also discovers
-the NixOS NVIDIA driver library path before invoking `uv`.
-
-The final training export is `apps/dqn/model.onnx`, which the Rust engine loads
-at startup. Validate the engine after replacing the model:
-
-```bash
-bunx nx run engine:test
-bunx nx run engine:dev
-curl http://127.0.0.1:8080/api/health
+just engine-test
+just api-test
 ```
 
 ## Development Workflow
