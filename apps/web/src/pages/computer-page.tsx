@@ -26,7 +26,9 @@ export default function ComputerPage() {
 	const [promotionState, setPromotionState] = useState<PromotionState | null>(null);
 	const [opponent, setOpponent] = useState<ComputerOpponent>(() => {
 		const stored = localStorage.getItem("chess_computer_opponent");
-		return stored === "dqn" || stored === "custom" ? stored : "minimax";
+		// Legacy "dqn" selections map to the custom engine, which is the
+		// strongest remaining opponent.
+		return stored === "custom" || stored === "dqn" ? "custom" : "minimax";
 	});
 	const prevMoveCountRef = useRef(0);
 

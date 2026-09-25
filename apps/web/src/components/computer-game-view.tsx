@@ -109,7 +109,7 @@ export default function ComputerGameView({
 					)}
 
 					<PlayerCard
-						label={opponent === "dqn" ? "DQN" : opponent === "custom" ? "Alpha-beta" : "Minimax"}
+						label={opponent === "custom" ? "Alpha-beta" : "Minimax"}
 						color="Black"
 						time={formatGameTime(blackTime, hasClock)}
 						isActive={turn === "Black"}
@@ -165,7 +165,6 @@ export default function ComputerGameView({
 								[
 									["minimax", "Minimax"],
 									["custom", "Alpha-beta"],
-									["dqn", "DQN"],
 								] as const
 							).map(([value, label]) => (
 								<button
@@ -184,11 +183,9 @@ export default function ComputerGameView({
 							))}
 						</div>
 						<p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-							{opponent === "dqn"
-								? "Neural policy search. Uses NVIDIA CUDA when available."
-								: opponent === "custom"
-									? "Iterative-deepening alpha-beta search with quiescence and a transposition table."
-									: "Classic depth-five minimax search."}
+							{opponent === "custom"
+								? "Iterative-deepening alpha-beta search with quiescence and a transposition table."
+								: "Classic depth-five minimax search."}
 						</p>
 					</div>
 					<MoveHistory moves={boardData?.moves ?? []} />
