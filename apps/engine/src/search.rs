@@ -6,6 +6,8 @@
 //! counter-moves, then quiet moves scored by main history plus one-ply and
 //! two-ply continuation history.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use arrayvec::ArrayVec;
@@ -24,6 +26,21 @@ pub const MATE_SCORE: i32 = 30_000;
 const MATE_BOUND: i32 = MATE_SCORE - 256;
 const INF: i32 = MATE_SCORE + 1;
 const TT_MB: usize = 64;
+
+/// Reports whether a search score represents a proven mate distance.
+pub fn is_mate_score(score: i32) -> bool {
+    score.abs() >= MATE_BOUND
+}
+
+/// Converts a mate score into plies-to-mate from the root, signed by outcome.
+pub fn mate_in_plies(score: i32) -> i32 {
+    let plies = MATE_SCORE - score.abs();
+    if score > 0 {
+        plies
+    } else {
+        -plies
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Bound {
@@ -60,6 +77,15 @@ pub struct SearchResult {
     pub score: i32,
     pub depth: i32,
     pub nodes: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct IterationInfo {
+    pub depth: i32,
+    pub score: i32,
+    pub nodes: u64,
+    pub elapsed: Duration,
+    pub pv: Vec<Move>,
 }
 
 fn material_value(role: Role) -> i32 {
@@ -123,8 +149,10 @@ pub struct Searcher {
     move_stack: [Option<Move>; MAX_PLY],
     lmr: [[i32; MAX_PLY]; MAX_PLY],
     nodes: u64,
+    node_limit: Option<u64>,
     deadline: Instant,
     aborted: bool,
+    stop_flag: Arc<AtomicBool>,
     root_best: Option<Move>,
 }
 
@@ -260,10 +288,28 @@ impl Searcher {
             move_stack: [None; MAX_PLY],
             lmr,
             nodes: 0,
+            node_limit: None,
             deadline: Instant::now(),
             aborted: false,
+            stop_flag: Arc::new(AtomicBool::new(false)),
             root_best: None,
         }
+    }
+
+    /// Installs a fresh external stop flag, replacing the previous one.
+    pub fn set_stop_flag(&mut self, flag: Arc<AtomicBool>) {
+        self.stop_flag = flag;
+    }
+
+    /// Sets an optional node budget; the next search aborts once reached.
+    pub fn set_node_limit(&mut self, limit: Option<u64>) {
+        self.node_limit = limit;
+    }
+
+    /// Resizes the transposition table, discarding its contents.
+    pub fn set_hash_mb(&mut self, mb: usize) {
+        let entries = (mb.clamp(1, 1024) * 1024 * 1024 / size_of::<TtEntry>()).next_power_of_two();
+        self.tt = vec![TtEntry::default(); entries.max(16)];
     }
 
     /// Clears the transposition table, killers, and all history tables.
@@ -285,8 +331,24 @@ impl Searcher {
     /// Returns the best move from the last completed iteration; root moves
     /// that completed and improved before an abort still count.
     pub fn search(&mut self, pos: &Chess, movetime: Duration, max_depth: i32) -> SearchResult {
-        self.deadline = Instant::now() + movetime;
+        self.search_with_reporter(pos, movetime, max_depth, |_| {})
+    }
+
+    /// Searches `pos` with an iteration reporter callback invoked after each completed depth.
+    pub fn search_with_reporter<F>(
+        &mut self,
+        pos: &Chess,
+        movetime: Duration,
+        max_depth: i32,
+        mut on_iter: F,
+    ) -> SearchResult
+    where
+        F: FnMut(&IterationInfo),
+    {
+        let start_time = Instant::now();
+        self.deadline = start_time + movetime;
         self.aborted = false;
+        self.stop_flag.store(false, Ordering::Relaxed);
         self.nodes = 0;
         self.root_best = None;
         self.killers = [[None; 2]; MAX_PLY];
@@ -332,7 +394,20 @@ impl Searcher {
                 }
             }
 
-            if self.aborted || result.score.abs() >= MATE_BOUND {
+            if self.aborted {
+                break;
+            }
+
+            let pv = self.collect_pv(pos);
+            on_iter(&IterationInfo {
+                depth,
+                score: result.score,
+                nodes: self.nodes,
+                elapsed: start_time.elapsed(),
+                pv,
+            });
+
+            if result.score.abs() >= MATE_BOUND {
                 break;
             }
         }
@@ -342,8 +417,49 @@ impl Searcher {
         result
     }
 
+    /// Extracts principal variation by following transposition table best moves.
+    pub fn collect_pv(&self, pos: &Chess) -> Vec<Move> {
+        let mut pv = Vec::new();
+        let mut cur = pos.clone();
+        let mut hashes: ArrayVec<u64, MAX_PLY> = ArrayVec::new();
+        hashes.push(position_hash(pos));
+
+        for _ in 0..MAX_PLY {
+            let hash = *hashes.last().unwrap();
+            let entry = &self.tt[self.tt_index(hash)];
+            if entry.key != hash {
+                break;
+            }
+            let Some(mv) = entry.best else {
+                break;
+            };
+            if !cur.legal_moves().contains(&mv) {
+                break;
+            }
+            cur.play_unchecked(mv);
+            pv.push(mv);
+            if cur.is_game_over() {
+                break;
+            }
+            let next_hash = position_hash(&cur);
+            if hashes.contains(&next_hash) {
+                break;
+            }
+            hashes.push(next_hash);
+        }
+        pv
+    }
+
     fn check_time(&mut self) {
-        if self.nodes & 2047 == 0 && Instant::now() >= self.deadline {
+        if let Some(limit) = self.node_limit {
+            if self.nodes >= limit {
+                self.aborted = true;
+                return;
+            }
+        }
+        if self.nodes & 2047 == 0
+            && (Instant::now() >= self.deadline || self.stop_flag.load(Ordering::Relaxed))
+        {
             self.aborted = true;
         }
     }

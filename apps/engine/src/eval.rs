@@ -676,10 +676,7 @@ mod tests {
             pawn_key(pos("8/8/8/8/4p3/4P3/8/K6k w - - 0 1").board()),
             pawn_key(pos("8/8/8/8/8/8/5PP1/K6k w - - 0 1").board()),
             // Same pawns with pieces added must hash identically.
-            pawn_key(
-                pos("rnbqkbnr/8/8/4p3/4P3/8/8/R3K2R w KQkq - 0 1")
-                    .board(),
-            ),
+            pawn_key(pos("rnbqkbnr/8/8/4p3/4P3/8/8/R3K2R w KQkq - 0 1").board()),
         ];
         let mirrored = pos("8/8/8/4p3/4P3/8/8/K6k w - - 0 1");
         let white_e4_black_e5 = mirrored.board();
@@ -688,9 +685,7 @@ mod tests {
         assert_ne!(keys[0], keys[2], "different pawn files must differ");
         assert_eq!(
             pawn_key(white_e4_black_e5),
-            pawn_key(
-                pos("rnbqkbnr/8/8/4p3/4P3/8/8/R3K2R w KQkq - 0 1").board()
-            ),
+            pawn_key(pos("rnbqkbnr/8/8/4p3/4P3/8/8/R3K2R w KQkq - 0 1").board()),
             "non-pawn pieces must not affect the pawn hash"
         );
     }
