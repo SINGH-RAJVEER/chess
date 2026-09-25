@@ -1,4 +1,11 @@
-FROM oven/bun:1
+# Build with podman from the repository root:
+#   podman build -f apps/web/Dockerfile -t chess-web .
+#
+# Run on the same podman network as the API so the default
+# VITE_API_PROXY_TARGET=http://api:4000 resolves (see docs/docker.md).
+# Override it at runtime with -e VITE_API_PROXY_TARGET=<api-url> when the
+# API container has a different name or address.
+FROM docker.io/oven/bun:1
 WORKDIR /app
 COPY package.json bun.lock biome.json ./
 COPY libs/types/package.json libs/types/package.json

@@ -25,6 +25,10 @@ in
 {
   packages = with pkgs; [
     bun
+    # Node.js runs the Expo CLI and Metro bundler for apps/mobile.
+    # They crash under the Bun runtime, so plain `bun run dev` is not
+    # enough there; use the mobile-* just recipes inside this shell.
+    nodejs
     go
     gcc
     postgresql_16
@@ -35,6 +39,12 @@ in
     rustfmt
     pkg-config
     openssl
+    # Container CLI for building and running the deployment images.
+    # Rootless podman also needs subuid/subgid ranges for this user, which
+    # NixOS provides via users.users.<name>.subUidRanges/subGidRanges.
+    podman
+    netavark
+    aardvark-dns
     nil
     nixd
   ] ++ lib.optionals pkgs.stdenv.isLinux (with pkgs; [

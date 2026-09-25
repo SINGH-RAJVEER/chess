@@ -2,25 +2,20 @@
 
 ## Overview
 
-The repository is a Bun-workspace monorepo with four runtime or buildable areas:
+The repository is a Bun-workspace monorepo with five runtime or buildable areas:
 
 ```text
-Browser
-  |
-  | same-origin /api requests
-  v
-Web client (React 19 + Vite, port 3000)
-  |
-  | HTTP
-  v
-Go API (port 4000) ---- PostgreSQL (port 5432)
+Web client (React 19 + Vite, port 3000) ──┐ same-origin /api
+                                          ├─> Go API (port 4000) ---- PostgreSQL (port 5432)
+Mobile client (Expo, iOS + Android) ──────┘ API over LAN (EXPO_PUBLIC_API_URL)
+```
   |
   | in-process CGO call into the Rust static library
   v
 Engine library (minimax + custom alpha-beta, no network hop)
 ```
 
-The web application does not connect directly to PostgreSQL or the engine.
+Neither client connects directly to PostgreSQL or the engine.
 The API owns game state, authentication, migrations, and computer moves.
 The engine is linked into the API process as a static library; it keeps no
 persistent state between moves (a fresh searcher is constructed per call)
@@ -38,6 +33,15 @@ and never touches the network or the database.
 - The client polls the API once per second for active boards and matchmaking
   state; there is no WebSocket transport.
 - Shared request and domain types come from `libs/types`.
+
+### Mobile client: `apps/mobile`
+
+- Expo (SDK 57) iOS and Android app with sign in, local, computer, and
+  online games against the same Go API.
+- Authenticates with the raw session token from sign-in, stored in
+  SecureStore and sent as a cookie header, instead of relying on platform
+  cookie jars.
+- See [mobile.md](mobile.md) for setup, commands, and monorepo notes.
 
 ### Desktop client: `apps/desktop`
 

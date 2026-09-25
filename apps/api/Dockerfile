@@ -1,17 +1,17 @@
-# Build context is the repository root:
-#   docker build -f apps/api/Dockerfile .
+# Build with podman from the repository root:
+#   podman build -f apps/api/Dockerfile -t chess-api .
 #
 # The API serves computer moves in-process through the Rust engine static
 # library, so the image builds the cdylib first and then the CGO-enabled Go
 # binary. No standalone engine service is needed at runtime.
 
-FROM rust:1.97-slim-trixie AS engine-builder
+FROM docker.io/library/rust:1.97-slim-trixie AS engine-builder
 WORKDIR /build
 COPY apps/engine/Cargo.toml apps/engine/Cargo.lock ./
 COPY apps/engine/src ./src
 RUN cargo build --release --lib
 
-FROM golang:1.26-trixie AS api-builder
+FROM docker.io/library/golang:1.26-trixie AS api-builder
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends gcc \
 	&& rm -rf /var/lib/apt/lists/*
@@ -23,7 +23,7 @@ COPY --from=engine-builder /build/target/release/libchess.a ./apps/engine/target
 WORKDIR /build/apps/api
 RUN CGO_ENABLED=1 go build -o /out/api ./cmd/api
 
-FROM debian:trixie-slim
+FROM docker.io/library/debian:trixie-slim
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends ca-certificates \
 	&& rm -rf /var/lib/apt/lists/*

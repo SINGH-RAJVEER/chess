@@ -5,6 +5,7 @@ Chess is a full-stack chess application with local games, online matchmaking, au
 ## What Is Included
 
 - `apps/web`: React and Vite browser application.
+- `apps/mobile`: Expo iOS and Android app with the same playable core.
 - `apps/desktop`: Tauri desktop shell around the web application.
 - `apps/api`: Go HTTP API for authentication, game state, matchmaking, clocks, migrations, and engine orchestration.
 - `apps/engine`: Rust engine library (minimax + custom alpha-beta) linked into the API.
@@ -71,7 +72,7 @@ The detailed documentation is split by audience and concern:
 - [Operations](docs/operations.md): release, deployment, health, and incidents.
 - [Security](docs/security.md): authentication, trust boundaries, and hardening.
 - [API implementation notes](docs/api.md): Go API structure and compatibility details.
-- [Computer opponent notes](docs/dqn.md): DQN inference, GPU fallback, and model training.
+- [Computer opponent notes](docs/dqn.md): retired DQN opponent and model training.
 - [Desktop](docs/desktop.md): Tauri desktop shell, build modes, and system dependencies.
 
-Production deployment guidance and known implementation gaps are documented in the operations and security guides. The repository does not include a reverse proxy, container image, deployment manifest, backup system, or monitoring stack.
+Production deployment guidance and known implementation gaps are documented in the operations and security guides. Podman-ready Dockerfiles live next to each app (see [Docker deployment](docs/docker.md)). The repository does not include a reverse proxy, deployment manifest, backup system, or monitoring stack.

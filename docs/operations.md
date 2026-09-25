@@ -9,9 +9,10 @@ API through the linked Rust engine library; there is no engine network service
 to isolate or scale separately. The API should be the only service allowed to
 reach PostgreSQL.
 
-The repository does not include a container image, deployment manifest,
-reverse-proxy configuration, or process supervisor. Choose and document those
-parts in the deployment environment.
+Podman-ready Dockerfiles ship with each app (see docker.md). The repository
+does not include a deployment manifest, reverse-proxy configuration, or
+process supervisor. Choose and document those parts in the deployment
+environment.
 
 ## Release Sequence
 
