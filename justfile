@@ -12,7 +12,7 @@ install:
 lockfile:
     bun run lockfile:generate
 
-# Start PostgreSQL, web, api, and engine via devenv
+# Start PostgreSQL, web, and api via devenv (the API serves computer moves in-process)
 dev:
     #!/usr/bin/env bash
     set -e
@@ -57,55 +57,79 @@ clean:
 
 # Start only the web app
 web-dev:
-    bunx nx run web:dev
+    cd apps/web && exec bun run dev
 
 # Build the web app
 web-build:
-    bunx nx run web:build
+    cd apps/web && bun run build
 
 # Preview the web production build
 web-preview:
-    bunx nx run web:preview
+    cd apps/web && bun run preview
 
 # Start the web production server
 web-start:
-    bunx nx run web:start
+    cd apps/web && bun run start
 
 # Lint the web app
 web-lint:
-    bunx nx run web:lint
+    cd apps/web && bun run lint
 
 # Format the web app
 web-format:
-    bunx nx run web:format
+    cd apps/web && bun run format
 
 # Run Biome checks for the web app
 web-check:
-    bunx nx run web:check
+    cd apps/web && bun run check
 
 # Typecheck the web app
 web-typecheck:
-    bunx nx run web:typecheck
+    cd apps/web && bun run typecheck
 
 # Clean web build output
 web-clean:
-    bunx nx run web:clean
+    cd apps/web && bun run clean
 
-# Start the API
-api-dev:
-    bunx nx run api:dev
+# Lint the shared types package
+types-lint:
+    cd libs/types && bun run lint
 
-# Build the API
-api-build:
-    bunx nx run api:build
+# Format the shared types package
+types-format:
+    cd libs/types && bun run format
+
+# Run Biome checks for the shared types package
+types-check:
+    cd libs/types && bun run check
+
+# Start the API in the devenv shell (builds the engine static library first)
+api-dev: engine-lib
+    devenv shell -- bash -c 'cd apps/api && AUTO_MIGRATE=true CGO_ENABLED=1 go run ./cmd/api'
+
+# Build the API in the devenv shell (builds the engine static library first)
+api-build: engine-lib
+    devenv shell -- bash -c 'cd apps/api && mkdir -p dist && CGO_ENABLED=1 go build -o dist/api ./cmd/api'
 
 # Start the built API
 api-start:
-    bunx nx run api:start
+    cd apps/api && AUTO_MIGRATE=true CGO_ENABLED=1 ./dist/api
 
-# Test the API
-api-test:
-    bunx nx run api:test
+# Test the API (builds the engine static library first; needs a C toolchain)
+api-test: engine-lib
+    devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go test ./...'
+
+# Vet the API (builds the engine static library first; needs a C toolchain)
+api-lint: engine-lib
+    devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go vet ./...'
+
+# Format the API
+api-format:
+    cd apps/api && gofmt -w ./cmd ./internal
+
+# Check the API (format, tests, vet; builds the engine static library first)
+api-check: engine-lib
+    cd apps/api && test -z "$(gofmt -l ./cmd ./internal)" && devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go test ./... && CGO_ENABLED=1 go vet ./...'
 
 # Apply the API's app-local migrations
 api-migrate: database-start
@@ -117,7 +141,7 @@ api-migrate: database-start
       set +a
     fi
     cd apps/api
-    CGO_ENABLED=0 go run ./cmd/api -migrate
+    CGO_ENABLED=1 go run ./cmd/api -migrate
 
 # Ensure PostgreSQL is running (init cluster on first run)
 database-start:
@@ -174,62 +198,119 @@ database-stop:
       pg_ctl stop -D "$PGDATA" -m fast
     fi
 
-# Start only the Rust engine
+# Build the Rust engine static library linked into the API
+engine-lib:
+    cd apps/engine && cargo build --release --lib
+
+# Probe the engine over UCI on stdin (e.g. `position startpos`, `go movetime 100`)
 engine-dev:
-    bunx nx run engine:dev
+    cd apps/engine && cargo run
 
 # Build the Rust engine
 engine-build:
-    bunx nx run engine:build
+    cd apps/engine && cargo build --release
 
 # Test the Rust engine
 engine-test:
-    bunx nx run engine:test
+    cd apps/engine && cargo test
 
 # Lint the Rust engine with clippy
 engine-lint:
-    bunx nx run engine:lint
+    cd apps/engine && cargo clippy --all-targets --all-features -- -D warnings
 
 # Format the Rust engine
 engine-format:
-    bunx nx run engine:format
+    cd apps/engine && cargo fmt --all
 
 # Run cargo check for the engine
 engine-check:
-    bunx nx run engine:check
+    cd apps/engine && cargo check
+
+# SPRT self-play between two UCI engine binaries, e.g.
+# just sprt -- --engine-a ./apps/engine/target/release/uci --engine-b /tmp/chess-baseline/uci --movetime 100 --max-games 2000
+sprt *args:
+    devenv shell -- bash -c 'cd apps/engine && cargo build --release --bin uci --bin sprt && ./target/release/sprt {{args}}'
+
+# SPRT self-play of the working copy (engine A) against a baseline revision
+# (engine B). Complements `just sprt`, which takes manual engine paths:
+# this recipe checks the baseline revision out into a scratch jj workspace,
+# builds it, and runs the match, so a whole comparison is one command.
+#
+# NOTE: pass arguments positionally (this just version mis-expands
+# `name=value` overrides inside shebang recipes):
+#   just sprt-baseline                                                        # bcfa baseline, 100ms/move, SPRT(0,10)
+#   just sprt-baseline uzmzypwnkknn 200 0 5 0.05 0.05 10000 4
+sprt-baseline baseline="bcfa3bba9059" movetime="100" elo0="0" elo1="10" alpha="0.05" beta="0.05" max_games="5000" concurrency="8":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    root="{{justfile_directory()}}"
+    cd "$root"
+    engine="$root/apps/engine"
+    base_work="$(mktemp -d "${TMPDIR:-/tmp}/chess-sprt-base-XXXXXX")"
+    # The repo moves fast (parallel sessions); refresh so workspace
+    # operations below do not fail on a stale working copy.
+    jj workspace update-stale >/dev/null 2>&1 || true
+    jj workspace forget sprt-base >/dev/null 2>&1 || true
+    jj workspace add -r "{{baseline}}" --name sprt-base "$base_work" >/dev/null
+    cleanup() { jj workspace forget sprt-base >/dev/null 2>&1 || true; rm -rf "$base_work"; }
+    trap cleanup EXIT INT TERM
+    mkdir -p "$base_work/apps/engine/src/bin" "$base_work/apps/engine/book"
+    cp "$engine/src/bin/uci.rs" "$base_work/apps/engine/src/bin/uci.rs"
+    cp "$engine/book/openings.book" "$base_work/apps/engine/book/openings.book"
+    # Share the test target dir for the baseline build: builds run
+    # sequentially, so registry-dependency artifacts are reused and only the
+    # engine crate itself rebuilds. The baseline binary is stashed aside
+    # before the test binaries are (re)built over it.
+    export CARGO_TARGET_DIR="$engine/target"
+    echo "chess: building baseline engine @ {{baseline}}..."
+    (cd "$base_work/apps/engine" && cargo build --release --bin uci)
+    cp "$engine/target/release/uci" "$base_work/base-uci"
+    echo "chess: building test engine and referee from working copy..."
+    (cd "$engine" && cargo build --release --bin uci --bin sprt)
+    log="$root/sprt-{{baseline}}.log"
+    echo "chess: SPRT match test=working copy base={{baseline}} movetime={{movetime}}ms SPRT({{elo0}},{{elo1}}) max_games={{max_games}} concurrency={{concurrency}}"
+    echo "chess: log -> $log"
+    set +e
+    "$engine/target/release/sprt" \
+        --engine-a "$engine/target/release/uci" \
+        --engine-b "$base_work/base-uci" \
+        --book "$engine/book/openings.book" \
+        --movetime "{{movetime}}" \
+        --elo0 "{{elo0}}" --elo1 "{{elo1}}" \
+        --alpha "{{alpha}}" --beta "{{beta}}" \
+        --max-games "{{max_games}}" \
+        --concurrency "{{concurrency}}" 2>&1 | tee "$log"
+    set -e
+    if grep -q "sprt: PASSED" "$log"; then exit 0; else exit 1; fi
 
 # Clean Rust build artifacts
 engine-clean:
-    bunx nx run engine:clean
+    cd apps/engine && cargo clean
 
 # Start the desktop app (requires the web dev server on port 3000)
 desktop-dev:
-    devenv shell -- bash -c 'exec bunx nx run desktop:dev'
+    devenv shell -- bash -c 'cd apps/desktop && exec bunx tauri dev'
 
 # Build and bundle the desktop app
 desktop-build:
-    devenv shell -- bash -c 'exec bunx nx run desktop:build'
+    devenv shell -- bash -c 'cd apps/desktop && exec bunx tauri build'
 
 # Test the desktop Rust crate
 desktop-test:
-    devenv shell -- bash -c 'exec bunx nx run desktop:test'
+    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo test'
 
 # Lint the desktop Rust crate with clippy
 desktop-lint:
-    devenv shell -- bash -c 'exec bunx nx run desktop:lint'
+    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo clippy --all-targets --all-features -- -D warnings'
 
 # Format the desktop Rust crate
 desktop-format:
-    devenv shell -- bash -c 'exec bunx nx run desktop:format'
+    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo fmt --all'
 
 # Run cargo check for the desktop crate
 desktop-check:
-    devenv shell -- bash -c 'exec bunx nx run desktop:check'
+    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo check'
 
 # Clean desktop build artifacts
 desktop-clean:
-    devenv shell -- bash -c 'exec bunx nx run desktop:clean'
-
-# Run an Nx target for a project, e.g. `just nx-target build web`
-nx-target target project:
-    bunx nx run {{project}}:{{target}}
+    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo clean'

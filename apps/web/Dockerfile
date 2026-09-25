@@ -1,10 +1,10 @@
 FROM oven/bun:1
 WORKDIR /app
-COPY package.json bun.lock biome.json nx.json ./
-COPY packages/types/package.json packages/types/package.json
+COPY package.json bun.lock biome.json ./
+COPY libs/types/package.json libs/types/package.json
 COPY apps/web/package.json apps/web/package.json
 RUN bun install --frozen-lockfile
-COPY packages/types packages/types
+COPY libs/types libs/types
 COPY apps/web apps/web
 RUN cd apps/web && bun run build
 WORKDIR /app/apps/web

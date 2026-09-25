@@ -5,8 +5,6 @@ AGENTS.md
 .env
 .postgres/
 .devenv/
-.nx/cache/
-.nx/workspace-data/
 .codex
 .tmp-runtime
 tsbuildinfo

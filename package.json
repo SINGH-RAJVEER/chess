@@ -6,25 +6,21 @@
 		"apps/web",
 		"apps/desktop",
 		"apps/engine",
-		"packages/types"
+		"libs/types"
 	],
 	"scripts": {
 		"lockfile:generate": "bun install --lockfile-only",
-		"dev": "nx run-many -t dev -p api engine web --parallel=3",
-		"build": "nx run-many -t build --all",
-		"test": "nx run-many -t test --all",
-		"lint": "nx run-many -t lint --all",
-		"format": "nx run-many -t format --all",
-		"check": "nx run-many -t check --all",
-		"typecheck": "nx run-many -t typecheck --all",
-		"affected:build": "nx affected -t build",
-		"affected:lint": "nx affected -t lint",
-		"affected:test": "nx affected -t test",
-		"api:migrate": "nx run api:migrate",
-		"clean": "nx run-many -t clean --all"
+		"dev": "just dev",
+		"build": "cd apps/web && bun run build && cd ../engine && cargo build --release --lib && cd ../api && mkdir -p dist && CGO_ENABLED=1 go build -o dist/api ./cmd/api && cd ../desktop && bun run build",
+		"test": "cd apps/api && CGO_ENABLED=1 go test ./... && cd ../engine && cargo test && cd ../desktop/src-tauri && cargo test",
+		"lint": "cd apps/web && bun run lint && cd ../../libs/types && bun run lint && cd ../../apps/api && CGO_ENABLED=1 go vet ./... && cd ../engine && cargo clippy --all-targets --all-features -- -D warnings && cd ../desktop/src-tauri && cargo clippy --all-targets --all-features -- -D warnings",
+		"format": "cd apps/web && bun run format && cd ../../libs/types && bun run format && cd ../../apps/api && gofmt -w ./cmd ./internal && cd ../engine && cargo fmt --all && cd ../desktop/src-tauri && cargo fmt --all",
+		"check": "cd apps/web && bun run check && cd ../../libs/types && bun run check && cd ../../apps/api && test -z \"$(gofmt -l ./cmd ./internal)\" && CGO_ENABLED=1 go test ./... && CGO_ENABLED=1 go vet ./... && cd ../engine && cargo check && cd ../desktop/src-tauri && cargo check",
+		"typecheck": "cd apps/web && bun run typecheck",
+		"api:migrate": "just api-migrate",
+		"clean": "cd apps/web && bun run clean && cd ../api && rm -rf dist && cd ../engine && cargo clean && cd ../desktop/src-tauri && cargo clean"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.10",
-		"nx": "^23.1.1"
+		"@biomejs/biome": "^2.5.10"
 	}
 }

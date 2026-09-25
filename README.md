@@ -7,14 +7,14 @@ Chess is a full-stack chess application with local games, online matchmaking, au
 - `apps/web`: React and Vite browser application.
 - `apps/desktop`: Tauri desktop shell around the web application.
 - `apps/api`: Go HTTP API for authentication, game state, matchmaking, clocks, migrations, and engine orchestration.
-- `apps/engine`: Rust service that selects computer moves with minimax, a custom alpha-beta engine, or DQN.
-- `apps/dqn`: ONNX model, inference support, and Python training pipeline.
-- `packages/types`: Shared TypeScript domain and API types.
+- `apps/engine`: Rust engine library (minimax + custom alpha-beta) linked into the API.
+- `apps/dqn`: retired DQN training pipeline and model, kept for research.
+- `libs/types`: Shared TypeScript domain and API types.
 - `docs`: Detailed architecture, development, API, operations, data model, and security documentation.
 
 ## How It Works
 
-The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API sends the current position to the Rust engine. The engine uses the bundled ONNX model for DQN games, its built-in alpha-beta engine for the custom opponent, and falls back to minimax when necessary.
+The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API selects the reply in-process through the linked Rust engine library (minimax or custom alpha-beta search).
 
 The local stack uses these ports:
 
@@ -22,8 +22,9 @@ The local stack uses these ports:
 | --- | --- |
 | Web | `3000` |
 | API | `4000` |
-| Engine | `8080` |
 | PostgreSQL | `5432` |
+
+Prerequisites: Nix, devenv, Bun, a C toolchain (`gcc` from devenv), and Rust for the engine library. API builds run with `CGO_ENABLED=1`.
 
 ## Quick Start
 
@@ -49,13 +50,13 @@ bun run clean       # Remove build outputs
 just api-migrate    # Apply PostgreSQL migrations
 ```
 
-Run one project with Nx:
+Run one project with just:
 
 ```bash
-bunx nx run web:dev
-bunx nx run api:dev
-bunx nx run engine:dev
-bunx nx run desktop:dev
+just web-dev
+just api-dev
+just engine-dev
+just desktop-dev
 ```
 
 ## Documentation
