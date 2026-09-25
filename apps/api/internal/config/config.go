@@ -9,7 +9,6 @@ type Config struct {
 	DatabaseURL        string
 	Host               string
 	Port               string
-	EngineURL          string
 	AuthSecret         string
 	AuthBaseURL        string
 	WebOrigin          string
@@ -23,7 +22,6 @@ func Load() (Config, error) {
 		DatabaseURL:        os.Getenv("DATABASE_URL"),
 		Host:               valueOrDefault("HOST", "0.0.0.0"),
 		Port:               valueOrDefault("PORT", "4000"),
-		EngineURL:          valueOrDefault("CHESS_ENGINE_URL", "http://127.0.0.1:8080"),
 		AuthSecret:         valueOrDefault("BETTER_AUTH_SECRET", "default-secret-change-me"),
 		AuthBaseURL:        valueOrDefault("AUTH_BASE_URL", "http://localhost:4000/api/auth"),
 		WebOrigin:          valueOrDefault("WEB_ORIGIN", "http://localhost:3000"),

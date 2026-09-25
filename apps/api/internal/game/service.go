@@ -1,30 +1,25 @@
 package game
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math/rand/v2"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	libchess "github.com/notnil/chess"
+	"github.com/rajveer/chess/apps/api/internal/engine"
 )
 
 type Service struct {
-	db         *pgxpool.Pool
-	engineURL  string
-	httpClient *http.Client
+	db *pgxpool.Pool
 }
 
-func NewService(db *pgxpool.Pool, engineURL string) *Service {
-	return &Service{db: db, engineURL: strings.TrimRight(engineURL, "/"), httpClient: &http.Client{Timeout: 30 * time.Second}}
+func NewService(db *pgxpool.Pool) *Service {
+	return &Service{db: db}
 }
 
 func (service *Service) createGame(ctx context.Context, mode string, timeControl, increment int, whiteID, blackID *string) (*Game, error) {
@@ -377,33 +372,23 @@ func (service *Service) requestEngineMove(gameID int, fen, opponent string) {
 	if opponent == "" {
 		opponent = "minimax"
 	}
-	body, _ := json.Marshal(map[string]string{"fen": fen, "opponent": opponent})
-	response, err := service.httpClient.Post(service.engineURL+"/api/engine-move", "application/json", bytes.NewReader(body))
+	bestMove, info, err := engine.BestMove(fen, opponent)
 	if err != nil {
 		log.Printf("engine request for game %d failed: %v", gameID, err)
 		return
 	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		log.Printf("engine request for game %d returned %s", gameID, response.Status)
-		return
+	if info != "" {
+		log.Printf("engine move for game %d selected by %s", gameID, info)
 	}
-	var result struct {
-		BestMove string `json:"best_move"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-		log.Printf("engine response for game %d was invalid: %v", gameID, err)
-		return
-	}
-	if len(result.BestMove) < 4 {
+	if len(bestMove) < 4 {
 		log.Printf("engine returned no move for game %d", gameID)
 		return
 	}
 	promotion := PieceType("")
-	if len(result.BestMove) == 5 {
-		promotion = map[byte]PieceType{'q': Queen, 'r': Rook, 'b': Bishop, 'n': Knight}[result.BestMove[4]]
+	if len(bestMove) == 5 {
+		promotion = map[byte]PieceType{'q': Queen, 'r': Rook, 'b': Bishop, 'n': Knight}[bestMove[4]]
 	}
-	if _, err := service.makeMove(context.Background(), gameID, indexFromAlgebraic(result.BestMove[:2]), indexFromAlgebraic(result.BestMove[2:4]), promotion, opponent, true); err != nil {
+	if _, err := service.makeMove(context.Background(), gameID, indexFromAlgebraic(bestMove[:2]), indexFromAlgebraic(bestMove[2:4]), promotion, opponent, true); err != nil {
 		log.Printf("engine move for game %d could not be applied: %v", gameID, err)
 	}
 }

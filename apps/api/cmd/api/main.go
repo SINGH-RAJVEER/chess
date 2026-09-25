@@ -42,7 +42,7 @@ func main() {
 		AuthBaseURL:  config.AuthBaseURL,
 		WebOrigin:    config.WebOrigin,
 	})
-	gameService := game.NewService(db, config.EngineURL)
+	gameService := game.NewService(db)
 	server := &http.Server{
 		Addr:              net.JoinHostPort(config.Host, config.Port),
 		Handler:           httpapi.NewHandler(authService, gameService, httpapi.WithCORSOrigin(config.WebOrigin)),
