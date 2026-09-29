@@ -474,7 +474,8 @@ func (service *Service) LeaveQueue(ctx context.Context, playerID string) error {
 	return err
 }
 
-func (service *Service) QueueStatus(ctx context.Context, playerID string) (map[string]any, error) {	var timeControl int
+func (service *Service) QueueStatus(ctx context.Context, playerID string) (map[string]any, error) {
+	var timeControl int
 	err := service.db.QueryRow(ctx, `SELECT time_control FROM queue WHERE player_id=$1 LIMIT 1`, playerID).Scan(&timeControl)
 	if err == nil {
 		return map[string]any{"status": "queued", "timeControl": timeControl}, nil
