@@ -4,11 +4,16 @@
 	"version": "0.0.0",
 	"type": "module",
 	"scripts": {
+		"test": "bun test",
 		"format": "biome format",
 		"lint": "biome lint",
 		"check": "biome check"
 	},
 	"exports": {
 		".": "./src/index.ts"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.4.2",
+		"bun-types": "^1.4.2"
 	}
 }
