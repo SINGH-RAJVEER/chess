@@ -5,6 +5,10 @@ The API is served under `/api` by the Go service. JSON errors use the shape
 500, including some invalid domain requests; clients should display the error
 message and operators should treat unexpected 500 responses as actionable.
 
+Game play is websocket-only over `GET /api/ws` (see Realtime below); the
+legacy REST game endpoints were removed and return 404. REST remains for
+health and authentication.
+
 ## Health
 
 ### `GET /api/health`
@@ -14,95 +18,44 @@ verify PostgreSQL reachability at request time. Computer moves are served
 in-process by the linked Rust engine; there is no separate engine service or
 engine health endpoint.
 
-## Board and Moves
+## Realtime (`GET /api/ws`)
 
-### `GET /api/board`
+One persistent socket per client carries all game traffic as JSON messages.
+Every client message carries an opaque `id` for request/response correlation;
+server pushes (`game.state`, `queue.status`, `presence`, offers) arrive
+without an id and are applied immediately. Web authenticates with the session
+cookie on upgrade; mobile passes `?token=` and a `hello` message with the
+stored session token.
 
-Query parameters:
+Client messages:
 
-- `mode`: `vs_player` or `vs_computer`; defaults to `vs_player`.
-- `gameId`: optional game ID.
-- `playerId`: optional player ID used to find the player's current online game.
+- `hello` (`token?`) — authenticate / re-authenticate.
+- `queue.join` (`timeControl`, `increment?`), `queue.leave`, `queue.get` —
+  matchmaking. Match responses arrive as `game.matched` plus `game.state`.
+- `game.new` (`mode`, `timeControl?`, `increment?`, `opponent?`) — create a
+  local or computer game. Rated online games use `queue.join` instead.
+- `game.join` / `game.leave` (`gameId`) — subscribe to a game room for
+  pushes; doubles as reconnect resume.
+- `board.get` (`gameId?`, `mode?`) and `moves.get` (`gameId`, `square`) —
+  one-shot reads answered with `game.state` and `moves.result`.
+- `game.move` (`gameId`, `from`, `to`, `promotion?`, `opponent?`) — the
+  server rejects moves from spectators and from the side not to move.
+  Anonymous local and computer games allow the connected client to move.
+- `game.resign` (`gameId`), `game.draw.offer` / `game.draw.respond`
+  (`gameId`, `accept`) — draw and resign flow through room broadcasts.
+- `game.undo.request` / `game.undo.respond` (`gameId`, `accept`) — rated
+  games require opponent consent; computer and anonymous boards apply
+  immediately.
+- `game.rematch.offer` / `game.rematch.respond` (`gameId`, `accept`) —
+  creates a new game with swapped colors on accept.
+- `ping` — answered with `pong`.
 
-The response includes the game ID, pieces, move history, current turn, status,
-clock values, user color, check state, draw state, and server timestamp.
-Square indexes are integers from `0` through `63`, using the same mapping as the
-Go and TypeScript clients.
-
-### `GET /api/moves?square={square}&gameId={gameId}`
-
-Returns an array of legal destination square indexes for the selected piece.
-Both query parameters are required.
-
-### `POST /api/move`
-
-Request:
-
-```json
-{
-    "gameId": 12,
-    "from": 52,
-    "to": 36,
-    "promotion": "Queen",
-    "opponent": "custom"
-}
-```
-
-`promotion` is optional and may be `Queen`, `Rook`, `Bishop`, or `Knight`.
-`opponent` is optional and may be `minimax` or `custom`; legacy `dqn` values
-are accepted and play as `custom`. It is used for computer games. The API
-validates the position and move server-side.
-
-Response fields include `success`, `nextTurn`, `status`, `captured`, `isCheck`,
-`isCheckmate`, and `isCastle`, with `promotion` when applicable.
-
-### `POST /api/reset`
-
-Creates a new game. Request fields are `mode`, `timeControl` in minutes, and
-optional `increment` in seconds. `timeControl: 0` creates an untimed game.
-
-### `POST /api/undo`
-
-Request: `{"gameId":12}`. Removes the most recent move and restores the prior
-piece state. The client uses two requests for a computer-game takeback when
-both the human and engine moves should be undone.
-
-### `POST /api/resign`
-
-Request: `{"gameId":12,"color":"White"}`. Marks the game as `Resignation`
-and returns the opposing color as `winner`.
-
-### `POST /api/draw-offer`
-
-Request: `{"gameId":12,"color":"White"}`. Stores the offering color while
-the game remains ongoing.
-
-### `POST /api/draw-respond`
-
-Request: `{"gameId":12,"accept":true}`. An accepted offer changes status to
-`Draw`; a declined offer clears the offer and leaves the game ongoing.
-
-## Matchmaking
-
-### `POST /api/join-queue`
-
-Request fields:
-
-```json
-{
-    "playerId": "user-id",
-    "timeControl": 10,
-    "increment": 0
-}
-```
-
-Returns one of `queued` or `matched`; a matched response includes `gameId`.
-Players are matched by equal time control and increment.
-
-### `GET /api/queue-status?playerId={playerId}`
-
-Returns `idle`, `queued`, or `matched`. A queued response includes the selected
-time control; a matched response includes `gameId`.
+Server pushes include `game.state` (full board, per-viewer `userColor`),
+`game.matched`, `queue.status`, `presence` (`whiteOnline`/`blackOnline`),
+`game.draw.offered`, `game.undo.requested` / `game.undo.result`,
+`game.rematch.offered`, `game.over`, and `error`. A 1s server ticker
+re-checks active rooms so timeouts and engine replies are pushed even if a
+notification is missed. Square indexes are integers from `0` through `63`.
 
 ## Authentication
 

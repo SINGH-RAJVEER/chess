@@ -18,6 +18,7 @@ the web build output.
 | `GOOGLE_CLIENT_ID` | No | Empty | Google OAuth client ID. Both Google variables are required to enable OAuth. |
 | `GOOGLE_CLIENT_SECRET` | No | Empty | Google OAuth client secret. |
 | `AUTO_MIGRATE` | No | `false` | When `true`, applies pending embedded migrations before serving. |
+| `REDIS_URL` | No | Empty | Redis connection URL for sharing realtime game updates across API replicas. When empty, a single-process in-memory broker is used. |
 
 ## Engine Variables
 

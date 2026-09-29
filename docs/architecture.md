@@ -155,8 +155,13 @@ own runtime types and does not import this package.
 - An unavailable or panicking engine call does not automatically recover a
   pending computer move; operators should monitor API logs and users may need
   to retry or reset a game.
-- Polling is gone from game play. The single-process hub (`internal/realtime`)
-  fans out to per-game rooms; PostgreSQL stays the source of truth, so a
-  reconnected client resumes with `game.join` and gets the latest state. A
-  production deployment with multiple API replicas will need a shared
-  pub/sub (e.g. Redis) behind the hub interface.
+- Game play is websocket-only. The legacy REST game endpoints (`/api/board`,
+  `/api/moves`, `/api/queue-status`, `/api/move`, `/api/undo`, `/api/resign`,
+  `/api/draw-offer`, `/api/draw-respond`, `/api/reset`, `/api/join-queue`)
+  were removed; REST remains for auth, health checks, and page loads.
+- Each API process runs one hub (`internal/realtime`) fanning out to
+  per-game rooms; PostgreSQL stays the source of truth, so a reconnected
+  client resumes with `game.join` and gets the latest state. Every mutation
+  is announced through a `Broker`: the in-memory default for a single
+  replica, or Redis pub/sub (`REDIS_URL`) so any replica's subscribers
+  converge on pushes in a multi-replica deployment.
