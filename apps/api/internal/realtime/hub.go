@@ -350,10 +350,8 @@ func (hub *Hub) handleGameNew(client *Client, msg incoming) {
 	if mode == "" {
 		mode = "vs_computer"
 	}
-	if mode == "vs_player" && client.userID != "" {
-		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": "use queue.join for rated online games"})
-		return
-	}
+	// Local boards are always anonymous, for guests and signed-in users
+	// alike; rated online games are only created through queue.join.
 	timeControl := 0
 	increment := 0
 	if msg.TimeControl != nil {
@@ -454,6 +452,7 @@ func (hub *Hub) handleMove(client *Client, msg incoming) {
 	}
 	hub.subscribe(client, *msg.GameID)
 	hub.gameChanged(*msg.GameID)
+	hub.sendBoard(client, msg.ID, *msg.GameID)
 }
 
 func (hub *Hub) handleResign(client *Client, msg incoming) {
@@ -515,7 +514,9 @@ func (hub *Hub) handleDrawOffer(client *Client, msg incoming) {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 		return
 	}
+	hub.subscribe(client, *msg.GameID)
 	hub.gameChanged(*msg.GameID)
+	hub.sendBoard(client, msg.ID, *msg.GameID)
 	hub.broadcastExcept(*msg.GameID, client, map[string]any{"type": "game.draw.offered", "gameId": *msg.GameID, "by": color})
 }
 
@@ -539,7 +540,9 @@ func (hub *Hub) handleDrawRespond(client *Client, msg incoming) {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 		return
 	}
+	hub.subscribe(client, *msg.GameID)
 	hub.gameChanged(*msg.GameID)
+	hub.sendBoard(client, msg.ID, *msg.GameID)
 }
 
 func (hub *Hub) handleUndoRequest(client *Client, msg incoming) {
@@ -561,7 +564,9 @@ func (hub *Hub) handleUndoRequest(client *Client, msg incoming) {
 				client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 				return
 			}
+			hub.subscribe(client, *msg.GameID)
 			hub.gameChanged(*msg.GameID)
+			hub.sendBoard(client, msg.ID, *msg.GameID)
 			return
 		}
 		if stored.Mode == "vs_computer" {
@@ -569,7 +574,9 @@ func (hub *Hub) handleUndoRequest(client *Client, msg incoming) {
 				client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 				return
 			}
+			hub.subscribe(client, *msg.GameID)
 			hub.gameChanged(*msg.GameID)
+			hub.sendBoard(client, msg.ID, *msg.GameID)
 			return
 		}
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
@@ -610,6 +617,7 @@ func (hub *Hub) handleUndoRespond(client *Client, msg incoming) {
 		return
 	}
 	if !*msg.Accept {
+		client.sendJSON(map[string]any{"id": msg.ID, "type": "game.undo.result", "gameId": *msg.GameID, "accepted": false})
 		hub.broadcast(*msg.GameID, map[string]any{"type": "game.undo.result", "gameId": *msg.GameID, "accepted": false})
 		return
 	}
@@ -619,6 +627,7 @@ func (hub *Hub) handleUndoRespond(client *Client, msg incoming) {
 	}
 	hub.broadcast(*msg.GameID, map[string]any{"type": "game.undo.result", "gameId": *msg.GameID, "accepted": true})
 	hub.gameChanged(*msg.GameID)
+	hub.sendBoard(client, msg.ID, *msg.GameID)
 }
 
 func (hub *Hub) handleRematchOffer(client *Client, msg incoming) {
@@ -643,7 +652,9 @@ func (hub *Hub) handleRematchOffer(client *Client, msg incoming) {
 	hub.mu.Lock()
 	hub.rematchOffers[*msg.GameID] = client.userID
 	hub.mu.Unlock()
+	hub.subscribe(client, *msg.GameID)
 	hub.broadcastExcept(*msg.GameID, client, map[string]any{"type": "game.rematch.offered", "gameId": *msg.GameID, "by": color})
+	hub.sendBoard(client, msg.ID, *msg.GameID)
 }
 
 func (hub *Hub) handleRematchRespond(client *Client, msg incoming) {
@@ -657,10 +668,16 @@ func (hub *Hub) handleRematchRespond(client *Client, msg incoming) {
 		delete(hub.rematchOffers, *msg.GameID)
 	}
 	hub.mu.Unlock()
-	if !pending || !*msg.Accept {
+	if !pending {
+		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": "no pending rematch offer"})
+		return
+	}
+	if !*msg.Accept {
+		hub.sendBoard(client, msg.ID, *msg.GameID)
 		return
 	}
 	if requester == client.userID {
+		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": "cannot answer your own offer"})
 		return
 	}
 	created, err := hub.games.Rematch(context.Background(), *msg.GameID, client.userID)
@@ -676,6 +693,7 @@ func (hub *Hub) handleRematchRespond(client *Client, msg incoming) {
 		}
 	}
 	hub.gameChanged(created.ID)
+	hub.sendBoard(client, msg.ID, created.ID)
 }
 
 func (hub *Hub) authorizeTurn(stored *game.Game, userID string) error {
