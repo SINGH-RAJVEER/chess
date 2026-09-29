@@ -30,6 +30,17 @@ func TestCredentialedCORS(t *testing.T) {
 	}
 }
 
+func TestCredentialedCORSAllowlist(t *testing.T) {
+	handler := httpapi.NewHandler(nil, nil, httpapi.WithCORSOrigin("http://localhost:3000, https://tauri.localhost"))
+	request := httptest.NewRequest(http.MethodOptions, "/api/auth/get-session", nil)
+	request.Header.Set("Origin", "https://tauri.localhost")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != "https://tauri.localhost" || response.Header().Get("Access-Control-Allow-Credentials") != "true" {
+		t.Fatalf("status=%d headers=%v", response.Code, response.Header())
+	}
+}
+
 func TestValidationContracts(t *testing.T) {
 	tests := []struct{ method, path, body, message string }{
 		{http.MethodPost, "/api/auth/sign-up", `{}`, "Email, password, and name are required"},

@@ -59,12 +59,38 @@ func (app *App) handler() http.Handler {
 	return recoverMiddleware(corsMiddleware(mux, app.corsOrigin))
 }
 
+// parseOriginAllowlist splits a comma-separated WEB_ORIGIN value into the
+// ordered allowlist plus a lookup set. A single origin behaves exactly as
+// before; multiple entries additionally let the packaged desktop webview
+// origin sit alongside the browser origin.
+func parseOriginAllowlist(configured string) ([]string, map[string]bool) {
+	ordered := []string{}
+	lookup := map[string]bool{}
+	for _, origin := range strings.Split(configured, ",") {
+		origin = strings.TrimSpace(strings.TrimRight(origin, "/"))
+		if origin == "" || lookup[origin] {
+			continue
+		}
+		lookup[origin] = true
+		ordered = append(ordered, origin)
+	}
+	return ordered, lookup
+}
+
 func corsMiddleware(next http.Handler, allowedOrigin string) http.Handler {
+	allowed, lookup := parseOriginAllowlist(allowedOrigin)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			origin := "*"
-			if allowedOrigin != "" {
-				origin = allowedOrigin
+			if len(allowed) > 0 {
+				// Echo a listed request origin so credentialed browser and
+				// desktop-webview callers pass CORS. Unlisted origins get
+				// the first configured value, preserving the previous
+				// single-origin behavior.
+				origin = allowed[0]
+				if requestOrigin := r.Header.Get("Origin"); lookup[requestOrigin] {
+					origin = requestOrigin
+				}
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Add("Vary", "Origin")
 			}
