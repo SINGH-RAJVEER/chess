@@ -12,7 +12,7 @@ the web build output.
 | `DATABASE_URL` | Yes | None | PostgreSQL connection string. The API fails startup when absent or unreachable. |
 | `HOST` | No | `0.0.0.0` | API bind host. |
 | `PORT` | No | `4000` | API listen port. |
-| `WEB_ORIGIN` | No | `http://localhost:3000` | Credentialed browser origin allowed by API CORS and OAuth callback validation. |
+| `WEB_ORIGIN` | No | `http://localhost:3000` | Credentialed browser origin allowed by API CORS and OAuth callback validation. Accepts a comma-separated allowlist; the API echoes a listed request origin. Add `https://tauri.localhost` for the packaged desktop shell. |
 | `BETTER_AUTH_SECRET` | No | `default-secret-change-me` | HMAC secret used to sign the session cookie. Replace in every non-local environment. |
 | `AUTH_BASE_URL` | No | `http://localhost:4000/api/auth` | Public API auth base URL and Google OAuth redirect base. |
 | `GOOGLE_CLIENT_ID` | No | Empty | Google OAuth client ID. Both Google variables are required to enable OAuth. |
@@ -43,6 +43,8 @@ research but no longer serves traffic.
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `VITE_API_PROXY_TARGET` | No | `http://127.0.0.1:4000` | Vite dev and preview proxy target for `/api`. |
+| `VITE_API_BASE_URL` | No | Empty | Explicit API base for the web client. When empty the browser stays same-origin. |
+| `VITE_DESKTOP_API_URL` | No | `http://127.0.0.1:4000` | API base for the packaged desktop shell. Consulted only under Tauri when `VITE_API_BASE_URL` is empty. |
 
 Only variables intentionally prefixed with `VITE_` are suitable for Vite
 client configuration. Never expose database credentials, OAuth secrets, or the

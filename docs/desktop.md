@@ -13,11 +13,23 @@ The desktop application is a native shell around the web application built with 
 ## Modes
 
 - Development (`tauri dev`): the window loads `http://localhost:3000`, so the Vite dev server, its `/api` proxy to the Go API, and hot reload all work exactly as in the browser. The web dev server must already be running.
-- Production (`tauri build`): build `apps/web/dist` first with `just web-build`, and Tauri embeds those static assets into the binary.
+- Production (`tauri build`): `just desktop-build` rebuilds `apps/web/dist`
+  first, and Tauri embeds those static assets into the binary.
 
 ## API access
 
-The web client calls relative `/api` paths. That works in development because Tauri loads the page from the Vite server. A packaged desktop build has no proxy, so set `VITE_API_BASE_URL` (for example `http://127.0.0.1:4000`) when building for desktop distribution. The API must then accept cross-origin requests from the desktop origin.
+The bundled web client resolves its API base at runtime. In the browser it
+stays same-origin behind the reverse proxy (or `VITE_API_BASE_URL` when set).
+Inside the Tauri shell it talks directly to `http://127.0.0.1:4000` by
+default, overridable with `VITE_DESKTOP_API_URL` at web build time, for both
+auth requests and the `/api/ws` game socket. That works in development
+because Tauri loads the page from the Vite server; a packaged build has no
+proxy, so the API must accept credentialed cross-origin requests from the
+desktop webview origin (`https://tauri.localhost`): add it to the
+comma-separated `WEB_ORIGIN` list, e.g.
+`WEB_ORIGIN=http://localhost:3000,https://tauri.localhost`. Google sign-in
+is unavailable in the shell (the OAuth callback cannot return to a Tauri
+origin); use email auth there.
 
 ## Commands
 
