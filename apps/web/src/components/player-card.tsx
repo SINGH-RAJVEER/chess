@@ -13,6 +13,7 @@ type PlayerCardProps = {
 	capturedByColor: Color;
 	materialAdvantage?: number;
 	showTime?: boolean;
+	isOnline?: boolean;
 	icon?: React.ReactNode;
 	children?: React.ReactNode;
 	isLowTime?: boolean;
@@ -27,6 +28,7 @@ export default function PlayerCard({
 	capturedByColor,
 	materialAdvantage = 0,
 	showTime = true,
+	isOnline,
 	icon,
 	children,
 	isLowTime = false,
@@ -68,7 +70,18 @@ export default function PlayerCard({
 
 			{/* Name + captured pieces */}
 			<div className="flex flex-1 flex-col gap-1 min-w-0">
-				<span className="text-sm font-medium text-zinc-300 leading-none">{label}</span>
+				<span className="text-sm font-medium text-zinc-300 leading-none flex items-center gap-1.5">
+					{label}
+					{isOnline !== undefined && (
+						<span
+							title={isOnline ? "Online" : "Offline"}
+							className={cn(
+								"inline-block size-1.5 rounded-full",
+								isOnline ? "bg-emerald-400" : "bg-zinc-600",
+							)}
+						/>
+					)}
+				</span>
 				<div className="flex items-center gap-0.5 flex-wrap min-h-[18px]">
 					{groupedCaptures.map(({ key, piece }) => (
 						<span key={key} className="inline-flex -mr-1">
