@@ -101,12 +101,16 @@ tactical regression suite of uniquely-forced positions (Scholar's mate,
 WAC.005). Fixed-depth searches keep those tests deterministic regardless of
 machine load.
 
-Two ignored benchmarks track speed:
+Two ignored benchmarks track speed (`just engine-bench` runs both):
 
 ```bash
 cargo test bench_middlegame --release -- --nocapture --ignored
 cargo test bench_eval --release -- --nocapture --ignored
 ```
+
+The API side (FEN encoding, move lookup, board formatting, and the
+minimax FFI call) is benchmarked with `just api-bench`, which runs the Go
+benchmarks in `apps/api/internal/game` without needing a database.
 
 ## Strength Measurement (SPRT)
 

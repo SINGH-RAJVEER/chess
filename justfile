@@ -87,9 +87,53 @@ web-check:
 web-typecheck:
     cd apps/web && bun run typecheck
 
+# Test the web app
+web-test:
+    cd apps/web && bun run test
+
 # Clean web build output
 web-clean:
     cd apps/web && bun run clean
+
+# Start the mobile app (Expo dev server; run inside devenv so Node is present)
+mobile-dev:
+    devenv shell -- bash -c 'cd apps/mobile && exec bun run dev'
+
+# Run the mobile app on Android (requires Android SDK or a dev build)
+mobile-android:
+    devenv shell -- bash -c 'cd apps/mobile && exec bun run android'
+
+# Run the mobile app on iOS (requires macOS with Xcode)
+mobile-ios:
+    devenv shell -- bash -c 'cd apps/mobile && exec bun run ios'
+
+# Bundle the mobile app for iOS and Android without a device
+mobile-export:
+    devenv shell -- bash -c 'cd apps/mobile && exec bunx expo export'
+
+# Lint the mobile app
+mobile-lint:
+    cd apps/mobile && bun run lint
+
+# Format the mobile app
+mobile-format:
+    cd apps/mobile && bun run format
+
+# Run Biome checks for the mobile app
+mobile-check:
+    cd apps/mobile && bun run check
+
+# Typecheck the mobile app
+mobile-typecheck:
+    cd apps/mobile && bun run typecheck
+
+# Test the mobile app
+mobile-test:
+    cd apps/mobile && bun run test
+
+# Clean mobile build output
+mobile-clean:
+    cd apps/mobile && bun run clean
 
 # Lint the shared types package
 types-lint:
@@ -102,6 +146,10 @@ types-format:
 # Run Biome checks for the shared types package
 types-check:
     cd libs/types && bun run check
+
+# Test the shared types package
+types-test:
+    cd libs/types && bun run test
 
 # Start the API in the devenv shell (builds the engine static library first)
 api-dev: engine-lib
@@ -131,8 +179,12 @@ api-format:
 api-check: engine-lib
     cd apps/api && test -z "$(gofmt -l ./cmd ./internal)" && devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go test ./... && CGO_ENABLED=1 go vet ./...'
 
-# Apply the API's app-local migrations
-api-migrate: database-start
+# Benchmark the API hot paths, including the engine FFI call (no database needed)
+api-bench: engine-lib
+    devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go test ./internal/game/ -bench=. -benchtime=100x -run=NONE'
+
+# Apply the API's app-local migrations (builds the engine static library first)
+api-migrate: engine-lib database-start
     #!/usr/bin/env bash
     set -e
     if [ -f .env ]; then
@@ -140,8 +192,7 @@ api-migrate: database-start
       source .env
       set +a
     fi
-    cd apps/api
-    CGO_ENABLED=1 go run ./cmd/api -migrate
+    devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go run ./cmd/api -migrate'
 
 # Ensure PostgreSQL is running (init cluster on first run)
 database-start:
@@ -225,6 +276,10 @@ engine-format:
 # Run cargo check for the engine
 engine-check:
     cd apps/engine && cargo check
+
+# Benchmark the engine (release eval plus a 10s search)
+engine-bench:
+    cd apps/engine && cargo test --release bench_eval -- --ignored --nocapture && cargo test --release bench_middlegame -- --ignored --nocapture
 
 # SPRT self-play between two UCI engine binaries, e.g.
 # just sprt -- --engine-a ./apps/engine/target/release/uci --engine-b /tmp/chess-baseline/uci --movetime 100 --max-games 2000

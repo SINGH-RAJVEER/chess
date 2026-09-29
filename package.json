@@ -6,21 +6,25 @@
 		"apps/web",
 		"apps/desktop",
 		"apps/engine",
+		"apps/mobile",
 		"libs/types"
 	],
 	"scripts": {
 		"lockfile:generate": "bun install --lockfile-only",
 		"dev": "just dev",
 		"build": "cd apps/web && bun run build && cd ../engine && cargo build --release --lib && cd ../api && mkdir -p dist && CGO_ENABLED=1 go build -o dist/api ./cmd/api && cd ../desktop && bun run build",
-		"test": "cd apps/api && CGO_ENABLED=1 go test ./... && cd ../engine && cargo test && cd ../desktop/src-tauri && cargo test",
-		"lint": "cd apps/web && bun run lint && cd ../../libs/types && bun run lint && cd ../../apps/api && CGO_ENABLED=1 go vet ./... && cd ../engine && cargo clippy --all-targets --all-features -- -D warnings && cd ../desktop/src-tauri && cargo clippy --all-targets --all-features -- -D warnings",
-		"format": "cd apps/web && bun run format && cd ../../libs/types && bun run format && cd ../../apps/api && gofmt -w ./cmd ./internal && cd ../engine && cargo fmt --all && cd ../desktop/src-tauri && cargo fmt --all",
-		"check": "cd apps/web && bun run check && cd ../../libs/types && bun run check && cd ../../apps/api && test -z \"$(gofmt -l ./cmd ./internal)\" && CGO_ENABLED=1 go test ./... && CGO_ENABLED=1 go vet ./... && cd ../engine && cargo check && cd ../desktop/src-tauri && cargo check",
-		"typecheck": "cd apps/web && bun run typecheck",
+		"test": "cd apps/web && bun test && cd ../mobile && bun test && cd ../../libs/types && bun test && cd ../../apps/api && CGO_ENABLED=1 go test ./... && cd ../engine && cargo test && cd ../desktop/src-tauri && cargo test",
+		"lint": "cd apps/web && bun run lint && cd ../mobile && bun run lint && cd ../../libs/types && bun run lint && cd ../../apps/api && CGO_ENABLED=1 go vet ./... && cd ../engine && cargo clippy --all-targets --all-features -- -D warnings && cd ../desktop/src-tauri && cargo clippy --all-targets --all-features -- -D warnings",
+		"format": "cd apps/web && bun run format && cd ../mobile && bun run format && cd ../../libs/types && bun run format && cd ../../apps/api && gofmt -w ./cmd ./internal && cd ../engine && cargo fmt --all && cd ../desktop/src-tauri && cargo fmt --all",
+		"check": "cd apps/web && bun run check && cd ../mobile && bun run check && cd ../../libs/types && bun run check && cd ../../apps/api && test -z \"$(gofmt -l ./cmd ./internal)\" && CGO_ENABLED=1 go test ./... && CGO_ENABLED=1 go vet ./... && cd ../engine && cargo check && cd ../desktop/src-tauri && cargo check",
+		"typecheck": "cd apps/web && bun run typecheck && cd ../mobile && bun run typecheck",
 		"api:migrate": "just api-migrate",
 		"clean": "cd apps/web && bun run clean && cd ../api && rm -rf dist && cd ../engine && cargo clean && cd ../desktop/src-tauri && cargo clean"
 	},
 	"devDependencies": {
+		"@babel/plugin-transform-react-jsx": "^7.28.6",
+		"@babel/plugin-transform-typescript": "^7.25.2",
+		"@babel/preset-typescript": "^7.23.0",
 		"@biomejs/biome": "^2.5.10"
 	}
 }

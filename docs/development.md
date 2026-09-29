@@ -92,9 +92,15 @@ Useful focused targets include:
 ```bash
 just api-test
 just engine-test
+just web-test
+just mobile-test
 just web-typecheck
 just api-migrate
 ```
+
+API and game service tests need PostgreSQL: they use `TEST_DATABASE_URL`
+when set, else `DATABASE_URL`, else a local `chess_test` database, and skip
+when nothing is reachable.
 
 The API build is a CGO-enabled Go binary linked against the Rust engine
 static library (`just engine-lib` builds `apps/engine/target/release/libchess.a`
