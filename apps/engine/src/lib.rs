@@ -362,4 +362,136 @@ mod ffi_tests {
         let (code, _) = call("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1", OPPONENT_MINIMAX);
         assert_eq!(code, ENGINE_NO_MOVES);
     }
+
+    #[test]
+    fn rejects_null_and_empty_inputs() {
+        let mut out = vec![0 as c_char; 16];
+        let fen = CString::new(STARTPOS).unwrap();
+        let null: *const c_char = std::ptr::null();
+        assert_eq!(
+            engine_best_move(
+                null,
+                OPPONENT_MINIMAX,
+                0,
+                0,
+                out.as_mut_ptr(),
+                out.len(),
+                null as *mut c_char,
+                0
+            ),
+            ENGINE_BAD_ARGS
+        );
+        assert_eq!(
+            engine_best_move(
+                fen.as_ptr(),
+                OPPONENT_MINIMAX,
+                0,
+                0,
+                null as *mut c_char,
+                16,
+                null as *mut c_char,
+                0
+            ),
+            ENGINE_BAD_ARGS
+        );
+        assert_eq!(
+            engine_best_move(
+                fen.as_ptr(),
+                OPPONENT_MINIMAX,
+                0,
+                0,
+                out.as_mut_ptr(),
+                0,
+                null as *mut c_char,
+                0
+            ),
+            ENGINE_BAD_ARGS
+        );
+        let empty = CString::new("").unwrap();
+        assert_eq!(
+            engine_best_move(
+                empty.as_ptr(),
+                OPPONENT_MINIMAX,
+                0,
+                0,
+                out.as_mut_ptr(),
+                out.len(),
+                null as *mut c_char,
+                0
+            ),
+            ENGINE_BAD_ARGS
+        );
+    }
+
+    #[test]
+    fn rejects_output_buffer_too_small_for_uci() {
+        let fen = CString::new(STARTPOS).unwrap();
+        // Any legal UCI move needs at least 5 bytes with the terminator.
+        let mut out = vec![0 as c_char; 2];
+        assert_eq!(
+            engine_best_move(
+                fen.as_ptr(),
+                OPPONENT_MINIMAX,
+                0,
+                0,
+                out.as_mut_ptr(),
+                out.len(),
+                std::ptr::null_mut(),
+                0
+            ),
+            ENGINE_BAD_ARGS
+        );
+    }
+
+    #[test]
+    fn info_buffer_is_optional_and_lossy() {
+        let fen = CString::new(STARTPOS).unwrap();
+        let mut out = vec![0 as c_char; 16];
+        // Null info buffer still succeeds.
+        assert_eq!(
+            engine_best_move(
+                fen.as_ptr(),
+                OPPONENT_CUSTOM,
+                50,
+                4,
+                out.as_mut_ptr(),
+                out.len(),
+                std::ptr::null_mut(),
+                0
+            ),
+            ENGINE_OK
+        );
+        // A too-small info buffer must not fail the move.
+        let mut tiny = vec![0 as c_char; 4];
+        assert_eq!(
+            engine_best_move(
+                fen.as_ptr(),
+                OPPONENT_CUSTOM,
+                50,
+                4,
+                out.as_mut_ptr(),
+                out.len(),
+                tiny.as_mut_ptr(),
+                tiny.len()
+            ),
+            ENGINE_OK
+        );
+        // A roomy buffer reports the custom engine diagnostics.
+        let mut info = vec![0 as c_char; 128];
+        assert_eq!(
+            engine_best_move(
+                fen.as_ptr(),
+                OPPONENT_CUSTOM,
+                50,
+                4,
+                out.as_mut_ptr(),
+                out.len(),
+                info.as_mut_ptr(),
+                info.len()
+            ),
+            ENGINE_OK
+        );
+        let text = unsafe { CStr::from_ptr(info.as_ptr()) }.to_string_lossy();
+        assert!(text.starts_with("engine=custom depth"), "info = {text:?}");
+    }
 }
