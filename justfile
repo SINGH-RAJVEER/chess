@@ -346,8 +346,8 @@ engine-clean:
 desktop-dev:
     devenv shell -- bash -c 'cd apps/desktop && exec bunx tauri dev'
 
-# Build and bundle the desktop app
-desktop-build:
+# Build and bundle the desktop app (embeds a fresh apps/web/dist)
+desktop-build: web-build
     devenv shell -- bash -c 'cd apps/desktop && exec bunx tauri build'
 
 # Test the desktop Rust crate
