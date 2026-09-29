@@ -17,8 +17,8 @@ import (
 // of making clients poll. PostgreSQL remains the source of truth; the hub
 // only routes notifications and enforces turn ownership.
 type Hub struct {
-	auth  *auth.Service
-	games *game.Service
+	auth   *auth.Service
+	games  *game.Service
 	broker Broker
 
 	mu            sync.Mutex
@@ -668,7 +668,8 @@ func (hub *Hub) handleRematchRespond(client *Client, msg incoming) {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 		return
 	}
-	for _, participant := range hub.participantClients(created) {		hub.subscribe(participant, created.ID)
+	for _, participant := range hub.participantClients(created) {
+		hub.subscribe(participant, created.ID)
 		info, err := hub.matchedInfo(created.ID, participant.userID)
 		if err == nil {
 			participant.sendJSON(map[string]any{"type": "game.matched", "gameId": info["gameId"], "color": info["color"], "timeControl": info["timeControl"], "increment": info["increment"]})
