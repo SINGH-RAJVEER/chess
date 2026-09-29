@@ -10,11 +10,13 @@ import (
 
 	"github.com/rajveer/chess/apps/api/internal/auth"
 	"github.com/rajveer/chess/apps/api/internal/game"
+	"github.com/rajveer/chess/apps/api/internal/realtime"
 )
 
 type App struct {
 	service    *game.Service
 	auth       *auth.Service
+	hub        *realtime.Hub
 	corsOrigin string
 }
 
@@ -27,7 +29,7 @@ func WithCORSOrigin(origin string) Option {
 }
 
 func NewHandler(authService *auth.Service, gameService *game.Service, options ...Option) http.Handler {
-	app := &App{service: gameService, auth: authService}
+	app := &App{service: gameService, auth: authService, hub: realtime.NewHub(authService, gameService)}
 	for _, option := range options {
 		option(app)
 	}
@@ -37,6 +39,7 @@ func NewHandler(authService *auth.Service, gameService *game.Service, options ..
 func (app *App) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) })
+	mux.HandleFunc("GET /api/ws", app.hub.ServeWS)
 	mux.HandleFunc("GET /api/board", app.board)
 	mux.HandleFunc("GET /api/moves", app.moves)
 	mux.HandleFunc("GET /api/queue-status", app.queueStatus)

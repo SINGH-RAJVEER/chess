@@ -16,10 +16,59 @@ import (
 
 type Service struct {
 	db *pgxpool.Pool
+	// OnUpdate is invoked (in a separate goroutine) after every committed
+	// game mutation so realtime subscribers can push fresh state without
+	// polling. Set by the realtime hub; nil when unused.
+	OnUpdate func(gameID int)
 }
 
 func NewService(db *pgxpool.Pool) *Service {
 	return &Service{db: db}
+}
+
+func (service *Service) notify(gameID int) {
+	if service.OnUpdate == nil {
+		return
+	}
+	go service.OnUpdate(gameID)
+}
+
+// GetGame loads a game row without pieces or moves. Used for
+// authorization and presence checks on the realtime path.
+func (service *Service) GetGame(ctx context.Context, gameID int) (*Game, error) {
+	return scanGame(service.db.QueryRow(ctx, `SELECT `+gameColumns+` FROM games WHERE id=$1`, gameID))
+}
+
+// Rematch creates a fresh game for the same participants with swapped
+// colors. Only participants of a finished vs_player game may rematch;
+// vs_computer rematches create a fresh anonymous computer game.
+func (service *Service) Rematch(ctx context.Context, gameID int, userID string) (*Game, error) {
+	game, err := service.GetGame(ctx, gameID)
+	if err != nil || game == nil {
+		return nil, errors.New("No game found")
+	}
+	if game.Status == "Ongoing" {
+		return nil, errors.New("Game is not over")
+	}
+	if game.Mode == "vs_computer" {
+		created, err := service.createGame(ctx, "vs_computer", 0, 0, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		service.notify(created.ID)
+		return created, nil
+	}
+	isParticipant := (game.WhitePlayerID != nil && *game.WhitePlayerID == userID) ||
+		(game.BlackPlayerID != nil && *game.BlackPlayerID == userID)
+	if !isParticipant {
+		return nil, errors.New("Only participants may request a rematch")
+	}
+	created, err := service.createGame(ctx, game.Mode, game.TimeControl, game.Increment, game.BlackPlayerID, game.WhitePlayerID)
+	if err != nil {
+		return nil, err
+	}
+	service.notify(created.ID)
+	return created, nil
 }
 
 func (service *Service) createGame(ctx context.Context, mode string, timeControl, increment int, whiteID, blackID *string) (*Game, error) {
@@ -358,6 +407,7 @@ func (service *Service) makeMove(ctx context.Context, gameID, from, to int, prom
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
+	service.notify(gameID)
 	result := map[string]any{"success": true, "nextTurn": next, "status": status, "captured": captured != "", "isCheck": check, "isCheckmate": status == "Checkmate", "isCastle": isCastle}
 	if promoted != "" {
 		result["promotion"] = promoted
@@ -398,8 +448,33 @@ func (service *Service) Reset(ctx context.Context, mode string, timeControl, inc
 	return err
 }
 
-func (service *Service) QueueStatus(ctx context.Context, playerID string) (map[string]any, error) {
-	var timeControl int
+// NewLocalGame creates an anonymous game for local or computer play and
+// returns it. The realtime game.new message uses this so single-player
+// sessions work over the same socket as PvP.
+func (service *Service) NewLocalGame(ctx context.Context, mode string, timeControl, increment int) (*Game, error) {
+	if mode == "" {
+		mode = "vs_player"
+	}
+	if mode == "vs_computer" {
+		timeControl = 0
+		increment = 0
+	}
+	created, err := service.createGame(ctx, mode, timeControl, increment, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	service.notify(created.ID)
+	return created, nil
+}
+
+// LeaveQueue removes a player from matchmaking. Used by the realtime
+// queue.leave message so clients stop receiving queue.status pushes.
+func (service *Service) LeaveQueue(ctx context.Context, playerID string) error {
+	_, err := service.db.Exec(ctx, `DELETE FROM queue WHERE player_id=$1`, playerID)
+	return err
+}
+
+func (service *Service) QueueStatus(ctx context.Context, playerID string) (map[string]any, error) {	var timeControl int
 	err := service.db.QueryRow(ctx, `SELECT time_control FROM queue WHERE player_id=$1 LIMIT 1`, playerID).Scan(&timeControl)
 	if err == nil {
 		return map[string]any{"status": "queued", "timeControl": timeControl}, nil
@@ -476,7 +551,11 @@ func (service *Service) JoinQueue(ctx context.Context, playerID string, timeCont
 	if err := results.Close(); err != nil {
 		return nil, err
 	}
-	return map[string]any{"status": "matched", "gameId": gameID}, tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	service.notify(gameID)
+	return map[string]any{"status": "matched", "gameId": gameID}, nil
 }
 
 func (service *Service) Undo(ctx context.Context, gameID int) (map[string]any, error) {
@@ -528,7 +607,11 @@ func (service *Service) Undo(ctx context.Context, gameID int) (map[string]any, e
 	if _, err := tx.Exec(ctx, `UPDATE games SET current_turn=$1,status='Ongoing',updated_at=$2,draw_offered_by=NULL WHERE id=$3`, last.PieceColor, time.Now().UnixMilli(), gameID); err != nil {
 		return nil, err
 	}
-	return map[string]any{"success": true}, tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	service.notify(gameID)
+	return map[string]any{"success": true}, nil
 }
 
 func (service *Service) Resign(ctx context.Context, gameID int, color Color) (map[string]any, error) {
@@ -547,6 +630,9 @@ func (service *Service) Resign(ctx context.Context, gameID int, color Color) (ma
 		winner = Black
 	}
 	_, err = service.db.Exec(ctx, `UPDATE games SET status='Resignation',updated_at=$1 WHERE id=$2`, time.Now().UnixMilli(), gameID)
+	if err == nil {
+		service.notify(gameID)
+	}
 	return map[string]any{"success": true, "status": "Resignation", "winner": winner}, err
 }
 func (service *Service) OfferDraw(ctx context.Context, gameID int, color Color) (map[string]any, error) {
@@ -571,6 +657,9 @@ func (service *Service) setDraw(ctx context.Context, gameID int, offer *Color, s
 		return nil, errors.New("Game is not ongoing")
 	}
 	_, err = service.db.Exec(ctx, `UPDATE games SET status=$1,draw_offered_by=$2,updated_at=$3 WHERE id=$4`, status, offer, time.Now().UnixMilli(), gameID)
+	if err == nil {
+		service.notify(gameID)
+	}
 	return result, err
 }
 func max64(a, b int64) int64 {
