@@ -1,0 +1,13 @@
+{
+	"extends": "expo/tsconfig.base.json",
+	"compilerOptions": {
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"types": ["bun"],
+		"paths": {
+			"@/*": ["./src/*"]
+		}
+	},
+	"include": ["**/*.ts", "**/*.tsx", "nativewind-env.d.ts"]
+}
