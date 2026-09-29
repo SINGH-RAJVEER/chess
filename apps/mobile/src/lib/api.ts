@@ -1,21 +1,4 @@
-import type {
-	AuthResponse,
-	BoardResponse,
-	Color,
-	DrawOfferResponse,
-	DrawRespondResponse,
-	GetBoardParams,
-	GetMovesParams,
-	JoinQueueRequest,
-	MakeMoveRequest,
-	MakeMoveResponse,
-	QueueStatusResponse,
-	ResetGameRequest,
-	ResetGameResponse,
-	ResignResponse,
-	UndoMoveRequest,
-	UndoMoveResponse,
-} from "@chess/types";
+import type { AuthResponse } from "@chess/types";
 import * as SecureStore from "expo-secure-store";
 import { getApiBaseUrl } from "./config";
 
@@ -68,80 +51,6 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
 	}
 
 	return (await response.json()) as T;
-}
-
-export function getBoard(params: GetBoardParams): Promise<BoardResponse> {
-	const searchParams = new URLSearchParams();
-	if (params.mode) searchParams.set("mode", params.mode);
-	if (params.gameId !== undefined) {
-		searchParams.set("gameId", String(params.gameId));
-	}
-	if (params.playerId) searchParams.set("playerId", params.playerId);
-
-	return apiRequest<BoardResponse>(`/api/board?${searchParams.toString()}`);
-}
-
-export function getMoves(params: GetMovesParams): Promise<number[]> {
-	const searchParams = new URLSearchParams({
-		square: String(params.square),
-		gameId: String(params.gameId),
-	});
-
-	return apiRequest<number[]>(`/api/moves?${searchParams.toString()}`);
-}
-
-export function getQueueStatus(playerId: string): Promise<QueueStatusResponse> {
-	const searchParams = new URLSearchParams({ playerId });
-	return apiRequest<QueueStatusResponse>(`/api/queue-status?${searchParams.toString()}`);
-}
-
-export function joinQueue(body: JoinQueueRequest): Promise<QueueStatusResponse> {
-	return apiRequest<QueueStatusResponse>("/api/join-queue", {
-		method: "POST",
-		body: JSON.stringify(body),
-	});
-}
-
-export function makeMove(body: MakeMoveRequest): Promise<MakeMoveResponse> {
-	return apiRequest<MakeMoveResponse>("/api/move", {
-		method: "POST",
-		body: JSON.stringify(body),
-	});
-}
-
-export function undoMove(body: UndoMoveRequest): Promise<UndoMoveResponse> {
-	return apiRequest<UndoMoveResponse>("/api/undo", {
-		method: "POST",
-		body: JSON.stringify(body),
-	});
-}
-
-export function resetGame(body: ResetGameRequest): Promise<ResetGameResponse> {
-	return apiRequest<ResetGameResponse>("/api/reset", {
-		method: "POST",
-		body: JSON.stringify(body),
-	});
-}
-
-export function resignGame(gameId: number, color: Color): Promise<ResignResponse> {
-	return apiRequest<ResignResponse>("/api/resign", {
-		method: "POST",
-		body: JSON.stringify({ gameId, color }),
-	});
-}
-
-export function offerDraw(gameId: number, color: Color): Promise<DrawOfferResponse> {
-	return apiRequest<DrawOfferResponse>("/api/draw-offer", {
-		method: "POST",
-		body: JSON.stringify({ gameId, color }),
-	});
-}
-
-export function respondToDraw(gameId: number, accept: boolean): Promise<DrawRespondResponse> {
-	return apiRequest<DrawRespondResponse>("/api/draw-respond", {
-		method: "POST",
-		body: JSON.stringify({ gameId, accept }),
-	});
 }
 
 export async function signIn(email: string, password: string): Promise<AuthResponse> {

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/rajveer/chess/apps/api/internal/auth"
@@ -14,7 +13,6 @@ import (
 )
 
 type App struct {
-	service    *game.Service
 	auth       *auth.Service
 	hub        *realtime.Hub
 	broker     realtime.Broker
@@ -36,7 +34,7 @@ func WithBroker(broker realtime.Broker) Option {
 }
 
 func NewHandler(authService *auth.Service, gameService *game.Service, options ...Option) http.Handler {
-	app := &App{service: gameService, auth: authService}
+	app := &App{auth: authService}
 	for _, option := range options {
 		option(app)
 	}
@@ -48,16 +46,7 @@ func (app *App) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) })
 	mux.HandleFunc("GET /api/ws", app.hub.ServeWS)
-	mux.HandleFunc("GET /api/board", app.board)
-	mux.HandleFunc("GET /api/moves", app.moves)
-	mux.HandleFunc("GET /api/queue-status", app.queueStatus)
-	mux.HandleFunc("POST /api/reset", app.reset)
-	mux.HandleFunc("POST /api/join-queue", app.joinQueue)
-	mux.HandleFunc("POST /api/move", app.move)
-	mux.HandleFunc("POST /api/undo", app.undo)
-	mux.HandleFunc("POST /api/resign", app.resign)
-	mux.HandleFunc("POST /api/draw-offer", app.drawOffer)
-	mux.HandleFunc("POST /api/draw-respond", app.drawRespond)
+	// Game play is websocket-only; auth stays on REST.
 	mux.HandleFunc("POST /api/auth/sign-up", app.signUp)
 	mux.HandleFunc("POST /api/auth/sign-up/email", app.signUp)
 	mux.HandleFunc("POST /api/auth/sign-in", app.signIn)
@@ -109,201 +98,6 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 func decode(r *http.Request, value any) error { return json.NewDecoder(r.Body).Decode(value) }
 func fail(w http.ResponseWriter, err error) {
 	writeJSON(w, 500, map[string]string{"error": err.Error()})
-}
-func intQuery(r *http.Request, name string) (int, error) {
-	return strconv.Atoi(r.URL.Query().Get(name))
-}
-
-func (app *App) board(w http.ResponseWriter, r *http.Request) {
-	var gameID *int
-	if raw := r.URL.Query().Get("gameId"); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err == nil {
-			gameID = &value
-		}
-	}
-	result, err := app.service.GetBoard(r.Context(), r.URL.Query().Get("mode"), gameID, r.URL.Query().Get("playerId"))
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, result)
-}
-func (app *App) moves(w http.ResponseWriter, r *http.Request) {
-	from, e1 := intQuery(r, "square")
-	gameID, e2 := intQuery(r, "gameId")
-	if e1 != nil || e2 != nil {
-		writeJSON(w, 400, map[string]string{"error": "square and gameId are required"})
-		return
-	}
-	result, err := app.service.ValidMoves(r.Context(), gameID, from)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, result)
-}
-func (app *App) queueStatus(w http.ResponseWriter, r *http.Request) {
-	playerID := r.URL.Query().Get("playerId")
-	if playerID == "" {
-		writeJSON(w, 400, map[string]string{"error": "playerId is required"})
-		return
-	}
-	result, err := app.service.QueueStatus(r.Context(), playerID)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, result)
-}
-
-type gameRequest struct {
-	GameID      *int           `json:"gameId"`
-	From        *int           `json:"from"`
-	To          *int           `json:"to"`
-	Mode        string         `json:"mode"`
-	TimeControl *int           `json:"timeControl"`
-	Increment   *int           `json:"increment"`
-	PlayerID    string         `json:"playerId"`
-	Promotion   game.PieceType `json:"promotion"`
-	Opponent    string         `json:"opponent"`
-	Color       game.Color     `json:"color"`
-	Accept      *bool          `json:"accept"`
-}
-
-func (app *App) reset(w http.ResponseWriter, r *http.Request) {
-	var body gameRequest
-	if err := decode(r, &body); err != nil {
-		fail(w, err)
-		return
-	}
-	mode := body.Mode
-	if mode == "" {
-		mode = "vs_player"
-	}
-	tc := 10
-	if body.TimeControl != nil {
-		tc = *body.TimeControl
-	}
-	increment := 0
-	if body.Increment != nil {
-		increment = *body.Increment
-	}
-	if err := app.service.Reset(r.Context(), mode, tc, increment); err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, map[string]bool{"success": true})
-}
-func (app *App) joinQueue(w http.ResponseWriter, r *http.Request) {
-	var body gameRequest
-	if err := decode(r, &body); err != nil {
-		fail(w, err)
-		return
-	}
-	if body.PlayerID == "" || body.TimeControl == nil {
-		writeJSON(w, 400, map[string]string{"error": "playerId and timeControl are required"})
-		return
-	}
-	increment := 0
-	if body.Increment != nil {
-		increment = *body.Increment
-	}
-	result, err := app.service.JoinQueue(r.Context(), body.PlayerID, *body.TimeControl, increment)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, result)
-}
-func (app *App) move(w http.ResponseWriter, r *http.Request) {
-	var body gameRequest
-	if err := decode(r, &body); err != nil {
-		fail(w, err)
-		return
-	}
-	if body.From == nil || body.To == nil || body.GameID == nil {
-		writeJSON(w, 400, map[string]string{"error": "from, to, and gameId are required"})
-		return
-	}
-	if body.Opponent != "" && body.Opponent != "minimax" && body.Opponent != "custom" && body.Opponent != "dqn" {
-		writeJSON(w, 400, map[string]string{"error": "opponent must be minimax, custom, or dqn"})
-		return
-	}
-	result, err := app.service.MakeMove(r.Context(), *body.GameID, *body.From, *body.To, body.Promotion, body.Opponent)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, result)
-}
-func (app *App) undo(w http.ResponseWriter, r *http.Request) {
-	var body gameRequest
-	if err := decode(r, &body); err != nil {
-		fail(w, err)
-		return
-	}
-	if body.GameID == nil {
-		writeJSON(w, 400, map[string]string{"error": "gameId is required"})
-		return
-	}
-	result, err := app.service.Undo(r.Context(), *body.GameID)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, result)
-}
-func (app *App) resign(w http.ResponseWriter, r *http.Request) {
-	var body gameRequest
-	if err := decode(r, &body); err != nil {
-		fail(w, err)
-		return
-	}
-	if body.GameID == nil || body.Color == "" {
-		writeJSON(w, 400, map[string]string{"error": "gameId and color are required"})
-		return
-	}
-	result, err := app.service.Resign(r.Context(), *body.GameID, body.Color)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, result)
-}
-func (app *App) drawOffer(w http.ResponseWriter, r *http.Request) {
-	var body gameRequest
-	if err := decode(r, &body); err != nil {
-		fail(w, err)
-		return
-	}
-	if body.GameID == nil || body.Color == "" {
-		writeJSON(w, 400, map[string]string{"error": "gameId and color are required"})
-		return
-	}
-	result, err := app.service.OfferDraw(r.Context(), *body.GameID, body.Color)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, result)
-}
-func (app *App) drawRespond(w http.ResponseWriter, r *http.Request) {
-	var body gameRequest
-	if err := decode(r, &body); err != nil {
-		fail(w, err)
-		return
-	}
-	if body.GameID == nil || body.Accept == nil {
-		writeJSON(w, 400, map[string]string{"error": "gameId and accept are required"})
-		return
-	}
-	result, err := app.service.RespondDraw(r.Context(), *body.GameID, *body.Accept)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	writeJSON(w, 200, result)
 }
 
 type authRequest struct {

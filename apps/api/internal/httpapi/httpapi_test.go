@@ -32,17 +32,8 @@ func TestCredentialedCORS(t *testing.T) {
 
 func TestValidationContracts(t *testing.T) {
 	tests := []struct{ method, path, body, message string }{
-		{http.MethodGet, "/api/moves", "", "square and gameId are required"},
-		{http.MethodGet, "/api/queue-status", "", "playerId is required"},
-		{http.MethodPost, "/api/move", `{}`, "from, to, and gameId are required"},
-		{http.MethodPost, "/api/undo", `{}`, "gameId is required"},
-		{http.MethodPost, "/api/resign", `{}`, "gameId and color are required"},
-		{http.MethodPost, "/api/draw-offer", `{}`, "gameId and color are required"},
-		{http.MethodPost, "/api/draw-respond", `{}`, "gameId and accept are required"},
-		{http.MethodPost, "/api/join-queue", `{}`, "playerId and timeControl are required"},
 		{http.MethodPost, "/api/auth/sign-up", `{}`, "Email, password, and name are required"},
 		{http.MethodPost, "/api/auth/sign-in", `{}`, "Email and password are required"},
-		{http.MethodPost, "/api/move", `{"from":52,"to":36,"gameId":1,"opponent":"unknown"}`, "opponent must be minimax, custom, or dqn"},
 	}
 	handler := httpapi.NewHandler(nil, nil)
 	for _, test := range tests {
@@ -53,6 +44,35 @@ func TestValidationContracts(t *testing.T) {
 			var result map[string]string
 			_ = json.Unmarshal(response.Body.Bytes(), &result)
 			if response.Code != 400 || result["error"] != test.message {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestGameRestEndpointsAreGone(t *testing.T) {
+	// Game play is websocket-only (`GET /api/ws`). The legacy REST game
+	// endpoints must stay removed so no client can bypass turn ownership
+	// and room broadcasts.
+	removed := []struct{ method, path, body string }{
+		{http.MethodGet, "/api/board", ""},
+		{http.MethodGet, "/api/moves?square=52&gameId=1", ""},
+		{http.MethodGet, "/api/queue-status?playerId=alice", ""},
+		{http.MethodPost, "/api/reset", `{}`},
+		{http.MethodPost, "/api/join-queue", `{}`},
+		{http.MethodPost, "/api/move", `{}`},
+		{http.MethodPost, "/api/undo", `{}`},
+		{http.MethodPost, "/api/resign", `{}`},
+		{http.MethodPost, "/api/draw-offer", `{}`},
+		{http.MethodPost, "/api/draw-respond", `{}`},
+	}
+	handler := httpapi.NewHandler(nil, nil)
+	for _, test := range removed {
+		t.Run(test.method+" "+test.path, func(t *testing.T) {
+			request := httptest.NewRequest(test.method, test.path, strings.NewReader(test.body))
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusNotFound {
 				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 			}
 		})

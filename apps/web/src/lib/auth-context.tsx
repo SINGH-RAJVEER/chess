@@ -1,5 +1,26 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
-import type { AuthResponse } from "./api";
+
+export type AuthResponse = {
+	user: {
+		id: string;
+		email: string;
+		name: string;
+		image: string | null;
+		emailVerified: boolean;
+		createdAt: string;
+		updatedAt: string;
+	};
+	session: {
+		id: string;
+		expiresAt: string;
+		token: string;
+		createdAt: string;
+		updatedAt: string;
+		ipAddress: string | null;
+		userAgent: string | null;
+		userId: string;
+	};
+};
 
 type AuthState = {
 	user: AuthResponse["user"] | null;
