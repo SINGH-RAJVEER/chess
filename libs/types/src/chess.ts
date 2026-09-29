@@ -21,6 +21,12 @@ export type ComputerOpponent = "minimax" | "custom";
 
 export type QueueStatus = "idle" | "queued" | "matched";
 
+export type QueueStatusResponse = {
+	status: QueueStatus;
+	timeControl?: number;
+	gameId?: number;
+};
+
 export type UserColor = Color | "Spectator";
 
 export type DrawOfferStatus = "none" | "offered" | "accepted" | "declined";
