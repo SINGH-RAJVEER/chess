@@ -17,6 +17,7 @@ type App struct {
 	service    *game.Service
 	auth       *auth.Service
 	hub        *realtime.Hub
+	broker     realtime.Broker
 	corsOrigin string
 }
 
@@ -28,11 +29,18 @@ func WithCORSOrigin(origin string) Option {
 	}
 }
 
+func WithBroker(broker realtime.Broker) Option {
+	return func(app *App) {
+		app.broker = broker
+	}
+}
+
 func NewHandler(authService *auth.Service, gameService *game.Service, options ...Option) http.Handler {
-	app := &App{service: gameService, auth: authService, hub: realtime.NewHub(authService, gameService)}
+	app := &App{service: gameService, auth: authService}
 	for _, option := range options {
 		option(app)
 	}
+	app.hub = realtime.NewHub(authService, gameService, app.broker)
 	return app.handler()
 }
 

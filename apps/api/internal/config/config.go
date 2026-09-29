@@ -15,6 +15,7 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	AutoMigrate        bool
+	RedisURL           string
 }
 
 func Load() (Config, error) {
@@ -28,6 +29,7 @@ func Load() (Config, error) {
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		AutoMigrate:        os.Getenv("AUTO_MIGRATE") == "true",
+		RedisURL:           os.Getenv("REDIS_URL"),
 	}
 	if config.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

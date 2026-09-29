@@ -13,6 +13,7 @@ import (
 	"github.com/rajveer/chess/apps/api/internal/database"
 	"github.com/rajveer/chess/apps/api/internal/game"
 	"github.com/rajveer/chess/apps/api/internal/httpapi"
+	"github.com/rajveer/chess/apps/api/internal/realtime"
 )
 
 func main() {
@@ -43,9 +44,19 @@ func main() {
 		WebOrigin:    config.WebOrigin,
 	})
 	gameService := game.NewService(db)
+	var broker realtime.Broker = realtime.NewMemoryBroker()
+	if config.RedisURL != "" {
+		redisBroker, err := realtime.NewRedisBroker(config.RedisURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer redisBroker.Close()
+		broker = redisBroker
+		log.Print("realtime broker using redis")
+	}
 	server := &http.Server{
 		Addr:              net.JoinHostPort(config.Host, config.Port),
-		Handler:           httpapi.NewHandler(authService, gameService, httpapi.WithCORSOrigin(config.WebOrigin)),
+		Handler:           httpapi.NewHandler(authService, gameService, httpapi.WithCORSOrigin(config.WebOrigin), httpapi.WithBroker(broker)),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	log.Printf("api listening on %s", server.Addr)

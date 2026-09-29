@@ -19,6 +19,7 @@ import (
 type Hub struct {
 	auth  *auth.Service
 	games *game.Service
+	broker Broker
 
 	mu            sync.Mutex
 	clients       map[*Client]bool
@@ -39,10 +40,14 @@ type Client struct {
 	done   chan struct{}
 }
 
-func NewHub(authService *auth.Service, gameService *game.Service) *Hub {
+func NewHub(authService *auth.Service, gameService *game.Service, broker Broker) *Hub {
+	if broker == nil {
+		broker = NewMemoryBroker()
+	}
 	hub := &Hub{
 		auth:          authService,
 		games:         gameService,
+		broker:        broker,
 		clients:       make(map[*Client]bool),
 		byUser:        make(map[string]map[*Client]bool),
 		rooms:         make(map[int]map[*Client]bool),
@@ -51,9 +56,25 @@ func NewHub(authService *auth.Service, gameService *game.Service) *Hub {
 		lastStatus:    make(map[int]game.GameStatus),
 		lastMoves:     make(map[int]int),
 	}
-	gameService.OnUpdate = hub.notifyGame
+	// Nil services are tolerated so handler contract tests can construct
+	// the mux without a database.
+	if gameService != nil {
+		gameService.OnUpdate = hub.notifyGame
+	}
+	// Every change flows through the broker so all replicas converge:
+	// the local broadcast below serves this instance's subscribers while
+	// remote instances deliver to theirs.
+	broker.Subscribe(func(gameID int) {
+		hub.broadcastGame(gameID)
+	})
 	go hub.timeoutLoop()
 	return hub
+}
+
+// gameChanged announces a mutation. Delivery to subscribers on this and
+// every other replica happens through the broker subscription above.
+func (hub *Hub) gameChanged(gameID int) {
+	hub.broker.Publish(gameID)
 }
 
 func (hub *Hub) ServeWS(writer http.ResponseWriter, request *http.Request) {
@@ -432,7 +453,7 @@ func (hub *Hub) handleMove(client *Client, msg incoming) {
 		return
 	}
 	hub.subscribe(client, *msg.GameID)
-	hub.broadcastGame(*msg.GameID)
+	hub.gameChanged(*msg.GameID)
 }
 
 func (hub *Hub) handleResign(client *Client, msg incoming) {
@@ -466,7 +487,7 @@ func (hub *Hub) handleResign(client *Client, msg incoming) {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 		return
 	}
-	hub.broadcastGame(*msg.GameID)
+	hub.gameChanged(*msg.GameID)
 	winner, _ := result["winner"].(game.Color)
 	client.sendJSON(map[string]any{"id": msg.ID, "type": "game.over", "gameId": *msg.GameID, "status": "Resignation", "winner": winner, "reason": "resignation"})
 }
@@ -494,7 +515,7 @@ func (hub *Hub) handleDrawOffer(client *Client, msg incoming) {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 		return
 	}
-	hub.broadcastGame(*msg.GameID)
+	hub.gameChanged(*msg.GameID)
 	hub.broadcastExcept(*msg.GameID, client, map[string]any{"type": "game.draw.offered", "gameId": *msg.GameID, "by": color})
 }
 
@@ -518,7 +539,7 @@ func (hub *Hub) handleDrawRespond(client *Client, msg incoming) {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 		return
 	}
-	hub.broadcastGame(*msg.GameID)
+	hub.gameChanged(*msg.GameID)
 }
 
 func (hub *Hub) handleUndoRequest(client *Client, msg incoming) {
@@ -540,7 +561,7 @@ func (hub *Hub) handleUndoRequest(client *Client, msg incoming) {
 				client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 				return
 			}
-			hub.broadcastGame(*msg.GameID)
+			hub.gameChanged(*msg.GameID)
 			return
 		}
 		if stored.Mode == "vs_computer" {
@@ -548,7 +569,7 @@ func (hub *Hub) handleUndoRequest(client *Client, msg incoming) {
 				client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 				return
 			}
-			hub.broadcastGame(*msg.GameID)
+			hub.gameChanged(*msg.GameID)
 			return
 		}
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
@@ -559,7 +580,7 @@ func (hub *Hub) handleUndoRequest(client *Client, msg incoming) {
 			client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 			return
 		}
-		hub.broadcastGame(*msg.GameID)
+		hub.gameChanged(*msg.GameID)
 		return
 	}
 	hub.mu.Lock()
@@ -597,7 +618,7 @@ func (hub *Hub) handleUndoRespond(client *Client, msg incoming) {
 		return
 	}
 	hub.broadcast(*msg.GameID, map[string]any{"type": "game.undo.result", "gameId": *msg.GameID, "accepted": true})
-	hub.broadcastGame(*msg.GameID)
+	hub.gameChanged(*msg.GameID)
 }
 
 func (hub *Hub) handleRematchOffer(client *Client, msg incoming) {
@@ -647,14 +668,13 @@ func (hub *Hub) handleRematchRespond(client *Client, msg incoming) {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 		return
 	}
-	for _, participant := range hub.participantClients(created) {
-		hub.subscribe(participant, created.ID)
+	for _, participant := range hub.participantClients(created) {		hub.subscribe(participant, created.ID)
 		info, err := hub.matchedInfo(created.ID, participant.userID)
 		if err == nil {
 			participant.sendJSON(map[string]any{"type": "game.matched", "gameId": info["gameId"], "color": info["color"], "timeControl": info["timeControl"], "increment": info["increment"]})
 		}
 	}
-	hub.broadcastGame(created.ID)
+	hub.gameChanged(created.ID)
 }
 
 func (hub *Hub) authorizeTurn(stored *game.Game, userID string) error {
@@ -915,12 +935,7 @@ func (hub *Hub) participantClients(created *game.Game) []*Client {
 }
 
 func (hub *Hub) notifyGame(gameID int) {
-	hub.mu.Lock()
-	_, watching := hub.rooms[gameID]
-	hub.mu.Unlock()
-	if watching {
-		hub.broadcastGame(gameID)
-	}
+	hub.gameChanged(gameID)
 }
 
 func (hub *Hub) timeoutLoop() {
@@ -945,7 +960,7 @@ func (hub *Hub) timeoutLoop() {
 			hub.lastMoves[gameID] = len(board.Moves)
 			hub.mu.Unlock()
 			if (!seenStatus || previousStatus != board.Status) || (!seenMoves || previousMoves != len(board.Moves)) {
-				hub.broadcastGame(gameID)
+				hub.gameChanged(gameID)
 			}
 		}
 	}
