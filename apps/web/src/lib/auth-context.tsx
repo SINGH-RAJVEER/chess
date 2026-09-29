@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
+import { apiUrl } from "./api-base";
 
 export type AuthResponse = {
 	user: {
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 		const loadSession = async () => {
 			try {
-				const response = await fetch("/api/auth/get-session", {
+				const response = await fetch(apiUrl("/api/auth/get-session"), {
 					credentials: "include",
 				});
 				const data = response.ok ? await response.json() : null;
@@ -102,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	}, []);
 
 	const signIn = async (email: string, password: string) => {
-		const response = await fetch("/api/auth/sign-in", {
+		const response = await fetch(apiUrl("/api/auth/sign-in"), {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			credentials: "include",
@@ -123,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	};
 
 	const signUp = async (email: string, password: string, name: string) => {
-		const response = await fetch("/api/auth/sign-up", {
+		const response = await fetch(apiUrl("/api/auth/sign-up"), {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			credentials: "include",
@@ -144,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	};
 
 	const signInWithGoogle = async () => {
-		const response = await fetch("/api/auth/sign-in/social", {
+		const response = await fetch(apiUrl("/api/auth/sign-in/social"), {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			credentials: "include",
@@ -164,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	};
 
 	const signOut = async () => {
-		await fetch("/api/auth/sign-out", {
+		await fetch(apiUrl("/api/auth/sign-out"), {
 			method: "POST",
 			credentials: "include",
 		}).catch(() => undefined);

@@ -1,4 +1,5 @@
 import type { WsClientMessage, WsServerMessage } from "@chess/types";
+import { getWsUrl } from "./api-base";
 
 export type SocketStatus = "idle" | "connecting" | "open" | "reconnecting";
 
@@ -10,11 +11,6 @@ type PendingEntry = {
 
 function nextId(): string {
 	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function wsUrl(): string {
-	const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-	return `${protocol}//${window.location.host}/api/ws`;
 }
 
 type StatusListener = (status: SocketStatus) => void;
@@ -102,7 +98,7 @@ class GameSocket {
 
 	private open() {
 		this.setStatus(this.reconnectAttempts === 0 ? "connecting" : "reconnecting");
-		const ws = new WebSocket(wsUrl());
+		const ws = new WebSocket(getWsUrl());
 		this.ws = ws;
 
 		ws.onopen = () => {
