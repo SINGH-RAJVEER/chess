@@ -203,6 +203,8 @@ func (hub *Hub) handle(client *Client, msg incoming) {
 		hub.handleQueueJoin(client, msg)
 	case "queue.leave":
 		hub.handleQueueLeave(client, msg)
+	case "queue.get":
+		hub.handleQueueGet(client, msg)
 	case "game.new":
 		hub.handleGameNew(client, msg)
 	case "game.join":
@@ -298,6 +300,28 @@ func (hub *Hub) handleQueueLeave(client *Client, msg incoming) {
 	}
 	_ = hub.games.LeaveQueue(context.Background(), client.userID)
 	client.sendJSON(map[string]any{"id": msg.ID, "type": "queue.status", "status": "idle"})
+}
+
+func (hub *Hub) handleQueueGet(client *Client, msg incoming) {
+	if client.userID == "" {
+		client.sendJSON(map[string]any{"id": msg.ID, "type": "queue.status", "status": "idle"})
+		return
+	}
+	result, err := hub.games.QueueStatus(context.Background(), client.userID)
+	if err != nil {
+		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
+		return
+	}
+	status, _ := result["status"].(string)
+	payload := map[string]any{"id": msg.ID, "type": "queue.status", "status": status}
+	if gameID, ok := result["gameId"].(int); ok {
+		payload["gameId"] = gameID
+		hub.subscribe(client, gameID)
+	}
+	if timeControl, ok := result["timeControl"].(int); ok {
+		payload["timeControl"] = timeControl
+	}
+	client.sendJSON(payload)
 }
 
 func (hub *Hub) handleGameNew(client *Client, msg incoming) {
@@ -423,10 +447,15 @@ func (hub *Hub) handleResign(client *Client, msg incoming) {
 	}
 	color, err := hub.playerColor(stored, client.userID)
 	if err != nil {
-		// Anonymous single-player sessions resign as White, matching the
-		// legacy REST behavior for vs_computer games.
-		if stored.Mode == "vs_computer" {
-			color = game.White
+		// Anonymous sessions (local board and vs_computer) have no color
+		// ownership. Single-player resigns as White to match the legacy
+		// REST behavior; local boards resign the side to move.
+		if stored.WhitePlayerID == nil && stored.BlackPlayerID == nil {
+			if stored.Mode == "vs_computer" {
+				color = game.White
+			} else {
+				color = stored.CurrentTurn
+			}
 		} else {
 			client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 			return
@@ -454,8 +483,12 @@ func (hub *Hub) handleDrawOffer(client *Client, msg incoming) {
 	}
 	color, err := hub.playerColor(stored, client.userID)
 	if err != nil {
-		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
-		return
+		if stored.WhitePlayerID == nil && stored.BlackPlayerID == nil {
+			color = stored.CurrentTurn
+		} else {
+			client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
+			return
+		}
 	}
 	if _, err := hub.games.OfferDraw(context.Background(), *msg.GameID, color); err != nil {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
@@ -476,8 +509,10 @@ func (hub *Hub) handleDrawRespond(client *Client, msg incoming) {
 		return
 	}
 	if _, err := hub.playerColor(stored, client.userID); err != nil {
-		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
-		return
+		if stored.WhitePlayerID != nil || stored.BlackPlayerID != nil {
+			client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
+			return
+		}
 	}
 	if _, err := hub.games.RespondDraw(context.Background(), *msg.GameID, *msg.Accept); err != nil {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
@@ -498,6 +533,16 @@ func (hub *Hub) handleUndoRequest(client *Client, msg incoming) {
 	}
 	color, err := hub.playerColor(stored, client.userID)
 	if err != nil {
+		// Anonymous boards (local and vs_computer) undo immediately with
+		// no consent flow; rated PvP games require the opponent to accept.
+		if stored.WhitePlayerID == nil && stored.BlackPlayerID == nil {
+			if _, err := hub.games.Undo(context.Background(), *msg.GameID); err != nil {
+				client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
+				return
+			}
+			hub.broadcastGame(*msg.GameID)
+			return
+		}
 		if stored.Mode == "vs_computer" {
 			if _, err := hub.games.Undo(context.Background(), *msg.GameID); err != nil {
 				client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})

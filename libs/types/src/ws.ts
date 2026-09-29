@@ -19,6 +19,7 @@ export type WsClientMessage =
     | { id: WsRequestId; type: "hello"; token?: string }
     | { id: WsRequestId; type: "queue.join"; timeControl: number; increment?: number }
     | { id: WsRequestId; type: "queue.leave" }
+    | { id: WsRequestId; type: "queue.get" }
     | { id: WsRequestId; type: "game.new"; mode: GameMode; timeControl?: number; increment?: number; opponent?: ComputerOpponent }
     | { id: WsRequestId; type: "game.join"; gameId: number }
     | { id: WsRequestId; type: "game.leave"; gameId: number }
