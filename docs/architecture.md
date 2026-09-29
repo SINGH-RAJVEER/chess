@@ -30,8 +30,11 @@ and never touches the network or the database.
 - Vite serves development and preview builds on port `3000`.
 - `/api` is proxied to `VITE_API_PROXY_TARGET` during Vite development and
   preview. A production reverse proxy must provide equivalent routing.
-- The client polls the API once per second for active boards and matchmaking
-  state; there is no WebSocket transport.
+- The client holds one persistent WebSocket (`GET /api/ws`) for all live
+  game traffic: matchmaking, board pushes, moves, draw/takeback/rematch
+  offers, presence, and timeout notifications. REST remains for auth,
+  health checks, and the initial page load; game mutations go over the
+  socket for push latency instead of 1s polling.
 - Shared request and domain types come from `libs/types`.
 
 ### Mobile client: `apps/mobile`
@@ -95,40 +98,55 @@ own runtime types and does not import this package.
 
 ### Local game
 
-1. The web client requests `GET /api/board?mode=vs_player`.
-2. The API finds or creates a local player game and returns pieces, moves,
+1. The web client requests `game.new` (or `board.get` to resume) over the
+   socket with `mode: vs_player`.
+2. The API finds or creates a local player game and pushes pieces, moves,
    clocks, turn, status, and derived display data.
-3. The client requests legal destinations with `GET /api/moves`.
-4. The client submits a move to `POST /api/move`.
-5. The API validates the move and commits the state change in one transaction.
-6. The client refreshes the board immediately and continues its one-second
-   polling loop.
+3. The client requests legal destinations with `moves.get`.
+4. The client submits a move with `game.move`.
+5. The API validates the move and commits the state change in one transaction,
+   then pushes the new board to the room.
 
 ### Online matchmaking
 
-1. An authenticated client submits `POST /api/join-queue` with player ID,
-   time control, and increment.
+1. An authenticated client opens `/api/ws` (session cookie on web, token
+   query plus `hello` on mobile) and submits `queue.join` with time
+   control and increment.
 2. The API locks the queue table, removes an existing entry for that player,
-   and either queues the player or pairs it with the oldest compatible entry.
-3. The client polls `GET /api/queue-status` until the result is `matched`.
-4. Both clients poll their board and submit moves through the same game API.
+   and either queues the player (`queue.status: queued`) or pairs it with
+   the oldest compatible entry.
+3. Both players receive `game.matched` plus a full `game.state` push over
+   their sockets; the waiting opponent is woken even if it joined first.
+4. Moves, resignations, draw offers, takeback requests, and rematch offers
+   are socket messages; the server broadcasts fresh `game.state` to the
+   game room after every committed mutation, with per-viewer `userColor`.
+5. Takebacks and rematches require opponent consent (`game.undo.request` /
+   `game.rematch.offer` plus accept/decline). Unilateral undo is disabled
+   in rated games. `queue.leave` cancels a search.
+6. Presence (`whiteOnline`/`blackOnline`) is pushed on join, leave, and
+   disconnect. A 1s server ticker re-checks active rooms so timeouts and
+   engine replies are pushed even if a notification is missed.
 
 ### Computer game
 
-1. The client requests a `vs_computer` board. Computer games use an unlimited
-   clock (`timeControl: 0`).
-2. The human move is committed by the API.
+1. The client requests `game.new` with `mode: vs_computer` (or `board.get`
+   to resume the latest one). Computer games use an unlimited clock
+   (`timeControl: 0`).
+2. The human move is committed by the API over the socket.
 3. If the game remains active and it is Black's turn, the API starts a
    background in-process engine call with the current position encoded as FEN.
 4. The engine returns UCI notation, such as `e7e5` or `e1g1`.
-5. The API validates and commits the engine move as a normal game mutation.
-6. The client discovers the move through polling.
+5. The API validates and commits the engine move as a normal game mutation,
+   which triggers an immediate `game.state` push to the room.
 
 ## Consistency and Failure Behavior
 
 - PostgreSQL is the source of truth for users, sessions, queues, games, pieces,
   and moves.
 - Game moves use row-level locking to serialize concurrent updates to one game.
+- Rated PvP moves are authorized by color ownership: the server rejects
+  moves from spectators and from the side that is not to move. Anonymous
+  local and computer games allow the connected client to move.
 - Queue matching uses a table lock to prevent two matchers from consuming the
   same queue entry.
 - Engine calls run in-process behind a semaphore sized to `NumCPU - 1`. A
@@ -137,6 +155,8 @@ own runtime types and does not import this package.
 - An unavailable or panicking engine call does not automatically recover a
   pending computer move; operators should monitor API logs and users may need
   to retry or reset a game.
-- Polling is intentionally simple but creates repeated read traffic. A
-  production deployment should size API and database capacity for the number
-  of active games.
+- Polling is gone from game play. The single-process hub (`internal/realtime`)
+  fans out to per-game rooms; PostgreSQL stays the source of truth, so a
+  reconnected client resumes with `game.join` and gets the latest state. A
+  production deployment with multiple API replicas will need a shared
+  pub/sub (e.g. Redis) behind the hub interface.
