@@ -68,3 +68,55 @@ func TestUnsupportedGoogleAuth(t *testing.T) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }
+
+func TestAuthValidation(t *testing.T) {
+	// A nil database is fine here: every case below returns before any
+	// query, except googleCallback which only clears a cookie first.
+	authService := auth.NewService(nil, "secret", auth.GoogleConfig{})
+	handler := httpapi.NewHandler(authService, nil)
+	tests := []struct{ name, method, path, body string }{
+		{"short password", http.MethodPost, "/api/auth/sign-up", `{"email":"a@b.c","password":"short","name":"A"}`},
+		{"social non-google", http.MethodPost, "/api/auth/sign-in/social", `{"provider":"yahoo"}`},
+		{"social malformed", http.MethodPost, "/api/auth/sign-in/social", `{"provider":`},
+		{"callback error", http.MethodGet, "/api/auth/callback/google?error=access_denied", ""},
+		{"callback missing", http.MethodGet, "/api/auth/callback/google", ""},
+		{"session id required", http.MethodGet, "/api/auth/session", ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var reader *strings.Reader
+			if test.body != "" {
+				reader = strings.NewReader(test.body)
+			} else {
+				reader = strings.NewReader("")
+			}
+			request := httptest.NewRequest(test.method, test.path, reader)
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != 400 {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			var result map[string]string
+			_ = json.Unmarshal(response.Body.Bytes(), &result)
+			if result["error"] == "" {
+				t.Fatalf("missing error message: %s", response.Body.String())
+			}
+		})
+	}
+}
+
+func TestRoutingContracts(t *testing.T) {
+	handler := httpapi.NewHandler(nil, nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/nope", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("unknown route status=%d", response.Code)
+	}
+	request = httptest.NewRequest(http.MethodPost, "/api/health", nil)
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("wrong method status=%d", response.Code)
+	}
+}

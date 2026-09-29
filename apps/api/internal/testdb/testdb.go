@@ -1,0 +1,125 @@
+// Package testdb opens per-package integration-test databases and migrates
+// them. Each calling package gets its own database so `go test ./...` can
+// run packages in parallel without sharing state. Tests skip when no
+// database server is reachable, keeping the suite green without PostgreSQL.
+package testdb
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rajveer/chess/apps/api/internal/database"
+)
+
+var wipeTables = []string{
+	"moves",
+	"pieces",
+	"games",
+	"queue",
+	"session",
+	"account",
+	"password",
+	"verification",
+	`"user"`,
+}
+
+// Open connects to the calling package's test database, migrates it, and
+// registers cleanup that wipes every table. The database name derives from
+// TEST_DATABASE_URL, DATABASE_URL, or a per-package local default, so each
+// package is isolated. It calls t.Skip when unreachable.
+func Open(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		url = os.Getenv("DATABASE_URL")
+	}
+	if url == "" {
+		url = fmt.Sprintf("postgres://postgres:postgres@localhost:5432/chess_test_%s", callerPackage())
+	} else {
+		url = withDatabase(url, callerPackage())
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ensureDatabase(ctx, url)
+	pool, err := database.Open(ctx, url)
+	if err != nil {
+		t.Skipf("no test database: %v", err)
+	}
+	if err := database.Migrate(ctx, pool); err != nil {
+		pool.Close()
+		t.Fatalf("migrate test database: %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		for _, table := range wipeTables {
+			if _, err := pool.Exec(ctx, "DELETE FROM "+table); err != nil {
+				t.Errorf("wipe %s: %v", table, err)
+			}
+		}
+		pool.Close()
+	})
+	return pool
+}
+
+// callerPackage returns the name of the package calling Open, sanitized
+// for use in a database identifier.
+func callerPackage() string {
+	// Skip callerPackage and Open to land on the calling test file.
+	_, file, _, ok := runtime.Caller(2)
+	if !ok {
+		return "misc"
+	}
+	name := filepath.Base(filepath.Dir(file))
+	var clean strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			clean.WriteRune(r)
+		} else {
+			clean.WriteRune('_')
+		}
+	}
+	if clean.Len() == 0 {
+		return "misc"
+	}
+	return clean.String()
+}
+
+// withDatabase returns url pointed at the given database name.
+func withDatabase(url, name string) string {
+	config, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return url
+	}
+	config.ConnConfig.Database = name
+	return config.ConnString()
+}
+
+// ensureDatabase creates the database named by url when missing, using the
+// maintenance database on the same server.
+func ensureDatabase(ctx context.Context, url string) {
+	config, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return
+	}
+	name := config.ConnConfig.Database
+	config.ConnConfig.Database = "postgres"
+	maintenance, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return
+	}
+	defer maintenance.Close()
+	var exists bool
+	if err := maintenance.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)`, name).Scan(&exists); err != nil || exists {
+		return
+	}
+	_, _ = maintenance.Exec(ctx, fmt.Sprintf(`CREATE DATABASE %s`, pgx.Identifier{name}.Sanitize()))
+}
