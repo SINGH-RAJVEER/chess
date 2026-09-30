@@ -56,17 +56,14 @@ export default function HomePage() {
 	// Local play runs over the same socket as every other mode. Board pushes
 	// replace the old 1s poll; anonymous boards need no session.
 	useEffect(() => {
-		gameSocket.connect();
-		const offStatus = gameSocket.onStatus(setSocketStatus);
-		const offMessages = gameSocket.subscribe((msg: WsServerMessage) => {
-			if (msg.type === "game.state" && msg.board.mode === "vs_player") {
-				setBoardData(msg.board);
-			}
-		});
-
-		void (async () => {
+		let cancelled = false;
+		let loading = false;
+		const loadInitial = async () => {
+			if (loading) return;
+			loading = true;
 			try {
 				const board = await gameSocket.request({ type: "board.get", mode: "vs_player" });
+				if (cancelled) return;
 				if (board.type === "game.state") {
 					if (board.board.id === 0) {
 						const created = await gameSocket.request({
@@ -74,7 +71,7 @@ export default function HomePage() {
 							mode: "vs_player",
 							timeControl: 10,
 						});
-						if (created.type === "game.state") setBoardData(created.board);
+						if (!cancelled && created.type === "game.state") setBoardData(created.board);
 					} else {
 						setBoardData(board.board);
 						await gameSocket
@@ -84,18 +81,36 @@ export default function HomePage() {
 				}
 			} catch (error) {
 				console.error("Failed to load local board over socket:", error);
+			} finally {
+				loading = false;
 			}
-		})();
+		};
+
+		gameSocket.connect();
+		const offStatus = gameSocket.onStatus(setSocketStatus);
+		const offMessages = gameSocket.subscribe((msg: WsServerMessage) => {
+			if (msg.type === "game.state" && msg.board.mode === "vs_player") {
+				setBoardData(msg.board);
+			}
+		});
+
+		void loadInitial();
 
 		const offReconnect = gameSocket.onStatus((status) => {
-			if (status === "open" && boardIdRef.current !== 0) {
+			if (status !== "open" || cancelled) return;
+			if (boardIdRef.current !== 0) {
 				gameSocket
 					.request({ type: "game.join", gameId: boardIdRef.current })
 					.catch(() => undefined);
+			} else {
+				// The first load failed (e.g. the server was unreachable);
+				// retry now that the socket is back.
+				void loadInitial();
 			}
 		});
 
 		return () => {
+			cancelled = true;
 			offStatus();
 			offMessages();
 			offReconnect();

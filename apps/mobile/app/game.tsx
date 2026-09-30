@@ -82,6 +82,8 @@ export default function GameScreen() {
 	const [rematchOffer, setRematchOffer] = useState<{ by: Color } | null>(null);
 	const [opponentOnline, setOpponentOnline] = useState<boolean | null>(null);
 	const startedRef = useRef(false);
+	const cancelledRef = useRef(false);
+	const loadingRef = useRef(false);
 	const boardIdRef = useRef(0);
 	const opponentRef = useRef(opponent);
 	opponentRef.current = opponent;
@@ -148,6 +150,54 @@ export default function GameScreen() {
 		}
 	}, [mode, startOnline]);
 
+	// Initial load over the socket, retried on reconnect while nothing
+	// loaded yet (e.g. the server was unreachable on first mount).
+	const loadInitial = useCallback(async () => {
+		if (loadingRef.current) return;
+		loadingRef.current = true;
+		try {
+			if (mode === "online") {
+				const loaded = await gameSocket.request({ type: "board.get", mode: "vs_player" });
+				if (cancelledRef.current) return;
+				if (loaded.type === "game.state" && loaded.board.id !== 0) {
+					setBoard(loaded.board);
+					await gameSocket
+						.request({ type: "game.join", gameId: loaded.board.id })
+						.catch(() => undefined);
+				} else {
+					await startOnline();
+				}
+			} else if (mode === "computer") {
+				const loaded = await gameSocket.request({ type: "board.get", mode: "vs_computer" });
+				if (cancelledRef.current) return;
+				if (loaded.type === "game.state" && loaded.board.id !== 0) {
+					setBoard(loaded.board);
+					await gameSocket
+						.request({ type: "game.join", gameId: loaded.board.id })
+						.catch(() => undefined);
+				} else {
+					const created = await gameSocket.request({
+						type: "game.new",
+						mode: "vs_computer",
+						opponent: opponentRef.current,
+					});
+					if (!cancelledRef.current && created.type === "game.state") setBoard(created.board);
+				}
+			} else {
+				const created = await gameSocket.request({
+					type: "game.new",
+					mode: "vs_player",
+					timeControl: 10,
+				});
+				if (!cancelledRef.current && created.type === "game.state") setBoard(created.board);
+			}
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to load board");
+		} finally {
+			loadingRef.current = false;
+		}
+	}, [mode, startOnline]);
+
 	// Single socket for all modes. Pushes replace the old queue/board
 	// polling loops; reconnects re-join the current room automatically.
 	useEffect(() => {
@@ -207,54 +257,23 @@ export default function GameScreen() {
 		});
 
 		void (async () => {
-			try {
-				if (mode === "online") {
-					const loaded = await gameSocket.request({ type: "board.get", mode: "vs_player" });
-					if (loaded.type === "game.state" && loaded.board.id !== 0) {
-						setBoard(loaded.board);
-						await gameSocket
-							.request({ type: "game.join", gameId: loaded.board.id })
-							.catch(() => undefined);
-					} else {
-						await startOnline();
-					}
-				} else if (mode === "computer") {
-					const loaded = await gameSocket.request({ type: "board.get", mode: "vs_computer" });
-					if (loaded.type === "game.state" && loaded.board.id !== 0) {
-						setBoard(loaded.board);
-						await gameSocket
-							.request({ type: "game.join", gameId: loaded.board.id })
-							.catch(() => undefined);
-					} else {
-						const created = await gameSocket.request({
-							type: "game.new",
-							mode: "vs_computer",
-							opponent: opponentRef.current,
-						});
-						if (created.type === "game.state") setBoard(created.board);
-					}
-				} else {
-					const created = await gameSocket.request({
-						type: "game.new",
-						mode: "vs_player",
-						timeControl: 10,
-					});
-					if (created.type === "game.state") setBoard(created.board);
-				}
-			} catch (err) {
-				setError(err instanceof Error ? err.message : "Failed to load board");
-			}
+			if (cancelledRef.current) return;
+			await loadInitial();
 		})();
 
 		const offReconnect = gameSocket.onStatus((status) => {
-			if (status === "open" && boardIdRef.current !== 0) {
+			if (status !== "open" || cancelledRef.current) return;
+			if (boardIdRef.current !== 0) {
 				gameSocket
 					.request({ type: "game.join", gameId: boardIdRef.current })
 					.catch(() => undefined);
+			} else {
+				void loadInitial();
 			}
 		});
 
 		return () => {
+			cancelledRef.current = true;
 			offStatus();
 			offMessages();
 			offReconnect();

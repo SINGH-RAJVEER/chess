@@ -80,6 +80,41 @@ export default function OnlinePlayerPage() {
 	// Live socket: pushes replace the old 1s board/queue polling loops.
 	useEffect(() => {
 		if (!playerId) return;
+		let cancelled = false;
+		let loading = false;
+		// Initial load over the socket: latest game or matchmaking state.
+		// Retried on reconnect while nothing loaded yet (e.g. the server
+		// was unreachable on first mount).
+		const loadInitial = async () => {
+			if (loading) return;
+			loading = true;
+			try {
+				const board = await gameSocket.request({ type: "board.get", mode: "vs_player" });
+				if (cancelled) return;
+				if (board.type === "game.state") {
+					setBoardData(board.board);
+					if (board.board.id !== 0) {
+						await gameSocket
+							.request({ type: "game.join", gameId: board.board.id })
+							.catch(() => undefined);
+					} else {
+						const queue = await gameSocket.request({ type: "queue.get" });
+						if (!cancelled && queue.type === "queue.status") {
+							setQueueStatus({
+								status: queue.status,
+								gameId: queue.gameId,
+								timeControl: queue.timeControl,
+							});
+						}
+					}
+				}
+			} catch (error) {
+				console.error("Failed to load board over socket:", error);
+			} finally {
+				loading = false;
+			}
+		};
+
 		gameSocket.connect();
 		const offStatus = gameSocket.onStatus(setSocketStatus);
 
@@ -127,42 +162,22 @@ export default function OnlinePlayerPage() {
 			}
 		});
 
-		// Initial load over the socket: latest game or matchmaking state.
-		void (async () => {
-			try {
-				const board = await gameSocket.request({ type: "board.get", mode: "vs_player" });
-				if (board.type === "game.state") {
-					setBoardData(board.board);
-					if (board.board.id !== 0) {
-						await gameSocket
-							.request({ type: "game.join", gameId: board.board.id })
-							.catch(() => undefined);
-					} else {
-						const queue = await gameSocket.request({ type: "queue.get" });
-						if (queue.type === "queue.status") {
-							setQueueStatus({
-								status: queue.status,
-								gameId: queue.gameId,
-								timeControl: queue.timeControl,
-							});
-						}
-					}
-				}
-			} catch (error) {
-				console.error("Failed to load board over socket:", error);
-			}
-		})();
+		void loadInitial();
 
-		// Resume the room after a reconnect.
+		// Resume the room after a reconnect, or retry the initial load.
 		const offReconnect = gameSocket.onStatus((status) => {
-			if (status === "open" && boardIdRef.current !== 0) {
+			if (status !== "open" || cancelled) return;
+			if (boardIdRef.current !== 0) {
 				gameSocket
 					.request({ type: "game.join", gameId: boardIdRef.current })
 					.catch(() => undefined);
+			} else {
+				void loadInitial();
 			}
 		});
 
 		return () => {
+			cancelled = true;
 			offStatus();
 			offMessages();
 			offReconnect();

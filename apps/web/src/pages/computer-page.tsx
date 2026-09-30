@@ -51,17 +51,14 @@ export default function ComputerPage() {
 	// immediately after the human move and again when the engine replies,
 	// replacing the old 1s poll for Black's move.
 	useEffect(() => {
-		gameSocket.connect();
-		const offStatus = gameSocket.onStatus(setSocketStatus);
-		const offMessages = gameSocket.subscribe((msg: WsServerMessage) => {
-			if (msg.type === "game.state" && msg.board.mode === "vs_computer") {
-				setBoardData(msg.board);
-			}
-		});
-
-		void (async () => {
+		let cancelled = false;
+		let loading = false;
+		const loadInitial = async () => {
+			if (loading) return;
+			loading = true;
 			try {
 				const board = await gameSocket.request({ type: "board.get", mode: "vs_computer" });
+				if (cancelled) return;
 				if (board.type === "game.state") {
 					if (board.board.id === 0) {
 						const created = await gameSocket.request({
@@ -69,7 +66,7 @@ export default function ComputerPage() {
 							mode: "vs_computer",
 							opponent: opponentRef.current,
 						});
-						if (created.type === "game.state") setBoardData(created.board);
+						if (!cancelled && created.type === "game.state") setBoardData(created.board);
 					} else {
 						setBoardData(board.board);
 						await gameSocket
@@ -79,18 +76,34 @@ export default function ComputerPage() {
 				}
 			} catch (error) {
 				console.error("Failed to load computer board over socket:", error);
+			} finally {
+				loading = false;
 			}
-		})();
+		};
+
+		gameSocket.connect();
+		const offStatus = gameSocket.onStatus(setSocketStatus);
+		const offMessages = gameSocket.subscribe((msg: WsServerMessage) => {
+			if (msg.type === "game.state" && msg.board.mode === "vs_computer") {
+				setBoardData(msg.board);
+			}
+		});
+
+		void loadInitial();
 
 		const offReconnect = gameSocket.onStatus((status) => {
-			if (status === "open" && boardIdRef.current !== 0) {
+			if (status !== "open" || cancelled) return;
+			if (boardIdRef.current !== 0) {
 				gameSocket
 					.request({ type: "game.join", gameId: boardIdRef.current })
 					.catch(() => undefined);
+			} else {
+				void loadInitial();
 			}
 		});
 
 		return () => {
+			cancelled = true;
 			offStatus();
 			offMessages();
 			offReconnect();
