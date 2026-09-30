@@ -18,10 +18,7 @@ function stripSlashes(value: string): string {
  * shell talks directly to the local API while the browser stays same-origin
  * behind its reverse proxy. One dist serves both.
  */
-export function resolveApiBaseUrl(
-	env: ApiBaseEnv,
-	isTauri: boolean,
-): string {
+export function resolveApiBaseUrl(env: ApiBaseEnv, isTauri: boolean): string {
 	const configured = env.VITE_API_BASE_URL?.trim();
 	if (configured) return stripSlashes(configured);
 	if (isTauri) {
@@ -37,8 +34,13 @@ export function resolveWsUrl(apiBase: string, protocol: string, host: string): s
 	return `${socketProtocol}//${host}/api/ws`;
 }
 
-function isTauri(): boolean {
+function isTauriRuntime(): boolean {
 	return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+/** True inside the packaged desktop shell; the browser stays same-origin. */
+export function isTauri(): boolean {
+	return isTauriRuntime();
 }
 
 export function getApiBaseUrl(): string {
@@ -48,7 +50,7 @@ export function getApiBaseUrl(): string {
 			VITE_API_BASE_URL: env.VITE_API_BASE_URL as string | undefined,
 			VITE_DESKTOP_API_URL: env.VITE_DESKTOP_API_URL as string | undefined,
 		},
-		isTauri(),
+		isTauriRuntime(),
 	);
 }
 

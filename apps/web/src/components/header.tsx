@@ -1,6 +1,7 @@
-import { Camera, ChevronDown, Cpu, LogOut, Settings, Trophy, User } from "lucide-react";
+import { Camera, ChevronDown, Cpu, LogOut, Settings, Trophy, User, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -11,6 +12,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
+import { isTauri } from "@/lib/api-base";
 import SettingsDialog from "./settings-dialog";
 
 interface HeaderProps {
@@ -123,7 +125,11 @@ export default function Header(props: HeaderProps) {
 	return (
 		<>
 			<header className="sticky top-0 z-50 flex items-center justify-between bg-zinc-950 px-6 py-2 text-zinc-100 border-b border-zinc-800">
-				<Link to="/" className="flex w-1/4 items-center gap-2 transition-opacity hover:opacity-80">
+				<Link
+					to="/"
+					className="flex w-1/4 items-center gap-2 transition-opacity hover:opacity-80"
+					data-tauri-drag-region
+				>
 					<h1 className="text-xl font-medium tracking-tight lowercase">chess</h1>
 				</Link>
 
@@ -300,6 +306,17 @@ export default function Header(props: HeaderProps) {
 							<User className="size-3 sm:mr-2" />
 							<span className="hidden text-xs font-medium sm:inline">Sign In</span>
 						</Link>
+					)}
+					{isTauri() && (
+						<button
+							type="button"
+							aria-label="Close window"
+							title="Close"
+							className="flex items-center justify-center h-8 w-8 rounded-md bg-zinc-900 border border-zinc-800 hover:bg-red-900/70 text-zinc-400 hover:text-red-100 transition-colors"
+							onClick={() => void getCurrentWindow().close()}
+						>
+							<X className="size-3.5" />
+						</button>
 					)}
 				</div>
 			</header>
