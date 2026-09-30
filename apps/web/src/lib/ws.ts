@@ -3,17 +3,23 @@ import { getWsUrl } from "./api-base";
 
 export type SocketStatus = "idle" | "connecting" | "open" | "reconnecting";
 
+type StatusListener = (status: SocketStatus) => void;
+
 type PendingEntry = {
 	resolve: (msg: WsServerMessage) => void;
 	reject: (err: Error) => void;
 	timer: number;
 };
 
+type OpenWaiter = {
+	timer: number;
+	unsubscribe: () => void;
+	reject: (err: Error) => void;
+};
+
 function nextId(): string {
 	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
-
-type StatusListener = (status: SocketStatus) => void;
 
 type ClientMessageWithoutId<T extends WsClientMessage = WsClientMessage> = T extends unknown
 	? Omit<T, "id"> & { id?: string }
@@ -28,6 +34,7 @@ type ClientMessageWithoutId<T extends WsClientMessage = WsClientMessage> = T ext
 class GameSocket {
 	private ws: WebSocket | null = null;
 	private pending = new Map<string, PendingEntry>();
+	private openWaiters = new Set<OpenWaiter>();
 	private handlers = new Set<(msg: WsServerMessage) => void>();
 	private statusListeners = new Set<StatusListener>();
 	private status: SocketStatus = "idle";
@@ -94,6 +101,40 @@ class GameSocket {
 			entry.reject(new Error("Socket disconnected"));
 		}
 		this.pending.clear();
+		for (const waiter of this.openWaiters) {
+			window.clearTimeout(waiter.timer);
+			waiter.unsubscribe();
+			waiter.reject(new Error("Socket disconnected"));
+		}
+		this.openWaiters.clear();
+	}
+
+	/**
+	 * Resolves once the socket is open. Pages fire their first request
+	 * immediately after connect(), while the handshake is still in flight;
+	 * waiting here instead of rejecting fixes that race on every page load.
+	 */
+	private waitForOpen(): Promise<void> {
+		if (this.ws?.readyState === WebSocket.OPEN) return Promise.resolve();
+		if (!this.shouldRun) return Promise.reject(new Error("Socket is not connected"));
+		return new Promise((resolve, reject) => {
+			const waiter: OpenWaiter = { timer: 0, unsubscribe: () => {}, reject };
+			waiter.timer = window.setTimeout(() => {
+				this.openWaiters.delete(waiter);
+				waiter.unsubscribe();
+				reject(new Error("Socket did not connect in time"));
+			}, 15000);
+			waiter.unsubscribe = this.onStatus((status) => {
+				if (status === "open" || status === "idle") {
+					window.clearTimeout(waiter.timer);
+					this.openWaiters.delete(waiter);
+					waiter.unsubscribe();
+					if (status === "open") resolve();
+					else reject(new Error("Socket is not connected"));
+				}
+			});
+			this.openWaiters.add(waiter);
+		});
 	}
 
 	private open() {
@@ -169,24 +210,27 @@ class GameSocket {
 	request(message: ClientMessageWithoutId): Promise<WsServerMessage> {
 		const id = ("id" in message && message.id) || nextId();
 		const payload = { ...message, id } as WsClientMessage;
-		return new Promise((resolve, reject) => {
-			if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-				reject(new Error("Socket is not connected"));
-				return;
-			}
-			const timer = window.setTimeout(() => {
-				this.pending.delete(id);
-				reject(new Error("Request timed out"));
-			}, 15000);
-			this.pending.set(id, { resolve, reject, timer });
-			try {
-				this.ws.send(JSON.stringify(payload));
-			} catch (error) {
-				window.clearTimeout(timer);
-				this.pending.delete(id);
-				reject(error instanceof Error ? error : new Error("Send failed"));
-			}
-		});
+		return (async () => {
+			await this.waitForOpen();
+			return new Promise<WsServerMessage>((resolve, reject) => {
+				if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+					reject(new Error("Socket is not connected"));
+					return;
+				}
+				const timer = window.setTimeout(() => {
+					this.pending.delete(id);
+					reject(new Error("Request timed out"));
+				}, 15000);
+				this.pending.set(id, { resolve, reject, timer });
+				try {
+					this.ws.send(JSON.stringify(payload));
+				} catch (error) {
+					window.clearTimeout(timer);
+					this.pending.delete(id);
+					reject(error instanceof Error ? error : new Error("Send failed"));
+				}
+			});
+		})();
 	}
 
 	/** Fire-and-forget for messages whose reply arrives as a push. */

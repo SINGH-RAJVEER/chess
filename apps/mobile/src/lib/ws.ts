@@ -9,6 +9,12 @@ type PendingEntry = {
 	timer: ReturnType<typeof setTimeout>;
 };
 
+type OpenWaiter = {
+	timer: ReturnType<typeof setTimeout>;
+	unsubscribe: () => void;
+	reject: (err: Error) => void;
+};
+
 function nextId(): string {
 	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -31,6 +37,7 @@ type ClientMessageWithoutId<T extends WsClientMessage = WsClientMessage> = T ext
 class GameSocket {
 	private ws: WebSocket | null = null;
 	private pending = new Map<string, PendingEntry>();
+	private openWaiters = new Set<OpenWaiter>();
 	private handlers = new Set<(msg: WsServerMessage) => void>();
 	private statusListeners = new Set<StatusListener>();
 	private status: SocketStatus = "idle";
@@ -99,6 +106,41 @@ class GameSocket {
 			entry.reject(new Error("Socket disconnected"));
 		}
 		this.pending.clear();
+		for (const waiter of this.openWaiters) {
+			clearTimeout(waiter.timer);
+			waiter.unsubscribe();
+			waiter.reject(new Error("Socket disconnected"));
+		}
+		this.openWaiters.clear();
+	}
+
+	/**
+	 * Resolves once the socket is open. Screens fire their first request
+	 * immediately after connect(), while the handshake is still in flight;
+	 * waiting here instead of rejecting fixes that race on every navigation.
+	 */
+	private waitForOpen(): Promise<void> {
+		if (this.ws?.readyState === WebSocket.OPEN) return Promise.resolve();
+		if (!this.shouldRun) return Promise.reject(new Error("Socket is not connected"));
+		return new Promise((resolve, reject) => {
+			let waiter!: OpenWaiter;
+			const timer = setTimeout(() => {
+				this.openWaiters.delete(waiter);
+				waiter.unsubscribe();
+				reject(new Error("Socket did not connect in time"));
+			}, 15000);
+			waiter = { timer, unsubscribe: () => {}, reject };
+			waiter.unsubscribe = this.onStatus((status) => {
+				if (status === "open" || status === "idle") {
+					clearTimeout(waiter.timer);
+					this.openWaiters.delete(waiter);
+					waiter.unsubscribe();
+					if (status === "open") resolve();
+					else reject(new Error("Socket is not connected"));
+				}
+			});
+			this.openWaiters.add(waiter);
+		});
 	}
 
 	private async open() {
@@ -173,24 +215,27 @@ class GameSocket {
 	request(message: ClientMessageWithoutId): Promise<WsServerMessage> {
 		const id = ("id" in message && message.id) || nextId();
 		const payload = { ...message, id } as WsClientMessage;
-		return new Promise((resolve, reject) => {
-			if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-				reject(new Error("Socket is not connected"));
-				return;
-			}
-			const timer = setTimeout(() => {
-				this.pending.delete(id);
-				reject(new Error("Request timed out"));
-			}, 15000);
-			this.pending.set(id, { resolve, reject, timer });
-			try {
-				this.ws.send(JSON.stringify(payload));
-			} catch (error) {
-				clearTimeout(timer);
-				this.pending.delete(id);
-				reject(error instanceof Error ? error : new Error("Send failed"));
-			}
-		});
+		return (async () => {
+			await this.waitForOpen();
+			return new Promise<WsServerMessage>((resolve, reject) => {
+				if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+					reject(new Error("Socket is not connected"));
+					return;
+				}
+				const timer = setTimeout(() => {
+					this.pending.delete(id);
+					reject(new Error("Request timed out"));
+				}, 15000);
+				this.pending.set(id, { resolve, reject, timer });
+				try {
+					this.ws.send(JSON.stringify(payload));
+				} catch (error) {
+					clearTimeout(timer);
+					this.pending.delete(id);
+					reject(error instanceof Error ? error : new Error("Send failed"));
+				}
+			});
+		})();
 	}
 }
 
