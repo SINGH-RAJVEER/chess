@@ -48,7 +48,7 @@ The `desktop-*` recipes run through `devenv shell` automatically, so they work f
 
 ## System dependencies
 
-On Linux, Tauri needs WebKitGTK, GTK, and D-Bus libraries. They are provided by the devenv shell: `webkitgtk_4_1`, `gtk3`, `libsoup_3`, `glib`, `cairo`, `pango`, `gdk-pixbuf`, `gobject-introspection`, and `dbus` are declared in `devenv.nix`. Run builds inside `devenv shell` (or via the `just desktop-*` recipes) so `pkg-config` can find them.
+On Linux, Tauri needs WebKitGTK, GTK, and D-Bus libraries. They are provided by the devenv shell: `webkitgtk_4_1`, `gtk3`, `libsoup_3`, `glib`, `glib-networking` (TLS backend so https assets such as piece images load in the webview), `cairo`, `pango`, `gdk-pixbuf`, `gobject-introspection`, and `dbus` are declared in `devenv.nix`. Run builds inside `devenv shell` (or via the `just desktop-*` recipes) so `pkg-config` can find them.
 
 ## Known gaps
 

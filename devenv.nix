@@ -23,6 +23,10 @@ let
   '';
 in
 {
+  # TLS backend for WebKitGTK/GIO so https (e.g. piece CDN images) works
+  # inside `devenv shell` and the desktop webview run from it.
+  env.GIO_EXTRA_MODULES = lib.optionalString pkgs.stdenv.isLinux "${pkgs.glib-networking}/lib/gio/modules";
+
   packages = with pkgs; [
     bun
     # Node.js runs the Expo CLI and Metro bundler for apps/mobile.
@@ -49,6 +53,7 @@ in
     nixd
   ] ++ lib.optionals pkgs.stdenv.isLinux (with pkgs; [
     glib
+    glib-networking
     gtk3
     webkitgtk_4_1
     libsoup_3
