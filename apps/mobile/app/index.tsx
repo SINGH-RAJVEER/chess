@@ -1,4 +1,5 @@
-import type { ComputerOpponent } from "@chess/types";
+import type { ComputerOpponent, StockfishLevel } from "@chess/types";
+import { DEFAULT_STOCKFISH_LEVEL, STOCKFISH_LEVELS } from "@chess/types";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
@@ -7,6 +8,7 @@ import { getApiBaseUrlForDisplay } from "../src/lib/api";
 import { useAuth } from "../src/lib/auth";
 
 const OPPONENT_KEY = "chess_computer_opponent";
+const LEVEL_KEY = "chess_computer_level";
 
 function MenuButton({ label, onPress }: { label: string; onPress: () => void }) {
 	return (
@@ -23,12 +25,23 @@ export default function HomeScreen() {
 	const router = useRouter();
 	const { user, isLoading, signOut } = useAuth();
 	const [opponent, setOpponent] = useState<ComputerOpponent>("minimax");
+	const [level, setLevel] = useState<StockfishLevel>(DEFAULT_STOCKFISH_LEVEL);
 	const [signingOut, setSigningOut] = useState(false);
 
 	const pickOpponent = async (next: ComputerOpponent) => {
 		setOpponent(next);
 		await SecureStore.setItemAsync(OPPONENT_KEY, next).catch(() => undefined);
 	};
+
+	const pickLevel = async (next: StockfishLevel) => {
+		setLevel(next);
+		await SecureStore.setItemAsync(LEVEL_KEY, String(next)).catch(() => undefined);
+	};
+
+	const computerRoute =
+		opponent === "stockfish"
+			? `/game?mode=computer&opponent=stockfish&level=${level}`
+			: `/game?mode=computer&opponent=${opponent}`;
 
 	const handleSignOut = async () => {
 		setSigningOut(true);
@@ -46,10 +59,7 @@ export default function HomeScreen() {
 
 			<View className="mt-8 gap-3">
 				<MenuButton label="Play locally" onPress={() => router.push("/game?mode=local")} />
-				<MenuButton
-					label="Play the computer"
-					onPress={() => router.push(`/game?mode=computer&opponent=${opponent}`)}
-				/>
+				<MenuButton label="Play the computer" onPress={() => router.push(computerRoute)} />
 				<MenuButton label="Play online" onPress={() => router.push("/game?mode=online")} />
 			</View>
 
@@ -60,8 +70,8 @@ export default function HomeScreen() {
 				<View className="flex-row rounded-lg border border-zinc-800 p-1">
 					{(
 						[
-							["minimax", "Minimax"],
-							["custom", "Alpha-beta"],
+							["minimax", "Default"],
+							["stockfish", "Stockfish"],
 						] as const
 					).map(([value, label]) => (
 						<Pressable
@@ -80,6 +90,32 @@ export default function HomeScreen() {
 						</Pressable>
 					))}
 				</View>
+				{opponent === "stockfish" ? (
+					<View className="mt-3">
+						<Text className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
+							Stockfish level
+						</Text>
+						<View className="flex-row rounded-lg border border-zinc-800 p-1">
+							{STOCKFISH_LEVELS.map((value) => (
+								<Pressable
+									key={value}
+									onPress={() => void pickLevel(value)}
+									accessibilityLabel={`Level ${value}`}
+									accessibilityState={{ selected: level === value }}
+									className={`flex-1 rounded-md py-2 items-center ${
+										level === value ? "bg-violet-500/80" : ""
+									}`}
+								>
+									<Text
+										className={`text-sm font-medium ${level === value ? "text-white" : "text-zinc-400"}`}
+									>
+										{value}
+									</Text>
+								</Pressable>
+							))}
+						</View>
+					</View>
+				) : null}
 			</View>
 
 			<View className="mt-auto gap-3">

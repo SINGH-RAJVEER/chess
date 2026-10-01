@@ -2,8 +2,10 @@ import type {
 	BoardResponse,
 	ComputerOpponent,
 	PromotionPiece,
+	StockfishLevel,
 	WsServerMessage,
 } from "@chess/types";
+import { parseComputerOpponent, parseStockfishLevel } from "@chess/types";
 import { WifiOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ComputerGameView, { type PromotionState } from "@/components/computer-game-view";
@@ -31,12 +33,16 @@ export default function ComputerPage() {
 	const [isResetPending, setIsResetPending] = useState(false);
 	const [socketStatus, setSocketStatus] = useState<SocketStatus>(gameSocket.getStatus());
 	const [promotionState, setPromotionState] = useState<PromotionState | null>(null);
-	const [opponent, setOpponent] = useState<ComputerOpponent>(() => {
-		const stored = localStorage.getItem("chess_computer_opponent");
-		// Legacy "dqn" selections map to the custom engine, which is the
-		// strongest remaining opponent.
-		return stored === "custom" || stored === "dqn" ? "custom" : "minimax";
-	});
+	// The picker exposes one default minimax engine; old custom selections now
+	// use that default while direct API callers can still request custom.
+	const [opponent, setOpponent] = useState<ComputerOpponent>(() =>
+		parseComputerOpponent(localStorage.getItem("chess_computer_opponent")) === "stockfish"
+			? "stockfish"
+			: "minimax",
+	);
+	const [level, setLevel] = useState<StockfishLevel>(() =>
+		parseStockfishLevel(localStorage.getItem("chess_computer_level")),
+	);
 	const prevMoveCountRef = useRef(0);
 	const boardIdRef = useRef(0);
 	const opponentRef = useRef(opponent);
@@ -228,6 +234,7 @@ export default function ComputerPage() {
 				gameId: boardData.id,
 				promotion,
 				opponent,
+				level: opponent === "stockfish" ? level : undefined,
 				type: "game.move",
 			});
 			setPendingMove(null);
@@ -260,6 +267,11 @@ export default function ComputerPage() {
 	const handleOpponentChange = (nextOpponent: ComputerOpponent) => {
 		setOpponent(nextOpponent);
 		localStorage.setItem("chess_computer_opponent", nextOpponent);
+	};
+
+	const handleLevelChange = (nextLevel: StockfishLevel) => {
+		setLevel(nextLevel);
+		localStorage.setItem("chess_computer_level", String(nextLevel));
 	};
 
 	const handleTakeback = async () => {
@@ -369,6 +381,7 @@ export default function ComputerPage() {
 				isGameOver={isGameOver}
 				gameOverMessage={getGameOverMessage()}
 				opponent={opponent}
+				level={level}
 				onRestart={() => void handleReset()}
 				onSquareClick={(square) => void handleSquareClick(square)}
 				onConfirmMove={(promotion) => void handleConfirmMove(promotion)}
@@ -377,6 +390,7 @@ export default function ComputerPage() {
 				onTakeback={() => void handleTakeback()}
 				onResign={() => void handleResign()}
 				onOpponentChange={handleOpponentChange}
+				onLevelChange={handleLevelChange}
 			/>
 		</div>
 	);

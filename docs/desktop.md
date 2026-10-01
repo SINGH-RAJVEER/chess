@@ -1,57 +1,41 @@
 # Desktop
 
-The desktop application is a native shell around the web application built with Tauri 2. It lives in `apps/desktop` and reuses the React UI from `apps/web` without duplicating it.
+The desktop application is an Electron shell around the web application. It lives in `apps/desktop` and reuses the React UI from `apps/web` without duplicating it.
 
 ## Layout
 
-- `apps/desktop/src-tauri`: Rust crate that owns the window, the webview, and the build configuration.
-- `apps/desktop/src-tauri/src/lib.rs`: application entry point shared by desktop and mobile targets.
-- `apps/desktop/src-tauri/tauri.conf.json`: window size, dev URL, bundle settings, and icons.
-- `apps/desktop/src-tauri/capabilities/default.json`: webview permission grant for the main window.
-- `apps/desktop/app-icon.png`: icon source; regenerate platform icons with `bunx tauri icon app-icon.png -o src-tauri/icons`.
+- `apps/desktop/main.cjs`: creates the frameless window and serves the packaged web assets through the secure `app://chess` protocol.
+- `apps/desktop/preload.cjs`: exposes the small, context-isolated desktop bridge used for window controls.
+- `apps/desktop/launch-electron.cjs`: clears inherited Electron runtime flags before starting the desktop process.
+- `apps/desktop/package.json`: Electron and electron-builder settings, including the platform installers.
+- `apps/web`: shared React application, built before packaging.
+
+The desktop settings section controls whether the header close button is shown. It is on by default; when shown, it sits at the far right of the header.
+
+The computer opponent picker presents the built-in minimax engine with alpha-beta pruning as one option labeled `Default`, alongside Stockfish.
 
 ## Modes
 
-- Development (`tauri dev`): the window loads `http://localhost:3000`, so the Vite dev server, its `/api` proxy to the Go API, and hot reload all work exactly as in the browser. The web dev server must already be running.
-- Production (`tauri build`): `just desktop-build` rebuilds `apps/web/dist`
-  first, and Tauri embeds those static assets into the binary.
+- Development (`just desktop-dev`): loads the Vite development server at `http://localhost:3000`. Start `just web-dev` first; its `/api` proxy handles API requests and hot reload.
+- Production (`just desktop-build`): rebuilds `apps/web/dist`, then packages those assets into AppImage and deb installers on Linux, a dmg on macOS, and an NSIS installer on Windows.
 
-## API access
-
-The bundled web client resolves its API base at runtime. In the browser it
-stays same-origin behind the reverse proxy (or `VITE_API_BASE_URL` when set).
-Inside the Tauri shell it talks directly to `http://127.0.0.1:4000` by
-default, overridable with `VITE_DESKTOP_API_URL` at web build time, for both
-auth requests and the `/api/ws` game socket. That works in development
-because Tauri loads the page from the Vite server; a packaged build has no
-proxy, so the API must accept credentialed cross-origin requests from the
-desktop webview origin (`https://tauri.localhost`): add it to the
-comma-separated `WEB_ORIGIN` list, e.g.
-`WEB_ORIGIN=http://localhost:3000,https://tauri.localhost`. Google sign-in
-is unavailable in the shell (the OAuth callback cannot return to a Tauri
-origin); use email auth there.
+The production renderer is loaded from the secure `app://chess` origin. The web client detects Electron through its preload bridge and talks directly to `http://127.0.0.1:4000` by default for auth and game sockets. Set `VITE_DESKTOP_API_URL` at web build time to override that host. Add `app://chess` to the API's comma-separated `WEB_ORIGIN` list, for example `WEB_ORIGIN=http://localhost:3000,app://chess`, so credentialed requests are accepted. Google sign-in is not supported in the packaged app; email auth remains available.
 
 ## Commands
 
 ```bash
 just web-dev         # start the Vite dev server (required before desktop-dev)
-just desktop-dev     # open the native window against localhost:3000
+just desktop-dev     # open the Electron window against localhost:3000
 just desktop-build   # produce release binaries and installers
-just desktop-check   # cargo check
-just desktop-lint    # clippy with -D warnings
-just desktop-test    # cargo test
-just desktop-format  # rustfmt
-just desktop-clean   # remove target/
+just desktop-check   # syntax-check Electron entry points
+just desktop-lint    # lint Electron entry points
+just desktop-test    # run desktop package tests
+just desktop-format  # format Electron entry points
+just desktop-clean   # remove desktop build output
 ```
-
-The `desktop-*` recipes run through `devenv shell` automatically, so they work from any shell with the system libraries present. Plain `cargo`/`bunx tauri` invocations outside the devenv shell fail at `pkg-config` with missing `dbus-1` or WebKitGTK.
-
-## System dependencies
-
-On Linux, Tauri needs WebKitGTK, GTK, and D-Bus libraries. They are provided by the devenv shell: `webkitgtk_4_1`, `gtk3`, `libsoup_3`, `glib`, `glib-networking` (TLS backend so https assets such as piece images load in the webview), `cairo`, `pango`, `gdk-pixbuf`, `gobject-introspection`, and `dbus` are declared in `devenv.nix`. Run builds inside `devenv shell` (or via the `just desktop-*` recipes) so `pkg-config` can find them.
 
 ## Known gaps
 
 - No updater, tray, or deep-link integration yet.
-- The production build still expects a reachable API host; there is no embedded single-player mode.
-- Mobile targets are scaffolded only at the code level (`lib.rs` entry point); no Android or iOS project files exist.
+- The packaged build expects a reachable API host; it does not embed single-player mode or the API.
+- The API OAuth callback allowlist does not currently support the packaged `app://chess` origin; use email auth in the packaged app.

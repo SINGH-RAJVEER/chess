@@ -1,17 +1,30 @@
 {
 	"name": "@chess/desktop",
+	"version": "0.1.0",
+	"description": "Chess desktop application",
 	"private": true,
-	"type": "module",
+	"main": "main.cjs",
 	"scripts": {
-		"dev": "tauri dev",
-		"build": "tauri build",
-		"check": "cargo check",
-		"lint": "cargo clippy --all-targets --all-features -- -D warnings",
-		"format": "cargo fmt --all",
-		"test": "cargo test",
-		"clean": "cargo clean && rm -rf gen"
+		"dev": "bun launch-electron.cjs",
+		"build": "electron-builder",
+		"check": "bun -e 'for (const file of [\"main.cjs\", \"preload.cjs\", \"launch-electron.cjs\"]) new Function(await Bun.file(file).text())'",
+		"lint": "biome lint main.cjs preload.cjs launch-electron.cjs",
+		"format": "biome format --write main.cjs preload.cjs launch-electron.cjs",
+		"test": "bun test",
+		"clean": "rm -rf dist release"
 	},
 	"devDependencies": {
-		"@tauri-apps/cli": "^2"
+		"electron": "^42.0.0",
+		"electron-builder": "^26.0.0"
+	},
+	"build": {
+		"appId": "dev.chess.desktop",
+		"productName": "Chess",
+		"directories": { "output": "release" },
+		"files": ["main.cjs", "preload.cjs", "launch-electron.cjs", "package.json"],
+		"extraResources": [{ "from": "../web/dist", "to": "web" }],
+		"linux": { "target": ["AppImage", "deb"], "icon": "icons/icon.png" },
+		"mac": { "target": ["dmg"], "icon": "icons/icon.icns" },
+		"win": { "target": ["nsis"], "icon": "icons/icon.ico" }
 	}
 }

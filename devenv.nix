@@ -43,6 +43,9 @@ in
     rustfmt
     pkg-config
     openssl
+    # UCI engine behind the "stockfish" computer opponent; the API resolves
+    # it from STOCKFISH_PATH or PATH.
+    stockfish
     # Container CLI for building and running the deployment images.
     # Rootless podman also needs subuid/subgid ranges for this user, which
     # NixOS provides via users.users.<name>.subUidRanges/subGidRanges.
@@ -53,14 +56,10 @@ in
     nixd
   ] ++ lib.optionals pkgs.stdenv.isLinux (with pkgs; [
     glib
-    glib-networking
     gtk3
-    webkitgtk_4_1
-    libsoup_3
     cairo
     pango
     gdk-pixbuf
-    gobject-introspection
     dbus
   ]);
 

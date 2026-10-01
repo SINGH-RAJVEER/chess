@@ -344,28 +344,28 @@ engine-clean:
 
 # Start the desktop app (requires the web dev server on port 3000)
 desktop-dev:
-    devenv shell -- bash -c 'cd apps/desktop && exec bunx tauri dev'
+    cd apps/desktop && ELECTRON_RENDERER_URL=http://localhost:3000 bun run dev
 
 # Build and bundle the desktop app (embeds a fresh apps/web/dist)
 desktop-build: web-build
-    devenv shell -- bash -c 'cd apps/desktop && exec bunx tauri build'
+    cd apps/desktop && bun run build
 
-# Test the desktop Rust crate
+# Test desktop package behavior
 desktop-test:
-    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo test'
+    cd apps/desktop && bun test
 
-# Lint the desktop Rust crate with clippy
+# Lint Electron entry points
 desktop-lint:
-    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo clippy --all-targets --all-features -- -D warnings'
+    cd apps/desktop && bun run lint
 
-# Format the desktop Rust crate
+# Format Electron entry points
 desktop-format:
-    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo fmt --all'
+    cd apps/desktop && bun run format
 
-# Run cargo check for the desktop crate
+# Check Electron entry point syntax
 desktop-check:
-    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo check'
+    cd apps/desktop && bun run check
 
 # Clean desktop build artifacts
 desktop-clean:
-    devenv shell -- bash -c 'cd apps/desktop/src-tauri && exec cargo clean'
+    cd apps/desktop && bun run clean

@@ -73,7 +73,8 @@ mobile yet; it needs a browser redirect flow.
 ## Game Flows
 
 - Local: `vs_player` board, both sides move on the device.
-- Computer: `vs_computer` board with a minimax/alpha-beta picker; the screen
+- Computer: `vs_computer` board with a Default minimax engine (alpha-beta
+  pruning) and Stockfish picker; the screen
   polls while it is Black's turn.
 - Online: requires sign-in; joins the matchmaking queue, polls queue status
   until matched, then polls the board. Moves are allowed only for the signed

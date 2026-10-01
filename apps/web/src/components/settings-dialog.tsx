@@ -2,6 +2,7 @@ import { Check, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { isDesktop } from "@/lib/api-base";
 import { useSettings } from "@/lib/settings-context";
 import { BOARD_THEMES, getPieceImageUrl, getPieceUnicode, PIECE_THEMES } from "@/lib/themes";
 
@@ -14,6 +15,7 @@ const SETTINGS_TABS = [
 	{ id: "board", label: "Board" },
 	{ id: "pieces", label: "Pieces" },
 	{ id: "play", label: "Play" },
+...(isDesktop() ? [{ id: "desktop", label: "Desktop" } as const] : []),
 ] as const;
 
 type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
@@ -33,7 +35,7 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 					<div
 						role="tablist"
 						aria-label="Settings sections"
-						className="grid grid-cols-3 rounded bg-zinc-950 p-1"
+						className={`grid ${isDesktop() ? "grid-cols-4" : "grid-cols-3"} rounded bg-zinc-950 p-1`}
 					>
 						{SETTINGS_TABS.map((tab) => (
 							<button
@@ -218,6 +220,21 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 								label="Auto-queen promotion"
 								checked={settings.autoQueen}
 								onChange={(v) => updateSettings({ autoQueen: v })}
+							/>
+						</section>
+					)}
+
+					{activeTab === "desktop" && isDesktop() && (
+						<section
+							id="settings-panel-desktop"
+							role="tabpanel"
+							aria-labelledby="settings-tab-desktop"
+							className="flex flex-col gap-2"
+						>
+							<ToggleRow
+								label="Show desktop close button"
+								checked={settings.showDesktopCloseButton}
+								onChange={(value) => updateSettings({ showDesktopCloseButton: value })}
 							/>
 						</section>
 					)}

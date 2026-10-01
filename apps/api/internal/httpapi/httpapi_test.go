@@ -31,12 +31,12 @@ func TestCredentialedCORS(t *testing.T) {
 }
 
 func TestCredentialedCORSAllowlist(t *testing.T) {
-	handler := httpapi.NewHandler(nil, nil, httpapi.WithCORSOrigin("http://localhost:3000, https://tauri.localhost"))
+	handler := httpapi.NewHandler(nil, nil, httpapi.WithCORSOrigin("http://localhost:3000, app://chess"))
 	request := httptest.NewRequest(http.MethodOptions, "/api/auth/get-session", nil)
-	request.Header.Set("Origin", "https://tauri.localhost")
+	request.Header.Set("Origin", "app://chess")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != "https://tauri.localhost" || response.Header().Get("Access-Control-Allow-Credentials") != "true" {
+	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != "app://chess" || response.Header().Get("Access-Control-Allow-Credentials") != "true" {
 		t.Fatalf("status=%d headers=%v", response.Code, response.Header())
 	}
 }

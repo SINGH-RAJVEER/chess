@@ -69,7 +69,7 @@ The web server proxies `/api` to `http://127.0.0.1:4000` by default. Set
 `VITE_API_PROXY_TARGET` in the root `.env` to point to another API during local
 development.
 
-The desktop target opens a native Tauri window that loads the web dev server at
+The desktop target opens an Electron window that loads the web dev server at
 `http://localhost:3000`; start `web:dev` first. See
 [desktop.md](desktop.md) for build modes and Linux system dependencies.
 
@@ -110,7 +110,8 @@ desktop release build embeds into the native binary.
 ## Computer Opponent Training (Retired)
 
 The DQN opponent was removed when the standalone engine server was replaced
-by the in-process library: only minimax and the custom alpha-beta engine
+by the in-process library: minimax, the custom alpha-beta engine, and
+Stockfish (installed by `devenv.nix`, see [stockfish.md](stockfish.md))
 serve traffic. The Python training pipeline in `apps/dqn/training` and the
 exported `apps/dqn/model.onnx` are retained for research but are no longer
 loaded at runtime.

@@ -1,7 +1,6 @@
 import { Camera, ChevronDown, Cpu, LogOut, Settings, Trophy, User, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -12,7 +11,8 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
-import { isTauri } from "@/lib/api-base";
+import { useSettings } from "@/lib/settings-context";
+import { isDesktop } from "@/lib/api-base";
 import SettingsDialog from "./settings-dialog";
 
 interface HeaderProps {
@@ -77,6 +77,7 @@ export default function Header(props: HeaderProps) {
 	const [failedProfileImage, setFailedProfileImage] = useState<string | null>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const { user, signOut, updateProfileImage } = useAuth();
+	const { settings } = useSettings();
 	const navigate = useNavigate();
 
 	useEffect(() => {
@@ -128,7 +129,7 @@ export default function Header(props: HeaderProps) {
 				<Link
 					to="/"
 					className="flex w-1/4 items-center gap-2 transition-opacity hover:opacity-80"
-					data-tauri-drag-region
+					style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
 				>
 					<h1 className="text-xl font-medium tracking-tight lowercase">chess</h1>
 				</Link>
@@ -245,6 +246,7 @@ export default function Header(props: HeaderProps) {
 					{/* Settings */}
 					<button
 						type="button"
+						aria-label="Settings"
 						className="flex items-center justify-center h-8 w-8 rounded-md bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors"
 						onClick={() => setSettingsOpen(true)}
 					>
@@ -307,13 +309,13 @@ export default function Header(props: HeaderProps) {
 							<span className="hidden text-xs font-medium sm:inline">Sign In</span>
 						</Link>
 					)}
-					{isTauri() && (
+					{isDesktop() && settings.showDesktopCloseButton && (
 						<button
 							type="button"
 							aria-label="Close window"
 							title="Close"
-							className="flex items-center justify-center h-8 w-8 rounded-md bg-zinc-900 border border-zinc-800 hover:bg-red-900/70 text-zinc-400 hover:text-red-100 transition-colors"
-							onClick={() => void getCurrentWindow().close()}
+							className="ml-auto flex items-center justify-center h-8 w-8 rounded-md bg-zinc-900 border border-zinc-800 hover:bg-red-900/70 text-zinc-400 hover:text-red-100 transition-colors"
+							onClick={() => window.chessDesktop?.close()}
 						>
 							<X className="size-3.5" />
 						</button>

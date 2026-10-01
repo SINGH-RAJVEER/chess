@@ -1,6 +1,6 @@
 declare global {
 	interface Window {
-		__TAURI_INTERNALS__?: unknown;
+		chessDesktop?: { close: () => void };
 	}
 }
 
@@ -18,10 +18,10 @@ function stripSlashes(value: string): string {
  * shell talks directly to the local API while the browser stays same-origin
  * behind its reverse proxy. One dist serves both.
  */
-export function resolveApiBaseUrl(env: ApiBaseEnv, isTauri: boolean): string {
+export function resolveApiBaseUrl(env: ApiBaseEnv, isDesktop: boolean): string {
 	const configured = env.VITE_API_BASE_URL?.trim();
 	if (configured) return stripSlashes(configured);
-	if (isTauri) {
+	if (isDesktop) {
 		const desktop = env.VITE_DESKTOP_API_URL?.trim();
 		return desktop ? stripSlashes(desktop) : "http://127.0.0.1:4000";
 	}
@@ -34,13 +34,13 @@ export function resolveWsUrl(apiBase: string, protocol: string, host: string): s
 	return `${socketProtocol}//${host}/api/ws`;
 }
 
-function isTauriRuntime(): boolean {
-	return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+function isDesktopRuntime(): boolean {
+	return typeof window !== "undefined" && "chessDesktop" in window;
 }
 
-/** True inside the packaged desktop shell; the browser stays same-origin. */
-export function isTauri(): boolean {
-	return isTauriRuntime();
+/** True inside the packaged Electron shell; the browser stays same-origin. */
+export function isDesktop(): boolean {
+	return isDesktopRuntime();
 }
 
 export function getApiBaseUrl(): string {
@@ -50,7 +50,7 @@ export function getApiBaseUrl(): string {
 			VITE_API_BASE_URL: env.VITE_API_BASE_URL as string | undefined,
 			VITE_DESKTOP_API_URL: env.VITE_DESKTOP_API_URL as string | undefined,
 		},
-		isTauriRuntime(),
+		isDesktopRuntime(),
 	);
 }
 

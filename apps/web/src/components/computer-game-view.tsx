@@ -4,7 +4,9 @@ import type {
 	Color,
 	ComputerOpponent,
 	PromotionPiece,
+	StockfishLevel,
 } from "@chess/types";
+import { STOCKFISH_LEVELS } from "@chess/types";
 import { AlertCircle, BrainCircuit, Cpu, User } from "lucide-react";
 import ChessBoard from "@/components/chess-board";
 import Header from "@/components/header";
@@ -20,6 +22,13 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import type { CapturedPieceEntry, PendingMove } from "@/lib/game-utils";
 import { formatGameTime } from "@/lib/game-utils";
 
@@ -49,6 +58,7 @@ type ComputerGameViewProps = {
 	isGameOver: boolean;
 	gameOverMessage: string;
 	opponent: ComputerOpponent;
+	level: StockfishLevel;
 	onRestart: () => void;
 	onSquareClick: (square: number) => void;
 	onConfirmMove: (promotion?: PromotionPiece) => void;
@@ -57,7 +67,26 @@ type ComputerGameViewProps = {
 	onTakeback: () => void;
 	onResign: () => void;
 	onOpponentChange: (opponent: ComputerOpponent) => void;
+	onLevelChange: (level: StockfishLevel) => void;
 };
+
+const OPPONENT_LABELS: Record<ComputerOpponent, string> = {
+	minimax: "Default",
+	custom: "Alpha-beta",
+	stockfish: "Stockfish",
+};
+
+const OPPONENT_DESCRIPTIONS: Record<ComputerOpponent, string> = {
+	minimax: "Default minimax engine with alpha-beta pruning.",
+	custom: "Iterative-deepening alpha-beta search with quiescence and a transposition table.",
+	stockfish: "Stockfish with a capped skill, depth, and think time. Level 8 is full strength.",
+};
+
+const LEVEL_ITEMS = STOCKFISH_LEVELS.map((value) => ({ value, label: `Level ${value}` }));
+const OPPONENT_OPTIONS: [ComputerOpponent, string][] = [
+	["minimax", OPPONENT_LABELS.minimax],
+	["stockfish", OPPONENT_LABELS.stockfish],
+];
 
 export default function ComputerGameView({
 	boardData,
@@ -79,6 +108,7 @@ export default function ComputerGameView({
 	isGameOver,
 	gameOverMessage,
 	opponent,
+	level,
 	onRestart,
 	onSquareClick,
 	onConfirmMove,
@@ -87,8 +117,11 @@ export default function ComputerGameView({
 	onTakeback,
 	onResign,
 	onOpponentChange,
+	onLevelChange,
 }: ComputerGameViewProps) {
 	const hasClock = boardData?.timeControl !== 0;
+	const opponentLabel =
+		opponent === "stockfish" ? `Stockfish \u00b7 Level ${level}` : OPPONENT_LABELS[opponent];
 
 	return (
 		<div className="h-screen flex flex-col bg-zinc-950 font-sans text-zinc-300 overflow-hidden">
@@ -109,7 +142,7 @@ export default function ComputerGameView({
 					)}
 
 					<PlayerCard
-						label={opponent === "custom" ? "Alpha-beta" : "Minimax"}
+						label={opponentLabel}
 						color="Black"
 						time={formatGameTime(blackTime, hasClock)}
 						isActive={turn === "Black"}
@@ -161,31 +194,52 @@ export default function ComputerGameView({
 							Opponent
 						</div>
 						<div className="flex rounded border border-zinc-800 p-0.5">
-							{(
-								[
-									["minimax", "Minimax"],
-									["custom", "Alpha-beta"],
-								] as const
-							).map(([value, label]) => (
-								<button
-									key={value}
-									type="button"
-									aria-pressed={opponent === value}
-									onClick={() => onOpponentChange(value)}
-									className={`flex-1 rounded px-1 py-1 text-[11px] font-medium transition-colors ${
-										opponent === value
-											? "bg-violet-500/80 text-zinc-50"
-											: "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
-									}`}
-								>
-									{label}
+							{OPPONENT_OPTIONS.map(([value, label]) => (
+									<button
+										key={value}
+										type="button"
+										aria-pressed={opponent === value}
+										onClick={() => onOpponentChange(value)}
+										className={`flex-1 rounded px-1 py-1 text-[11px] font-medium transition-colors ${
+											opponent === value
+												? "bg-violet-500/80 text-zinc-50"
+												: "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+										}`}
+									>
+										{label}
 								</button>
 							))}
 						</div>
+						{opponent === "stockfish" && (
+							<Select
+								items={LEVEL_ITEMS}
+								value={level}
+								onValueChange={(value) => {
+									if (value !== null) onLevelChange(value);
+								}}
+							>
+								<SelectTrigger
+									size="sm"
+									aria-label="Stockfish level"
+									className="mt-2 w-full border-zinc-800 text-xs text-zinc-200"
+								>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent className="bg-zinc-900 text-zinc-300 ring-zinc-800">
+									{LEVEL_ITEMS.map((item) => (
+										<SelectItem
+											key={item.value}
+											value={item.value}
+											className="text-xs focus:bg-zinc-800 focus:text-zinc-100"
+										>
+											{item.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						)}
 						<p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-							{opponent === "custom"
-								? "Iterative-deepening alpha-beta search with quiescence and a transposition table."
-								: "Classic depth-five minimax search."}
+							{OPPONENT_DESCRIPTIONS[opponent]}
 						</p>
 					</div>
 					<MoveHistory moves={boardData?.moves ?? []} />

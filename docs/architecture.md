@@ -13,6 +13,10 @@ Mobile client (Expo, iOS + Android) ──────┘ API over LAN (EXPO_PUB
   | in-process CGO call into the Rust static library
   v
 Engine library (minimax + custom alpha-beta, no network hop)
+  |
+  | or: child process per move over UCI
+  v
+Stockfish binary (STOCKFISH_PATH)
 ```
 
 Neither client connects directly to PostgreSQL or the engine.
@@ -48,7 +52,7 @@ and never touches the network or the database.
 
 ### Desktop client: `apps/desktop`
 
-- Tauri 2 shell that renders the web client in a native window without
+- Electron shell that renders the web client in a native window without
   duplicating UI code.
 - Development loads the Vite dev server at `http://localhost:3000`, so the API
   proxy and hot reload behave as in the browser.
@@ -72,7 +76,9 @@ and never touches the network or the database.
 - Rust library using `shakmaty`, linked into the Go API via CGO
   (`apps/api/internal/engine`, C symbol `engine_best_move`).
 - Accepts a FEN plus a `minimax` or `custom` opponent choice; legacy `dqn`
-  requests map to `custom`.
+  requests map to `custom`. The `stockfish` choice bypasses the library and
+  runs the Stockfish binary at one of eight difficulty levels (see
+  [stockfish.md](stockfish.md)).
 - Minimax uses alpha-beta search at depth five and material evaluation.
 - Custom runs an iterative-deepening alpha-beta search with quiescence,
   transposition table, and PeSTO evaluation (see docs/engine.md).
@@ -134,7 +140,9 @@ own runtime types and does not import this package.
    (`timeControl: 0`).
 2. The human move is committed by the API over the socket.
 3. If the game remains active and it is Black's turn, the API starts a
-   background in-process engine call with the current position encoded as FEN.
+   background engine call with the current position encoded as FEN: an
+   in-process library search for minimax and custom, or a Stockfish child
+   process at the requested level.
 4. The engine returns UCI notation, such as `e7e5` or `e1g1`.
 5. The API validates and commits the engine move as a normal game mutation,
    which triggers an immediate `game.state` push to the room.

@@ -6,16 +6,16 @@ Chess is a full-stack chess application with local games, online matchmaking, au
 
 - `apps/web`: React and Vite browser application.
 - `apps/mobile`: Expo iOS and Android app with the same playable core.
-- `apps/desktop`: Tauri desktop shell around the web application.
+- `apps/desktop`: Electron desktop shell around the web application.
 - `apps/api`: Go HTTP API for authentication, game state, matchmaking, clocks, migrations, and engine orchestration.
-- `apps/engine`: Rust engine library (minimax + custom alpha-beta) linked into the API.
+- `apps/engine`: Rust engine library (minimax + custom alpha-beta) linked into the API. A Stockfish opponent with eight difficulty levels runs alongside it.
 - `apps/dqn`: retired DQN training pipeline and model, kept for research.
 - `libs/types`: Shared TypeScript domain and API types.
 - `docs`: Detailed architecture, development, API, operations, data model, and security documentation.
 
 ## How It Works
 
-The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API selects the reply in-process through the linked Rust engine library (minimax or custom alpha-beta search).
+The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API selects the reply in-process through the linked Rust engine library (minimax or custom alpha-beta search), or from a Stockfish child process at the chosen difficulty level.
 
 The local stack uses these ports:
 
@@ -72,7 +72,8 @@ The detailed documentation is split by audience and concern:
 - [Operations](docs/operations.md): release, deployment, health, and incidents.
 - [Security](docs/security.md): authentication, trust boundaries, and hardening.
 - [API implementation notes](docs/api.md): Go API structure and compatibility details.
+- [Stockfish opponent](docs/stockfish.md): difficulty levels, binary setup, and request flow.
 - [Computer opponent notes](docs/dqn.md): retired DQN opponent and model training.
-- [Desktop](docs/desktop.md): Tauri desktop shell, build modes, and system dependencies.
+- [Desktop](docs/desktop.md): Electron desktop shell and build modes.
 
 Production deployment guidance and known implementation gaps are documented in the operations and security guides. Podman-ready Dockerfiles live next to each app (see [Docker deployment](docs/docker.md)). The repository does not include a reverse proxy, deployment manifest, backup system, or monitoring stack.

@@ -11,6 +11,7 @@ export type GameSettings = {
 	showLegalMoves: boolean;
 	showLastMove: boolean;
 	boardFlipped: boolean;
+	showDesktopCloseButton: boolean;
 };
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS: GameSettings = {
 	showLegalMoves: true,
 	showLastMove: true,
 	boardFlipped: false,
+	showDesktopCloseButton: true,
 };
 
 const STORAGE_KEY = "chess_settings";
