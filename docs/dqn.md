@@ -2,10 +2,11 @@
 
 The DQN opponent was removed when the standalone Rust engine server was
 replaced by the in-process engine library. The vs computer page now offers
-two opponents:
+three opponents:
 
 - Minimax runs the depth-five material search.
 - Custom runs the built-in iterative-deepening alpha-beta engine (see docs/engine.md).
+- Stockfish runs the external Stockfish binary at levels 1 to 8 (see docs/stockfish.md).
 
 Stored `dqn` selections in browser local storage migrate to `custom`, and
 the API maps any remaining `dqn` requests to the custom engine, so old

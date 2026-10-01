@@ -79,6 +79,10 @@ returns `engine=custom depth .. score .. .. nodes` diagnostics. A fresh
 `Searcher` is constructed per call, so concurrent games never share mutable
 search state; a Go-side semaphore bounds parallel searches.
 
+The `stockfish` opponent never reaches this library; the Go bridge runs the
+external Stockfish binary under the same semaphore (see
+[stockfish.md](stockfish.md)).
+
 ## Configuration
 
 Optional environment variables loaded from the root `.env`:

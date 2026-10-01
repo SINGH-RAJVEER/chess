@@ -10,6 +10,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/rajveer/chess/apps/api/internal/auth"
+	"github.com/rajveer/chess/apps/api/internal/engine"
 	"github.com/rajveer/chess/apps/api/internal/game"
 )
 
@@ -196,6 +197,7 @@ type incoming struct {
 	To          *int   `json:"to"`
 	Promotion   string `json:"promotion"`
 	Opponent    string `json:"opponent"`
+	Level       *int   `json:"level"`
 	Accept      *bool  `json:"accept"`
 }
 
@@ -441,9 +443,20 @@ func (hub *Hub) handleMove(client *Client, msg incoming) {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 		return
 	}
-	opponent := msg.Opponent
-	if stored.Mode == "vs_computer" && opponent == "" {
-		opponent = "minimax"
+	opponent := engine.Options{Opponent: msg.Opponent}
+	if msg.Level != nil {
+		opponent.Level = *msg.Level
+	}
+	if stored.Mode == "vs_computer" {
+		if opponent.Opponent == "" {
+			opponent.Opponent = "minimax"
+		}
+		// Reject before committing the human move; otherwise the game would
+		// sit waiting on an engine reply that can never arrive.
+		if opponent.Opponent == "stockfish" && !engine.StockfishAvailable() {
+			client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": engine.ErrStockfishUnavailable.Error()})
+			return
+		}
 	}
 	_, err = hub.games.MakeMove(context.Background(), *msg.GameID, *msg.From, *msg.To, game.PieceType(msg.Promotion), opponent)
 	if err != nil {

@@ -276,11 +276,11 @@ func (service *Service) ValidMoves(ctx context.Context, gameID, from int) ([]int
 	return result, nil
 }
 
-func (service *Service) MakeMove(ctx context.Context, gameID, from, to int, promotion PieceType, opponent string) (map[string]any, error) {
+func (service *Service) MakeMove(ctx context.Context, gameID, from, to int, promotion PieceType, opponent engine.Options) (map[string]any, error) {
 	return service.makeMove(ctx, gameID, from, to, promotion, opponent, false)
 }
 
-func (service *Service) makeMove(ctx context.Context, gameID, from, to int, promotion PieceType, opponent string, engine bool) (map[string]any, error) {
+func (service *Service) makeMove(ctx context.Context, gameID, from, to int, promotion PieceType, opponent engine.Options, engine bool) (map[string]any, error) {
 	tx, err := service.db.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -418,9 +418,9 @@ func (service *Service) makeMove(ctx context.Context, gameID, from, to int, prom
 	return result, nil
 }
 
-func (service *Service) requestEngineMove(gameID int, fen, opponent string) {
-	if opponent == "" {
-		opponent = "minimax"
+func (service *Service) requestEngineMove(gameID int, fen string, opponent engine.Options) {
+	if opponent.Opponent == "" {
+		opponent.Opponent = "minimax"
 	}
 	bestMove, info, err := engine.BestMove(fen, opponent)
 	if err != nil {

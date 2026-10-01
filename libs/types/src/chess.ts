@@ -17,7 +17,27 @@ export type GameStatus =
 
 export type GameMode = "vs_player" | "vs_computer";
 
-export type ComputerOpponent = "minimax" | "custom";
+export type ComputerOpponent = "minimax" | "custom" | "stockfish";
+
+/** Stockfish strength from 1 (weakest) to 8 (full strength). */
+export type StockfishLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+export const STOCKFISH_LEVELS: readonly StockfishLevel[] = [1, 2, 3, 4, 5, 6, 7, 8];
+
+export const DEFAULT_STOCKFISH_LEVEL: StockfishLevel = 4;
+
+/** Parses a stored or routed level, falling back to the default. */
+export function parseStockfishLevel(value: unknown): StockfishLevel {
+	const level = Number(value);
+	return STOCKFISH_LEVELS.find((candidate) => candidate === level) ?? DEFAULT_STOCKFISH_LEVEL;
+}
+
+/** Parses a stored or routed opponent; legacy "dqn" maps to custom. */
+export function parseComputerOpponent(value: unknown): ComputerOpponent {
+	if (value === "stockfish") return "stockfish";
+	if (value === "custom" || value === "dqn") return "custom";
+	return "minimax";
+}
 
 export type QueueStatus = "idle" | "queued" | "matched";
 

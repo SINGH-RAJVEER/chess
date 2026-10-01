@@ -56,7 +56,7 @@ func BenchmarkEngineMinimaxFFI(b *testing.B) {
 	const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, _, err := engine.BestMove(fen, "minimax"); err != nil {
+		if _, _, err := engine.BestMove(fen, engine.Options{Opponent: "minimax"}); err != nil {
 			b.Fatal(err)
 		}
 	}

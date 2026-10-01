@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rajveer/chess/apps/api/internal/engine"
 	"github.com/rajveer/chess/apps/api/internal/testdb"
 )
 
@@ -46,7 +47,7 @@ func TestResetAndGetBoard(t *testing.T) {
 func TestMakeMoveAppliesE2E4(t *testing.T) {
 	service, ctx := openService(t)
 	id := resetAndLoad(t, service, ctx, "vs_player", 10)
-	result, err := service.MakeMove(ctx, id, 52, 36, "", "")
+	result, err := service.MakeMove(ctx, id, 52, 36, "", engine.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,10 +69,10 @@ func TestMakeMoveAppliesE2E4(t *testing.T) {
 func TestMakeMoveRejects(t *testing.T) {
 	service, ctx := openService(t)
 	id := resetAndLoad(t, service, ctx, "vs_player", 10)
-	if _, err := service.MakeMove(ctx, id, 8, 16, "", ""); err == nil || err.Error() != "Invalid move" {
+	if _, err := service.MakeMove(ctx, id, 8, 16, "", engine.Options{}); err == nil || err.Error() != "Invalid move" {
 		t.Fatalf("moving the other side's pawn: err=%v", err)
 	}
-	if _, err := service.MakeMove(ctx, id+999999, 52, 36, "", ""); err == nil || err.Error() != "No game found" {
+	if _, err := service.MakeMove(ctx, id+999999, 52, 36, "", engine.Options{}); err == nil || err.Error() != "No game found" {
 		t.Fatalf("unknown game: err=%v", err)
 	}
 }
@@ -127,7 +128,7 @@ func TestQueueMatchmaking(t *testing.T) {
 func TestUndoRestoresPosition(t *testing.T) {
 	service, ctx := openService(t)
 	id := resetAndLoad(t, service, ctx, "vs_player", 10)
-	if _, err := service.MakeMove(ctx, id, 52, 36, "", ""); err != nil {
+	if _, err := service.MakeMove(ctx, id, 52, 36, "", engine.Options{}); err != nil {
 		t.Fatal(err)
 	}
 	undone, err := service.Undo(ctx, id)
@@ -160,7 +161,7 @@ func TestResignEndsGame(t *testing.T) {
 	if _, err := service.Resign(ctx, id, Black); err == nil {
 		t.Fatal("second resign should fail on a finished game")
 	}
-	if _, err := service.MakeMove(ctx, id, 52, 36, "", ""); err == nil {
+	if _, err := service.MakeMove(ctx, id, 52, 36, "", engine.Options{}); err == nil {
 		t.Fatal("move on a finished game should fail")
 	}
 }
@@ -188,7 +189,7 @@ func TestDrawOfferAndResponse(t *testing.T) {
 func TestComputerGameGetsEngineReply(t *testing.T) {
 	service, ctx := openService(t)
 	id := resetAndLoad(t, service, ctx, "vs_computer", 0)
-	if _, err := service.MakeMove(ctx, id, 52, 36, "", "minimax"); err != nil {
+	if _, err := service.MakeMove(ctx, id, 52, 36, "", engine.Options{Opponent: "minimax"}); err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(20 * time.Second)

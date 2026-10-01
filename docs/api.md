@@ -44,6 +44,8 @@ Computer moves are computed in-process: `internal/engine` calls
 `engine_best_move` in the Rust static library (`apps/engine`, built by
 `just engine-lib`) over CGO. Builds require a C toolchain and
 `CGO_ENABLED=1`. Legacy `dqn` opponent values map to the custom engine.
+The `stockfish` opponent instead spawns the binary from `STOCKFISH_PATH` (or
+`PATH`) per move; see [stockfish.md](stockfish.md).
 
 ## Configuration
 

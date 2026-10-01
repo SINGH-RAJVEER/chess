@@ -6,6 +6,8 @@
 // server. A fresh Rust Searcher is constructed per custom-engine call, which
 // keeps concurrent callers isolated; a semaphore bounds how many searches run
 // at once so a burst of computer games cannot starve the HTTP server.
+// Stockfish is the exception: it runs as an external binary (see
+// stockfish.go) behind the same semaphore.
 package engine
 
 /*
@@ -24,12 +26,23 @@ import (
 	"runtime"
 	"strings"
 	"unsafe"
+
+	"github.com/notnil/chess"
 )
 
 const (
 	opponentMinimax = 0
 	opponentCustom  = 1
+	// opponentStockfish never reaches the Rust library.
+	opponentStockfish = 2
 )
+
+// Options selects the computer opponent. Level only applies to Stockfish
+// and is clamped by NormalizeLevel.
+type Options struct {
+	Opponent string
+	Level    int
+}
 
 const (
 	maxUCIBytes  = 16
@@ -57,22 +70,33 @@ func searchConcurrency() int {
 // BestMove selects a computer move for fen and returns it in UCI notation
 // (for example "e7e5" or "e7e8q"), plus optional diagnostic info.
 //
-// opponent is "minimax" or "custom"; "" defaults to minimax and legacy "dqn"
-// values map to custom. Time and depth budgets come from
-// ENGINE_CUSTOM_MOVETIME_MS / ENGINE_CUSTOM_MAX_DEPTH.
-func BestMove(fen, opponent string) (string, string, error) {
-	selector, err := normalizeOpponent(opponent)
+// options.Opponent is "minimax", "custom", or "stockfish"; "" defaults to
+// minimax and legacy "dqn" values map to custom. Custom time and depth
+// budgets come from ENGINE_CUSTOM_MOVETIME_MS / ENGINE_CUSTOM_MAX_DEPTH;
+// Stockfish strength comes from options.Level.
+func BestMove(fen string, options Options) (string, string, error) {
+	selector, err := normalizeOpponent(options.Opponent)
 	if err != nil {
 		return "", "", err
 	}
 	if strings.TrimSpace(fen) == "" {
 		return "", "", ErrInvalidPosition
 	}
+	// The Rust library rejects bad FEN itself; Stockfish does not and may
+	// crash on malformed input, so validate before handing it over.
+	if selector == opponentStockfish {
+		if _, err := chess.FEN(fen); err != nil {
+			return "", "", ErrInvalidPosition
+		}
+	}
 	select {
 	case searchSlots <- struct{}{}:
 		defer func() { <-searchSlots }()
 	default:
 		return "", "", ErrBusy
+	}
+	if selector == opponentStockfish {
+		return stockfishBestMove(fen, NormalizeLevel(options.Level))
 	}
 	cFen := C.CString(fen)
 	defer C.free(unsafe.Pointer(cFen))
@@ -109,7 +133,9 @@ func normalizeOpponent(opponent string) (int, error) {
 		return opponentMinimax, nil
 	case "custom", "dqn":
 		return opponentCustom, nil
+	case "stockfish":
+		return opponentStockfish, nil
 	default:
-		return 0, errors.New("opponent must be minimax or custom")
+		return 0, errors.New("opponent must be minimax, custom, or stockfish")
 	}
 }

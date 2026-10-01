@@ -6,6 +6,7 @@ import type {
 	GameStatus,
 	PromotionPiece,
 	QueueStatus,
+	StockfishLevel,
 } from "./chess";
 
 // Single persistent socket per client. Every client message carries an
@@ -40,6 +41,8 @@ export type WsClientMessage =
 			to: number;
 			promotion?: PromotionPiece;
 			opponent?: ComputerOpponent;
+			/** Only read when opponent is "stockfish"; defaults to 4. */
+			level?: StockfishLevel;
 	  }
 	| { id: WsRequestId; type: "game.resign"; gameId: number }
 	| { id: WsRequestId; type: "game.draw.offer"; gameId: number }

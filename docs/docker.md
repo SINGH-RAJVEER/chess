@@ -42,7 +42,8 @@ podman run -d --name db --network chess \
 ```
 
 API (build from the repository root, since it compiles the Rust engine
-static library first):
+static library first). The image also installs Debian's `stockfish` package
+and sets `STOCKFISH_PATH=/usr/games/stockfish` for the Stockfish opponent:
 
 ```bash
 podman build -f apps/api/Dockerfile -t chess-api .

@@ -7,6 +7,7 @@ import type {
 	QueueStatusResponse,
 	WsServerMessage,
 } from "@chess/types";
+import { parseComputerOpponent, parseStockfishLevel } from "@chess/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, Text, View } from "react-native";
@@ -64,10 +65,11 @@ function pairedMoves(moves: BoardMove[]): { number: number; white?: string; blac
 export default function GameScreen() {
 	const router = useRouter();
 	const { user, isLoading: isAuthLoading } = useAuth();
-	const params = useLocalSearchParams<{ mode?: string; opponent?: string }>();
+	const params = useLocalSearchParams<{ mode?: string; opponent?: string; level?: string }>();
 	const mode: GameMode =
 		params.mode === "computer" || params.mode === "online" ? params.mode : "local";
-	const opponent: ComputerOpponent = params.opponent === "custom" ? "custom" : "minimax";
+	const opponent: ComputerOpponent = parseComputerOpponent(params.opponent);
+	const level = parseStockfishLevel(params.level);
 
 	const [board, setBoard] = useState<BoardResponse | null>(null);
 	const [queue, setQueue] = useState<QueueStatusResponse>({ status: "idle" });
@@ -294,6 +296,7 @@ export default function GameScreen() {
 					gameId,
 					promotion: promotionPiece,
 					opponent: mode === "computer" ? opponent : undefined,
+					level: mode === "computer" && opponent === "stockfish" ? level : undefined,
 				});
 				setSelected(null);
 				setValidTargets([]);
@@ -304,7 +307,7 @@ export default function GameScreen() {
 				setBusy(false);
 			}
 		},
-		[gameId, busy, mode, opponent],
+		[gameId, busy, mode, opponent, level],
 	);
 
 	const handleSquarePress = useCallback(
@@ -443,6 +446,7 @@ export default function GameScreen() {
 				<Text className="text-sm font-medium text-zinc-400">
 					{MODE_TITLES[mode]}
 					{mode === "computer" ? ` · ${opponent}` : ""}
+					{mode === "computer" && opponent === "stockfish" ? ` level ${level}` : ""}
 					{mode === "online" && board?.userColor ? ` · playing ${board.userColor}` : ""}
 					{mode === "online" && opponentOnline !== null
 						? opponentOnline

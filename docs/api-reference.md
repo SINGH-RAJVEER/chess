@@ -38,9 +38,13 @@ Client messages:
   pushes; doubles as reconnect resume.
 - `board.get` (`gameId?`, `mode?`) and `moves.get` (`gameId`, `square`) —
   one-shot reads answered with `game.state` and `moves.result`.
-- `game.move` (`gameId`, `from`, `to`, `promotion?`, `opponent?`) — the
-  server rejects moves from spectators and from the side not to move.
+- `game.move` (`gameId`, `from`, `to`, `promotion?`, `opponent?`, `level?`)
+  — the server rejects moves from spectators and from the side not to move.
   Anonymous local and computer games allow the connected client to move.
+  `opponent` is `minimax` (default), `custom`, or `stockfish`; `level`
+  (1 to 8, default 4) only applies to Stockfish. A Stockfish move is
+  rejected with `stockfish is not installed on the server` when the binary
+  is missing.
 - `game.resign` (`gameId`), `game.draw.offer` / `game.draw.respond`
   (`gameId`, `accept`) — draw and resign flow through room broadcasts.
 - `game.undo.request` / `game.undo.respond` (`gameId`, `accept`) — rated
@@ -90,12 +94,14 @@ client.
 
 ## Engine Selection
 
-Computer moves are computed in-process by the Rust engine static library
-(`apps/engine`, bridged through `apps/api/internal/engine`); there is no
-engine HTTP service.
+Minimax and custom computer moves are computed in-process by the Rust engine
+static library (`apps/engine`, bridged through `apps/api/internal/engine`);
+there is no engine HTTP service. The `stockfish` opponent spawns the
+Stockfish binary per move (see [stockfish.md](stockfish.md)).
 
-The Go bridge accepts a FEN plus `minimax` or `custom` (legacy `dqn` maps to
-`custom`), selects the move, and returns UCI notation such as `e7e5`. Invalid
+The Go bridge accepts a FEN plus `minimax`, `custom`, or `stockfish` with a
+level (legacy `dqn` maps to `custom`), selects the move, and returns UCI
+notation such as `e7e5`. Invalid
 or illegal positions surface as engine errors and leave the game unchanged.
 For the custom opponent, the API log records reached depth, score, and node
-count as diagnostics.
+count as diagnostics; Stockfish moves log level, depth, and score.

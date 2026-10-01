@@ -71,10 +71,13 @@ connection saturation, queue depth, and engine saturation rate.
 1. Check API logs for engine request failures or `engine busy` saturation.
 2. Confirm `ENGINE_CUSTOM_MOVETIME_MS` / `ENGINE_CUSTOM_MAX_DEPTH` are sane;
    oversized budgets hold search slots and serialize computer games.
-3. Confirm the API binary was built with the engine static library
+3. For Stockfish games, confirm the binary resolves from `STOCKFISH_PATH`
+   or `PATH` in the API process environment; a missing binary rejects moves
+   with `stockfish is not installed on the server`.
+4. Confirm the API binary was built with the engine static library
    (`just api-build` builds `libchess.a` first); a stale library can
    desynchronize search behavior.
-4. Reset or retry the affected game after recovery.
+5. Reset or retry the affected game after recovery.
 
 ### Database migration failure
 
@@ -90,7 +93,7 @@ Never manually mark a migration applied without verifying the complete schema.
 
 The client polls active games and queues once per second. API and PostgreSQL
 capacity must be sized for this read pattern as well as move writes.
-Custom-engine searches run in-process and are bounded by a semaphore, so
+Custom-engine searches and Stockfish child processes share a semaphore, so
 concurrent computer games serialize past `NumCPU - 1` parallel searches.
 Size API CPU for the expected number of concurrent computer games and the
 `ENGINE_CUSTOM_MOVETIME_MS` budget.

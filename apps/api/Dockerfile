@@ -3,7 +3,8 @@
 #
 # The API serves computer moves in-process through the Rust engine static
 # library, so the image builds the cdylib first and then the CGO-enabled Go
-# binary. No standalone engine service is needed at runtime.
+# binary. No standalone engine service is needed at runtime. The Stockfish
+# opponent runs Debian's stockfish package as a child process per move.
 
 FROM docker.io/library/rust:1.97-slim-trixie AS engine-builder
 WORKDIR /build
@@ -25,10 +26,11 @@ RUN CGO_ENABLED=1 go build -o /out/api ./cmd/api
 
 FROM docker.io/library/debian:trixie-slim
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ca-certificates \
+	&& apt-get install -y --no-install-recommends ca-certificates stockfish \
 	&& rm -rf /var/lib/apt/lists/*
 COPY --from=api-builder /out/api /usr/local/bin/api
 ENV HOST=0.0.0.0 \
-	PORT=4000
+	PORT=4000 \
+	STOCKFISH_PATH=/usr/games/stockfish
 EXPOSE 4000
 ENTRYPOINT ["api"]
