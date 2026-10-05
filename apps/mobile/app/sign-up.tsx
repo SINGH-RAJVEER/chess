@@ -88,7 +88,8 @@ export default function SignUpScreen() {
 			<Link href="/sign-in" asChild>
 				<Pressable className="mt-4 items-center">
 					<Text className="text-sm text-zinc-400">
-						Already have an account? <Text className="text-zinc-100 underline">Sign in</Text>
+						Already have an account?{" "}
+						<Text className="text-zinc-100 underline">Sign in</Text>
 					</Text>
 				</Pressable>
 			</Link>

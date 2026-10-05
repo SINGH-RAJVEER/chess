@@ -123,7 +123,9 @@ export default function HomeScreen() {
 					<ActivityIndicator color="#fafafa" />
 				) : user ? (
 					<View className="gap-3">
-						<Text className="text-center text-sm text-zinc-400">Signed in as {user.email}</Text>
+						<Text className="text-center text-sm text-zinc-400">
+							Signed in as {user.email}
+						</Text>
 						<Pressable
 							onPress={() => void handleSignOut()}
 							disabled={signingOut}
@@ -150,7 +152,9 @@ export default function HomeScreen() {
 						</Pressable>
 					</View>
 				)}
-				<Text className="text-center text-xs text-zinc-600">API: {getApiBaseUrlForDisplay()}</Text>
+				<Text className="text-center text-xs text-zinc-600">
+					API: {getApiBaseUrlForDisplay()}
+				</Text>
 			</View>
 		</View>
 	);

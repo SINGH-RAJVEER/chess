@@ -15,7 +15,7 @@ const SETTINGS_TABS = [
 	{ id: "board", label: "Board" },
 	{ id: "pieces", label: "Pieces" },
 	{ id: "play", label: "Play" },
-...(isDesktop() ? [{ id: "desktop", label: "Desktop" } as const] : []),
+	...(isDesktop() ? [{ id: "desktop", label: "Desktop" } as const] : []),
 ] as const;
 
 type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
@@ -88,13 +88,17 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 													<div
 														key={`preview-square-${row}-${col}`}
 														style={{
-															backgroundColor: isDark ? theme.dark : theme.light,
+															backgroundColor: isDark
+																? theme.dark
+																: theme.light,
 														}}
 													/>
 												);
 											})}
 										</div>
-										<span className="text-[10px] text-zinc-400">{theme.name}</span>
+										<span className="text-[10px] text-zinc-400">
+											{theme.name}
+										</span>
 										{settings.boardTheme === key && (
 											<div className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-100">
 												<Check className="size-2.5 text-zinc-900" />
@@ -174,7 +178,11 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 														draggable={false}
 													/>
 													<img
-														src={getPieceImageUrl(key, "Black", "Queen")}
+														src={getPieceImageUrl(
+															key,
+															"Black",
+															"Queen",
+														)}
 														alt="Black Queen"
 														className="h-8 w-8"
 														draggable={false}
@@ -182,7 +190,9 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 												</>
 											)}
 										</div>
-										<span className="text-[10px] text-zinc-400">{theme.name}</span>
+										<span className="text-[10px] text-zinc-400">
+											{theme.name}
+										</span>
 										{settings.pieceTheme === key && (
 											<div className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-100">
 												<Check className="size-2.5 text-zinc-900" />
@@ -234,7 +244,9 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
 							<ToggleRow
 								label="Show desktop close button"
 								checked={settings.showDesktopCloseButton}
-								onChange={(value) => updateSettings({ showDesktopCloseButton: value })}
+								onChange={(value) =>
+									updateSettings({ showDesktopCloseButton: value })
+								}
 							/>
 						</section>
 					)}

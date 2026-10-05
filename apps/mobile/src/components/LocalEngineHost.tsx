@@ -7,7 +7,10 @@ import type { MobileEngine } from "../lib/computer-game";
 export default function LocalEngineHost({ engine }: { engine: MobileEngine }) {
 	const host = useRef<WebView<unknown>>(null);
 	return (
-		<View pointerEvents="none" style={{ position: "absolute", width: 1, height: 1, opacity: 0 }}>
+		<View
+			pointerEvents="none"
+			style={{ position: "absolute", width: 1, height: 1, opacity: 0 }}
+		>
 			<WebView<unknown>
 				ref={host}
 				source={{ html: LOCAL_ENGINE_HTML, baseUrl: "https://sixtyfour.local/" }}
@@ -18,7 +21,10 @@ export default function LocalEngineHost({ engine }: { engine: MobileEngine }) {
 					engine.receive(event.nativeEvent.data);
 				}}
 				onError={(event) => engine.fail(new Error(event.nativeEvent.description))}
-				onShouldStartLoadWithRequest={(request) => request.url === "about:blank" || request.url.startsWith("https://sixtyfour.local/")}
+				onShouldStartLoadWithRequest={(request) =>
+					request.url === "about:blank" ||
+					request.url.startsWith("https://sixtyfour.local/")
+				}
 			/>
 		</View>
 	);

@@ -9,12 +9,16 @@ app.setName("SixtyFour");
 
 function engineFor(event) {
 	const window = BrowserWindow.fromWebContents(event.sender);
-	if (!window || event.senderFrame !== event.sender.mainFrame) throw new Error("Invalid engine caller");
+	if (!window || event.senderFrame !== event.sender.mainFrame)
+		throw new Error("Invalid engine caller");
 	let engine = engines.get(event.sender.id);
 	if (!engine) {
 		engine = new NativeEngine(process.resourcesPath, app.isPackaged);
 		engines.set(event.sender.id, engine);
-		window.on("closed", () => { engine.dispose(); engines.delete(event.sender.id); });
+		window.on("closed", () => {
+			engine.dispose();
+			engines.delete(event.sender.id);
+		});
 	}
 	return engine;
 }
@@ -40,7 +44,9 @@ function registerAppProtocol() {
 			return new Response("Not found", { status: 404 });
 		}
 		const file =
-			existsSync(candidate) && statSync(candidate).isFile() ? candidate : join(root, "index.html");
+			existsSync(candidate) && statSync(candidate).isFile()
+				? candidate
+				: join(root, "index.html");
 		return net.fetch(pathToFileURL(file).toString());
 	});
 }

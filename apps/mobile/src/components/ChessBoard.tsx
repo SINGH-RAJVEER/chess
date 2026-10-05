@@ -66,7 +66,8 @@ export default function ChessBoard({
 				const piece = pieceMap.get(squareIndex);
 				const isDark = (row + col) % 2 === 1;
 				const isLastMove =
-					boardData?.lastMove?.from === squareIndex || boardData?.lastMove?.to === squareIndex;
+					boardData?.lastMove?.from === squareIndex ||
+					boardData?.lastMove?.to === squareIndex;
 				const isSelected = selectedSquare === squareIndex;
 				const isCheck = squareIndex === kingInCheck;
 				const isTarget = validMoveSet.has(squareIndex);
@@ -98,7 +99,8 @@ export default function ChessBoard({
 									fontSize: squareSize * 0.72,
 									lineHeight: squareSize * 0.8,
 									color: piece.color === "White" ? "#fafafa" : "#18181b",
-									textShadowColor: piece.color === "White" ? "#18181b" : "#fafafa",
+									textShadowColor:
+										piece.color === "White" ? "#18181b" : "#fafafa",
 									textShadowRadius: 2,
 								}}
 							>

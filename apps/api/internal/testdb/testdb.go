@@ -62,10 +62,14 @@ func Open(t *testing.T) *pgxpool.Pool {
 	if err := database.Migrate(ctx, pool); err != nil {
 		pool.Close()
 		config, err := pgxpool.ParseConfig(url)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		config.ConnConfig.Database = "postgres"
 		maintenance, err := pgxpool.NewWithConfig(ctx, config)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		defer maintenance.Close()
 		_, _ = maintenance.Exec(ctx, fmt.Sprintf("DROP DATABASE %s", pgx.Identifier{name}.Sanitize()))
 		t.Fatalf("migrate test database: %v", err)

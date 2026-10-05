@@ -73,7 +73,8 @@ export default function ChessBoard({
 					const col = squareIndex % 8;
 					const piece = pieceMap.get(squareIndex);
 					const lastMove = settings.showLastMove ? boardData?.lastMove : null;
-					const isLastMove = lastMove?.from === squareIndex || lastMove?.to === squareIndex;
+					const isLastMove =
+						lastMove?.from === squareIndex || lastMove?.to === squareIndex;
 					const isSelected = selectedSquare === squareIndex;
 					const isKingInCheck = squareIndex === kingSquare;
 					const isValidTarget = settings.showLegalMoves && validMoveSet.has(squareIndex);

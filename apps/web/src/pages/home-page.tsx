@@ -71,7 +71,8 @@ export default function HomePage() {
 							mode: "vs_player",
 							timeControl: 10,
 						});
-						if (!cancelled && created.type === "game.state") setBoardData(created.board);
+						if (!cancelled && created.type === "game.state")
+							setBoardData(created.board);
 					} else {
 						setBoardData(board.board);
 						await gameSocket
@@ -233,7 +234,12 @@ export default function HomePage() {
 
 		try {
 			setIsMovePending(true);
-			await gameSocket.request({ ...move, gameId: boardData.id, promotion, type: "game.move" });
+			await gameSocket.request({
+				...move,
+				gameId: boardData.id,
+				promotion,
+				type: "game.move",
+			});
 			setPendingMove(null);
 			setPromotionState(null);
 			setTakebackRequestedBy(null);
@@ -246,7 +252,8 @@ export default function HomePage() {
 
 	const handleConfirmMove = async (promotion?: PromotionPiece) => {
 		const move =
-			pendingMove ?? (promotionState ? { from: promotionState.from, to: promotionState.to } : null);
+			pendingMove ??
+			(promotionState ? { from: promotionState.from, to: promotionState.to } : null);
 		if (!move) return;
 		await submitMove(move, promotion);
 	};
@@ -289,25 +296,39 @@ export default function HomePage() {
 		try {
 			await gameSocket.request({ type: "game.draw.offer", gameId: boardData.id });
 		} catch (error) {
-			showError(`Draw offer failed: ${error instanceof Error ? error.message : String(error)}`);
+			showError(
+				`Draw offer failed: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		}
 	};
 
 	const handleAcceptDraw = async () => {
 		if (!boardData?.id) return;
 		try {
-			await gameSocket.request({ type: "game.draw.respond", gameId: boardData.id, accept: true });
+			await gameSocket.request({
+				type: "game.draw.respond",
+				gameId: boardData.id,
+				accept: true,
+			});
 		} catch (error) {
-			showError(`Draw response failed: ${error instanceof Error ? error.message : String(error)}`);
+			showError(
+				`Draw response failed: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		}
 	};
 
 	const handleDeclineDraw = async () => {
 		if (!boardData?.id) return;
 		try {
-			await gameSocket.request({ type: "game.draw.respond", gameId: boardData.id, accept: false });
+			await gameSocket.request({
+				type: "game.draw.respond",
+				gameId: boardData.id,
+				accept: false,
+			});
 		} catch (error) {
-			showError(`Draw response failed: ${error instanceof Error ? error.message : String(error)}`);
+			showError(
+				`Draw response failed: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		}
 	};
 
@@ -435,7 +456,8 @@ export default function HomePage() {
 						}
 						showTime={boardData?.timeControl !== 0}
 						isLowTime={
-							(topColor === "White" ? whiteTime : blackTime) < 30000 && boardData?.timeControl !== 0
+							(topColor === "White" ? whiteTime : blackTime) < 30000 &&
+							boardData?.timeControl !== 0
 						}
 						icon={
 							<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-zinc-950 text-zinc-100 border border-zinc-800">

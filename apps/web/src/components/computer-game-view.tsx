@@ -195,18 +195,18 @@ export default function ComputerGameView({
 						</div>
 						<div className="flex rounded border border-zinc-800 p-0.5">
 							{OPPONENT_OPTIONS.map(([value, label]) => (
-									<button
-										key={value}
-										type="button"
-										aria-pressed={opponent === value}
-										onClick={() => onOpponentChange(value)}
-										className={`flex-1 rounded px-1 py-1 text-[11px] font-medium transition-colors ${
-											opponent === value
-												? "bg-violet-500/80 text-zinc-50"
-												: "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
-										}`}
-									>
-										{label}
+								<button
+									key={value}
+									type="button"
+									aria-pressed={opponent === value}
+									onClick={() => onOpponentChange(value)}
+									className={`flex-1 rounded px-1 py-1 text-[11px] font-medium transition-colors ${
+										opponent === value
+											? "bg-violet-500/80 text-zinc-50"
+											: "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+									}`}
+								>
+									{label}
 								</button>
 							))}
 						</div>
@@ -323,7 +323,10 @@ export default function ComputerGameView({
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter className="sm:justify-center mt-6">
-						<Button className="bg-zinc-100 text-zinc-900 hover:bg-white px-8" onClick={onRestart}>
+						<Button
+							className="bg-zinc-100 text-zinc-900 hover:bg-white px-8"
+							onClick={onRestart}
+						>
 							Play Again
 						</Button>
 					</DialogFooter>

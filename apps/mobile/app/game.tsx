@@ -82,7 +82,9 @@ export default function GameScreen() {
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [localEngine] = useState(() => new MobileEngine());
-	const [{ game: localGame, archive }] = useState(() => createComputerGame(localEngine, (error) => setError(error.message)));
+	const [{ game: localGame, archive }] = useState(() =>
+		createComputerGame(localEngine, (error) => setError(error.message)),
+	);
 	const gameSocket = mode === "computer" ? localGame : remoteSocket;
 	const [socketStatus, setSocketStatus] = useState<SocketStatus>(gameSocket.getStatus());
 	const [takebackRequest, setTakebackRequest] = useState<{ by: Color } | null>(null);
@@ -97,8 +99,14 @@ export default function GameScreen() {
 
 	const playerId = user?.id ?? "";
 	const gameId = board?.id ?? 0;
-	useEffect(() => { if (mode === "computer") void localGame.configure(opponent, level).catch((error) => setError(error.message)); }, [localGame, mode, opponent, level]);
-	useEffect(() => { archive.setEnabled(mode === "computer" && Boolean(user)); return () => archive.setEnabled(false); }, [archive, mode, user]);
+	useEffect(() => {
+		if (mode === "computer")
+			void localGame.configure(opponent, level).catch((error) => setError(error.message));
+	}, [localGame, mode, opponent, level]);
+	useEffect(() => {
+		archive.setEnabled(mode === "computer" && Boolean(user));
+		return () => archive.setEnabled(false);
+	}, [archive, mode, user]);
 	useEffect(() => {
 		if (mode !== "computer" || board?.revision === undefined) return;
 		const frame = requestAnimationFrame(() => localGame.markRendered(board.revision ?? 0));
@@ -195,7 +203,8 @@ export default function GameScreen() {
 						mode: "vs_computer",
 						opponent: opponentRef.current,
 					});
-					if (!cancelledRef.current && created.type === "game.state") setBoard(created.board);
+					if (!cancelledRef.current && created.type === "game.state")
+						setBoard(created.board);
 				}
 			} else {
 				const created = await gameSocket.request({
@@ -231,7 +240,11 @@ export default function GameScreen() {
 					setBoard(msg.board);
 					break;
 				case "queue.status":
-					setQueue({ status: msg.status, gameId: msg.gameId, timeControl: msg.timeControl });
+					setQueue({
+						status: msg.status,
+						gameId: msg.gameId,
+						timeControl: msg.timeControl,
+					});
 					setJoining(false);
 					break;
 				case "game.matched":
@@ -247,7 +260,11 @@ export default function GameScreen() {
 							if (!current || current.id !== msg.gameId) return current;
 							const mine = current.userColor;
 							setOpponentOnline(
-								mine === "White" ? msg.blackOnline : mine === "Black" ? msg.whiteOnline : null,
+								mine === "White"
+									? msg.blackOnline
+									: mine === "Black"
+										? msg.whiteOnline
+										: null,
 							);
 							return current;
 						});
@@ -430,7 +447,9 @@ export default function GameScreen() {
 		return (
 			<View className="flex-1 bg-zinc-950 items-center justify-center px-6">
 				<Text className="text-base text-zinc-300">
-					{queue.status === "queued" || joining ? "Waiting for an opponent..." : "Loading game..."}
+					{queue.status === "queued" || joining
+						? "Waiting for an opponent..."
+						: "Loading game..."}
 				</Text>
 				{queue.status === "queued" || joining ? (
 					<ActivityIndicator color="#fafafa" style={{ marginTop: 12 }} />
@@ -574,7 +593,9 @@ export default function GameScreen() {
 							<Text className="flex-1 text-xs text-zinc-200">{item.black ?? ""}</Text>
 						</View>
 					)}
-					ListEmptyComponent={<Text className="p-2 text-xs text-zinc-500">No moves yet.</Text>}
+					ListEmptyComponent={
+						<Text className="p-2 text-xs text-zinc-500">No moves yet.</Text>
+					}
 				/>
 			</View>
 
@@ -589,10 +610,14 @@ export default function GameScreen() {
 								? promotionChoices(board.turn).map(({ type, glyph }) => (
 										<Pressable
 											key={type}
-											onPress={() => void submitMove(promotion.from, promotion.to, type)}
+											onPress={() =>
+												void submitMove(promotion.from, promotion.to, type)
+											}
 											className="h-14 w-14 items-center justify-center rounded-lg bg-zinc-800"
 										>
-											<Text style={{ fontSize: 32, color: "#fafafa" }}>{glyph}</Text>
+											<Text style={{ fontSize: 32, color: "#fafafa" }}>
+												{glyph}
+											</Text>
 										</Pressable>
 									))
 								: null}

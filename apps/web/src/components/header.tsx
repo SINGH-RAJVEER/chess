@@ -188,13 +188,16 @@ export default function Header(props: HeaderProps) {
 										<div className="grid grid-cols-2 gap-1 p-1">
 											{category.options.map((option) => {
 												const isSelected =
-													selectedTime === option.minutes && selectedIncrement === option.increment;
+													selectedTime === option.minutes &&
+													selectedIncrement === option.increment;
 												return (
 													<DropdownMenuItem
 														key={option.label}
 														onClick={() => handleSelect(option)}
 														className={`justify-center text-xs font-medium focus:bg-zinc-100 focus:text-zinc-900 ${
-															isSelected ? "bg-zinc-100 text-zinc-900" : ""
+															isSelected
+																? "bg-zinc-100 text-zinc-900"
+																: ""
 														}`}
 													>
 														{option.label}
@@ -261,14 +264,18 @@ export default function Header(props: HeaderProps) {
 									name={user.name}
 									onImageError={() => setFailedProfileImage(user.image ?? null)}
 								/>
-								<span className="ml-2 hidden max-w-24 truncate md:inline">{user.name}</span>
+								<span className="ml-2 hidden max-w-24 truncate md:inline">
+									{user.name}
+								</span>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent className="w-48 bg-zinc-900 border-zinc-800 text-zinc-300">
 								<DropdownMenuLabel className="flex items-center gap-2 px-2 py-2">
 									<ProfileAvatar
 										image={profileImage}
 										name={user.name}
-										onImageError={() => setFailedProfileImage(user.image ?? null)}
+										onImageError={() =>
+											setFailedProfileImage(user.image ?? null)
+										}
 									/>
 									<span className="min-w-0">
 										<span className="block truncate text-xs font-medium normal-case tracking-normal text-zinc-100">
@@ -346,7 +353,12 @@ function ProfileAvatar({
 }) {
 	if (image) {
 		return (
-			<img src={image} alt="" className="size-5 rounded-full object-cover" onError={onImageError} />
+			<img
+				src={image}
+				alt=""
+				className="size-5 rounded-full object-cover"
+				onError={onImageError}
+			/>
 		);
 	}
 

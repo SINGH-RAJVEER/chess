@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"test": "bun test",
-		"format": "biome format",
+		"format": "biome format --write",
 		"lint": "biome lint",
 		"check": "biome check"
 	},

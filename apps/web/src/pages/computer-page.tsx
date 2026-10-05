@@ -32,7 +32,9 @@ export default function ComputerPage() {
 	const [isMovePending, setIsMovePending] = useState(false);
 	const [isUndoPending, setIsUndoPending] = useState(false);
 	const [isResetPending, setIsResetPending] = useState(false);
-	const [{ game: gameSocket, archive }] = useState(() => createComputerGame((error) => setErrorMsg(error.message)));
+	const [{ game: gameSocket, archive }] = useState(() =>
+		createComputerGame((error) => setErrorMsg(error.message)),
+	);
 	const [promotionState, setPromotionState] = useState<PromotionState | null>(null);
 	// The picker exposes one default minimax engine; old custom selections now
 	// use that default while direct API callers can still request custom.
@@ -48,8 +50,13 @@ export default function ComputerPage() {
 	const boardIdRef = useRef(0);
 	const opponentRef = useRef(opponent);
 	opponentRef.current = opponent;
-	useEffect(() => { void gameSocket.configure(opponent, level).catch((error) => setErrorMsg(error.message)); }, [gameSocket, opponent, level]);
-	useEffect(() => { archive.setEnabled(Boolean(user)); return () => archive.setEnabled(false); }, [archive, user]);
+	useEffect(() => {
+		void gameSocket.configure(opponent, level).catch((error) => setErrorMsg(error.message));
+	}, [gameSocket, opponent, level]);
+	useEffect(() => {
+		archive.setEnabled(Boolean(user));
+		return () => archive.setEnabled(false);
+	}, [archive, user]);
 	useEffect(() => {
 		if (boardData?.revision === undefined) return;
 		const frame = requestAnimationFrame(() => gameSocket.markRendered(boardData.revision ?? 0));
@@ -78,7 +85,8 @@ export default function ComputerPage() {
 							mode: "vs_computer",
 							opponent: opponentRef.current,
 						});
-						if (!cancelled && created.type === "game.state") setBoardData(created.board);
+						if (!cancelled && created.type === "game.state")
+							setBoardData(created.board);
 					} else {
 						setBoardData(board.board);
 						await gameSocket
@@ -201,7 +209,9 @@ export default function ComputerPage() {
 			const movingPiece = pieces.find((p) => p.square === selectedSquare);
 			const destRow = Math.floor(squareIndex / 8);
 			const isPromotion =
-				movingPiece?.piece_type === "Pawn" && movingPiece.color === "White" && destRow === 0;
+				movingPiece?.piece_type === "Pawn" &&
+				movingPiece.color === "White" &&
+				destRow === 0;
 
 			if (isPromotion && !settings.autoQueen) {
 				setPromotionState({ from: selectedSquare, to: squareIndex, color: "White" });
@@ -244,7 +254,8 @@ export default function ComputerPage() {
 
 	const handleConfirmMove = async (promotion?: PromotionPiece) => {
 		const move =
-			pendingMove ?? (promotionState ? { from: promotionState.from, to: promotionState.to } : null);
+			pendingMove ??
+			(promotionState ? { from: promotionState.from, to: promotionState.to } : null);
 		if (!move) return;
 		await submitMove(move, promotion);
 	};
@@ -304,7 +315,11 @@ export default function ComputerPage() {
 	const handleReset = async () => {
 		try {
 			setIsResetPending(true);
-			const created = await gameSocket.request({ type: "game.new", mode: "vs_computer", opponent });
+			const created = await gameSocket.request({
+				type: "game.new",
+				mode: "vs_computer",
+				opponent,
+			});
 			if (created.type === "game.state") setBoardData(created.board);
 			setSelectedSquare(null);
 			setValidMoves([]);

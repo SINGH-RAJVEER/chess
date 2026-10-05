@@ -39,12 +39,12 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}()
 
 	if _, err := connection.Exec(ctx, `
-        CREATE TABLE IF NOT EXISTS schema_migrations (
-            version bigint PRIMARY KEY,
-            name text NOT NULL,
-            applied_at timestamptz NOT NULL DEFAULT now()
-        )
-    `); err != nil {
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version bigint PRIMARY KEY,
+			name text NOT NULL,
+			applied_at timestamptz NOT NULL DEFAULT now()
+		)
+	`); err != nil {
 		return fmt.Errorf("create migration table: %w", err)
 	}
 

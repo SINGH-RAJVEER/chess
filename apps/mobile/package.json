@@ -10,7 +10,7 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
 		"clean": "rm -rf .expo dist",
-		"format": "biome format",
+		"format": "biome format --write",
 		"lint": "biome lint",
 		"check": "biome check"
 	},

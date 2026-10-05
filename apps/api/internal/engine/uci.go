@@ -61,7 +61,11 @@ func Acquire(ctx context.Context, options Options, gameID int) (*Lease, error) {
 	pool.reserved++
 	var selected *worker
 	for _, candidate := range pool.workers {
-		select { case <-candidate.done: continue; default: }
+		select {
+		case <-candidate.done:
+			continue
+		default:
+		}
 		if !candidate.busy && candidate.path == path {
 			selected = candidate
 			if gameID != 0 && candidate.gameID == gameID {

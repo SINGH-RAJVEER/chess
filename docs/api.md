@@ -40,15 +40,7 @@ CGO_ENABLED=0 go test ./...
 
 Set `AUTO_MIGRATE=true` to apply pending app-local migrations when the server starts. `devenv up` runs migrations explicitly before starting the API.
 
-The API is pure Go and builds without a C toolchain. Computer moves come
-from child processes: `internal/engine` spawns the `sixtyfour-engine` binary
-(`apps/engine`, built by `just engine-bin`) per move for minimax and custom,
-and the binary from `STOCKFISH_PATH` (or `PATH`) for the `stockfish`
-opponent. Legacy `dqn` opponent values map to the custom engine. Inside the
-repository the API finds `apps/engine/target/release/sixtyfour-engine` without
-configuration; elsewhere set `ENGINE_PATH`. The engine tests and the
-computer-reply game test need that binary, so build it before
-`go test ./...`. See [engine.md](engine.md) and [stockfish.md](stockfish.md).
+The API is pure Go and builds without a C toolchain. Computer moves come from child processes: `internal/engine` spawns the `sixtyfour-engine` binary (`apps/engine`, built by `just engine-bin`) per move for minimax and custom, and the binary from `STOCKFISH_PATH` (or `PATH`) for the `stockfish` opponent. Legacy `dqn` opponent values map to the custom engine. Inside the repository the API finds `apps/engine/target/release/sixtyfour-engine` without configuration; elsewhere set `ENGINE_PATH`. The engine tests and the computer-reply game test need that binary, so build it before `go test ./...`. See [engine.md](engine.md) and [stockfish.md](stockfish.md).
 
 ## Configuration
 

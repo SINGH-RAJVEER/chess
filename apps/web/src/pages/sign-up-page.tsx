@@ -56,7 +56,9 @@ export default function SignUpPage() {
 						Back to SixtyFour
 					</Button>
 					<CardTitle className="text-zinc-100">Create Account</CardTitle>
-					<CardDescription className="text-zinc-400">Sign up for a new account</CardDescription>
+					<CardDescription className="text-zinc-400">
+						Sign up for a new account
+					</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<form onSubmit={handleSubmit} className="space-y-4">

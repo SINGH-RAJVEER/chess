@@ -128,7 +128,11 @@ export default function OnlinePlayerPage() {
 					}
 					break;
 				case "queue.status":
-					setQueueStatus({ status: msg.status, gameId: msg.gameId, timeControl: msg.timeControl });
+					setQueueStatus({
+						status: msg.status,
+						gameId: msg.gameId,
+						timeControl: msg.timeControl,
+					});
 					setIsJoiningQueue(false);
 					break;
 				case "game.matched":
@@ -293,7 +297,11 @@ export default function OnlinePlayerPage() {
 					(movingPiece.color === "Black" && destRow === 7));
 
 			if (isPromotion && !settings.autoQueen) {
-				setPromotionState({ from: selectedSquare, to: squareIndex, color: userColor as Color });
+				setPromotionState({
+					from: selectedSquare,
+					to: squareIndex,
+					color: userColor as Color,
+				});
 				setSelectedSquare(null);
 				setValidMoves([]);
 				return;
@@ -314,7 +322,12 @@ export default function OnlinePlayerPage() {
 
 		try {
 			setIsMovePending(true);
-			await gameSocket.request({ ...move, gameId: boardData.id, promotion, type: "game.move" });
+			await gameSocket.request({
+				...move,
+				gameId: boardData.id,
+				promotion,
+				type: "game.move",
+			});
 			setPendingMove(null);
 			setPromotionState(null);
 		} catch (error) {
@@ -326,7 +339,8 @@ export default function OnlinePlayerPage() {
 
 	const handleConfirmMove = async (promotion?: PromotionPiece) => {
 		const move =
-			pendingMove ?? (promotionState ? { from: promotionState.from, to: promotionState.to } : null);
+			pendingMove ??
+			(promotionState ? { from: promotionState.from, to: promotionState.to } : null);
 		if (!move) return;
 		await submitMove(move, promotion);
 	};
@@ -376,25 +390,39 @@ export default function OnlinePlayerPage() {
 		try {
 			await gameSocket.request({ type: "game.draw.offer", gameId: boardData.id });
 		} catch (error) {
-			showError(`Draw offer failed: ${error instanceof Error ? error.message : String(error)}`);
+			showError(
+				`Draw offer failed: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		}
 	};
 
 	const handleAcceptDraw = async () => {
 		if (!boardData?.id) return;
 		try {
-			await gameSocket.request({ type: "game.draw.respond", gameId: boardData.id, accept: true });
+			await gameSocket.request({
+				type: "game.draw.respond",
+				gameId: boardData.id,
+				accept: true,
+			});
 		} catch (error) {
-			showError(`Draw response failed: ${error instanceof Error ? error.message : String(error)}`);
+			showError(
+				`Draw response failed: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		}
 	};
 
 	const handleDeclineDraw = async () => {
 		if (!boardData?.id) return;
 		try {
-			await gameSocket.request({ type: "game.draw.respond", gameId: boardData.id, accept: false });
+			await gameSocket.request({
+				type: "game.draw.respond",
+				gameId: boardData.id,
+				accept: false,
+			});
 		} catch (error) {
-			showError(`Draw response failed: ${error instanceof Error ? error.message : String(error)}`);
+			showError(
+				`Draw response failed: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		}
 	};
 
@@ -447,7 +475,11 @@ export default function OnlinePlayerPage() {
 	const handleRematchRespond = async (accept: boolean) => {
 		if (!boardData?.id) return;
 		try {
-			await gameSocket.request({ type: "game.rematch.respond", gameId: boardData.id, accept });
+			await gameSocket.request({
+				type: "game.rematch.respond",
+				gameId: boardData.id,
+				accept,
+			});
 			if (!accept) setRematchOffer(null);
 		} catch (error) {
 			showError(`Rematch failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -463,7 +495,9 @@ export default function OnlinePlayerPage() {
 		switch (boardData.status) {
 			case "Checkmate": {
 				const winner = boardData.turn === "White" ? "Black" : "White";
-				return winner === userColor ? "You win by checkmate!" : `${winner} wins by checkmate`;
+				return winner === userColor
+					? "You win by checkmate!"
+					: `${winner} wins by checkmate`;
 			}
 			case "Timeout": {
 				const winner = boardData.turn === "White" ? "Black" : "White";
@@ -572,7 +606,9 @@ export default function OnlinePlayerPage() {
 						label={hasActiveGame ? `Opponent (${opponentColor})` : "Opponent"}
 						color={opponentColor}
 						time={
-							hasActiveGame ? formatGameTime(opponentTime, boardData?.timeControl !== 0) : "--:--"
+							hasActiveGame
+								? formatGameTime(opponentTime, boardData?.timeControl !== 0)
+								: "--:--"
 						}
 						isActive={!isUserTurn}
 						capturedPieces={opponentCaptured}
@@ -600,9 +636,17 @@ export default function OnlinePlayerPage() {
 
 					{/* Your card */}
 					<PlayerCard
-						label={hasActiveGame && userColor !== "Spectator" ? `You (${userColor})` : "You"}
+						label={
+							hasActiveGame && userColor !== "Spectator"
+								? `You (${userColor})`
+								: "You"
+						}
 						color={userColor === "Spectator" ? "White" : (userColor as Color)}
-						time={hasActiveGame ? formatGameTime(userTime, boardData?.timeControl !== 0) : "--:--"}
+						time={
+							hasActiveGame
+								? formatGameTime(userTime, boardData?.timeControl !== 0)
+								: "--:--"
+						}
 						isActive={isUserTurn}
 						capturedPieces={userCaptured}
 						capturedByColor={opponentColor}
@@ -643,11 +687,17 @@ export default function OnlinePlayerPage() {
 								onTakeback={() => void handleTakebackRequest()}
 								drawOfferedBy={boardData?.drawOfferedBy}
 								userColor={userColor as Color}
-								canTakeback={!takebackSent && !pendingMove && (boardData?.moves.length ?? 0) > 0}
+								canTakeback={
+									!takebackSent &&
+									!pendingMove &&
+									(boardData?.moves.length ?? 0) > 0
+								}
 								isGameOngoing={boardData?.status === "Ongoing"}
 							/>
 							{takebackSent && (
-								<p className="text-[11px] text-zinc-500 text-center">Takeback requested…</p>
+								<p className="text-[11px] text-zinc-500 text-center">
+									Takeback requested…
+								</p>
 							)}
 						</div>
 					)}

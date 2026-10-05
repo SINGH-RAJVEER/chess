@@ -10,31 +10,51 @@ import (
 
 func TestPersistentWorkerBudgetAndCancellation(t *testing.T) {
 	lease, err := Acquire(context.Background(), Options{Opponent: "minimax"}, 123)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	pid := lease.worker.cmd.Process.Pid
 	start := time.Now()
 	move, info, err := lease.Search(context.Background(), startFEN)
 	lease.Release()
-	if err != nil || len(move)<4 || !strings.Contains(info, "depth") { t.Fatalf("move=%q info=%q err=%v", move, info, err) }
-	if time.Since(start)>800*time.Millisecond { t.Fatalf("search overran 500ms budget: %s", time.Since(start)) }
+	if err != nil || len(move) < 4 || !strings.Contains(info, "depth") {
+		t.Fatalf("move=%q info=%q err=%v", move, info, err)
+	}
+	if time.Since(start) > 800*time.Millisecond {
+		t.Fatalf("search overran 500ms budget: %s", time.Since(start))
+	}
 	lease, err = Acquire(context.Background(), Options{Opponent: "minimax"}, 123)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer lease.Release()
-	if lease.worker.cmd.Process.Pid != pid { t.Fatal("worker was not reused") }
+	if lease.worker.cmd.Process.Pid != pid {
+		t.Fatal("worker was not reused")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	if _, _, err := lease.Search(ctx, startFEN); !errors.Is(err, context.DeadlineExceeded) { t.Fatalf("expected deadline, got %v", err) }
+	if _, _, err := lease.Search(ctx, startFEN); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected deadline, got %v", err)
+	}
 }
 
 func TestCapacityReservation(t *testing.T) {
 	var leases []*Lease
-	defer func() { for _, lease := range leases { lease.Release() } }()
-	for i:=0; i<searchConcurrency(); i++ {
-		lease, err := Acquire(context.Background(), Options{Opponent:"minimax"}, i+1000)
-		if err != nil { t.Fatal(err) }
+	defer func() {
+		for _, lease := range leases {
+			lease.Release()
+		}
+	}()
+	for i := 0; i < searchConcurrency(); i++ {
+		lease, err := Acquire(context.Background(), Options{Opponent: "minimax"}, i+1000)
+		if err != nil {
+			t.Fatal(err)
+		}
 		leases = append(leases, lease)
 	}
-	if _, err := Acquire(context.Background(), Options{Opponent:"minimax"}, 9999); !errors.Is(err, ErrBusy) { t.Fatalf("expected busy, got %v", err) }
+	if _, err := Acquire(context.Background(), Options{Opponent: "minimax"}, 9999); !errors.Is(err, ErrBusy) {
+		t.Fatalf("expected busy, got %v", err)
+	}
 }
 
 const startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"

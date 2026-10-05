@@ -47,7 +47,9 @@ func (service *Service) notify(gameID int) {
 
 func (service *Service) CancelEngine(gameID int) {
 	service.mu.Lock()
-	if job := service.pending[gameID]; job != nil { job.cancel() }
+	if job := service.pending[gameID]; job != nil {
+		job.cancel()
+	}
 	service.mu.Unlock()
 }
 
@@ -101,7 +103,7 @@ func (service *Service) createGame(ctx context.Context, mode string, timeControl
 	}
 	now := time.Now().UnixMilli()
 	game, err := scanGame(tx.QueryRow(ctx, `INSERT INTO games(current_turn,status,mode,time_control,increment,white_time_remaining,black_time_remaining,last_move_time,white_player_id,black_player_id,draw_offered_by,half_move_clock,created_at,updated_at)
-        VALUES('White','Ongoing',$1,$2,$3,$4,$4,NULL,$5,$6,NULL,0,$7,$7) RETURNING `+gameColumns,
+		VALUES('White','Ongoing',$1,$2,$3,$4,$4,NULL,$5,$6,NULL,0,$7,$7) RETURNING `+gameColumns,
 		mode, timeControl, increment, startingTime, whiteID, blackID, now))
 	if err != nil {
 		return nil, err

@@ -5,7 +5,9 @@ declare global {
 			close: () => void;
 			engine?: {
 				prepare: (opponent: import("@sixtyfour/types").ComputerOpponent) => Promise<void>;
-				search: (request: import("@sixtyfour/types").EngineRequest) => Promise<import("@sixtyfour/types").EngineReply>;
+				search: (
+					request: import("@sixtyfour/types").EngineRequest,
+				) => Promise<import("@sixtyfour/types").EngineReply>;
 				reset: () => Promise<void>;
 				cancel: () => Promise<void>;
 			};

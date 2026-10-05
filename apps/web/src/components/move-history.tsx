@@ -45,7 +45,9 @@ export default function MoveHistory({ moves, currentMoveIndex, onNavigate }: Mov
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<div className="px-4 py-3 border-b border-zinc-800">
-				<span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Moves</span>
+				<span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+					Moves
+				</span>
 			</div>
 			<div ref={scrollRef} className="flex-1 overflow-y-auto">
 				{movePairs.length === 0 ? (
@@ -54,8 +56,17 @@ export default function MoveHistory({ moves, currentMoveIndex, onNavigate }: Mov
 					<table className="w-full text-sm font-mono">
 						<tbody>
 							{movePairs.map(
-								({ moveNumber, whiteMove, whiteMoveIndex, blackMove, blackMoveIndex }) => (
-									<tr key={moveNumber} className="border-b border-zinc-900 hover:bg-zinc-900/40">
+								({
+									moveNumber,
+									whiteMove,
+									whiteMoveIndex,
+									blackMove,
+									blackMoveIndex,
+								}) => (
+									<tr
+										key={moveNumber}
+										className="border-b border-zinc-900 hover:bg-zinc-900/40"
+									>
 										<td className="pl-4 pr-2 py-1.5 text-xs text-zinc-600 w-8 select-none">
 											{moveNumber}.
 										</td>

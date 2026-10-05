@@ -6,5 +6,5 @@
 //! `src/bin/uci.rs` instead.
 
 fn main() -> std::io::Result<()> {
-    sixtyfour::uci::run()
+	sixtyfour::uci::run()
 }

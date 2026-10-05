@@ -91,7 +91,11 @@ export default function PlayerCard({
 								</span>
 							) : (
 								<img
-									src={getPieceImageUrl(settings.pieceTheme, capturedByColor, piece)}
+									src={getPieceImageUrl(
+										settings.pieceTheme,
+										capturedByColor,
+										piece,
+									)}
 									alt={piece}
 									className="h-[18px] w-[18px] opacity-60"
 									draggable={false}
@@ -100,7 +104,9 @@ export default function PlayerCard({
 						</span>
 					))}
 					{materialAdvantage > 0 && (
-						<span className="text-xs font-mono text-zinc-500 ml-1">+{materialAdvantage}</span>
+						<span className="text-xs font-mono text-zinc-500 ml-1">
+							+{materialAdvantage}
+						</span>
 					)}
 				</div>
 			</div>
