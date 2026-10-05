@@ -1,5 +1,5 @@
 {
-	"name": "@chess/types",
+	"name": "@sixtyfour/types",
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
@@ -15,5 +15,8 @@
 	"devDependencies": {
 		"@types/bun": "^1.4.2",
 		"bun-types": "^1.4.2"
+	},
+	"dependencies": {
+		"chess.js": "1.4.0"
 	}
 }

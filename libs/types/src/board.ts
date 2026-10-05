@@ -20,6 +20,9 @@ export type BoardMove = {
 };
 
 export type BoardResponse = {
+	latency?: { serverMs: number; acquireMs: number; commitMs: number; searchMs: number };
+	revision?: number;
+	legalMoves?: Record<number, number[]>;
 	id: number;
 	pieces: BoardPiece[];
 	capturedPieces: {
