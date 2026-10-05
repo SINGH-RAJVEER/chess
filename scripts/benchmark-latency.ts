@@ -1,4 +1,4 @@
-import { moveLatency, type BoardResponse, type WsServerMessage } from "@sixtyfour/types";
+import { type BoardResponse, moveLatency, type WsServerMessage } from "../libs/types/src";
 
 const url = process.env.LATENCY_WS_URL ?? "ws://127.0.0.1:4000/api/ws";
 const count = Number(process.env.LATENCY_SAMPLES ?? 10);
@@ -23,7 +23,9 @@ async function sample() {
 		rejectMove = reject;
 	});
 	const timer = setTimeout(() => {
-		rejectMove(new Error("Move timed out"));
+		const error = new Error("Move timed out");
+		rejectMove(error);
+		for (const request of pending.values()) request.reject(error);
 		socket.close();
 	}, 15000);
 	try {

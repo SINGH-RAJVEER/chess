@@ -3,8 +3,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev --port 3000",
-		"build": "vite build",
+		"dev": "bun ../../scripts/build-local-engines.ts && vite dev --port 3000",
+		"build": "bun ../../scripts/build-local-engines.ts && vite build",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",

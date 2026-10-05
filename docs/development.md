@@ -5,7 +5,7 @@
 - Nix and `devenv` for the managed local stack
 - Bun `1.2.22` or a compatible Bun `1.x` release
 - Go `1.25` for the API
-- Rust and Cargo for the engine
+- Rust, Cargo, rustup, and a C linker for native and WebAssembly engines
 - `uv` and Python `3.11+` for model training
 - PostgreSQL client and server tools when running database tasks outside `devenv`
 
@@ -29,7 +29,7 @@ The recommended local path is:
 just dev
 ```
 
-This runs `devenv up`, which provides PostgreSQL and starts the web and API processes. Computer moves are served by the `sixtyfour-engine` binary, built automatically before the API starts and spawned by the API once per move, so there is no long-running engine process. The local service ports are:
+This runs `devenv up`, which provides PostgreSQL and starts the web and API processes. Computer games run locally through native or WebAssembly engines. Web and mobile development commands build the offline assets automatically, then reuse them when sources are unchanged. The API builds its native binary and prewarms a bounded pool of persistent workers for server computer-game requests. The local service ports are:
 
 | Service | Address |
 | --- | --- |
@@ -62,6 +62,8 @@ The desktop target opens an Electron window that loads the web dev server at `ht
 
 ## Checks and Builds
 
+Mobile development, platform builds, and typechecking prepare the local engine assets first. `scripts/build-local-engines.ts` caches those assets using a hash of the engine sources, shared types, build script, and Bun lockfile. It reuses complete matching outputs; pass `--force` to rebuild them. Missing Rust toolchains or WebAssembly targets are installed when needed.
+
 Run the repository-wide targets from the root (implemented as direct `bun`, `go`, and `cargo` invocations via `package.json` and `just`):
 
 ```bash
@@ -84,7 +86,7 @@ just web-typecheck
 just api-migrate
 ```
 
-API and game service tests need PostgreSQL: they use `TEST_DATABASE_URL` when set, else `DATABASE_URL`, else a local `sixtyfour_test` database, and skip when nothing is reachable.
+API integration tests need PostgreSQL. They use `TEST_DATABASE_URL`, then `DATABASE_URL`, then a local PostgreSQL server, and create isolated temporary databases per test. They skip when nothing is reachable. Run `bun run test:browser` inside devenv to verify offline browser play; set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to a compatible system Chromium when Playwright binaries cannot run on NixOS. `ELECTRON_EXECUTABLE` enables the native desktop IPC test. `bun run benchmark:latency` measures server p50/p95; its `LATENCY_WS_URL`, `LATENCY_SAMPLES`, `LATENCY_CONCURRENCY`, and `LATENCY_OPPONENT` variables select an isolated test server and workload.
 
 The API build is a pure Go binary (`CGO_ENABLED=0`); the engine ships beside it as `apps/engine/target/release/sixtyfour-engine` (`just engine-bin`), and both must be deployed together. The web production output is written to `apps/web/dist`, which the desktop release build embeds into the native binary.
 

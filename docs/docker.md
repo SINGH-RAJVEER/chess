@@ -11,7 +11,7 @@ Rootless Podman needs subordinate UID/GID ranges for your user. On NixOS this is
 | Image | Dockerfile | Build context | Notes |
 | --- | --- | --- | --- |
 | `sixtyfour-api` | apps/api/Dockerfile | repository root | Multi-stage Rust + Go build; pure Go API plus the `sixtyfour-engine` binary on debian-slim; runs migrations on boot when `AUTO_MIGRATE=true` |
-| `sixtyfour-web` | apps/web/Dockerfile | repository root | Bun build, served by vite preview; proxies `/api` to `VITE_API_PROXY_TARGET` |
+| `sixtyfour-web` | apps/web/Dockerfile | repository root | Rust + Bun builder prepares local engine assets and the web app; Bun runtime serves vite preview and proxies `/api` to `VITE_API_PROXY_TARGET` |
 | `sixtyfour-train` | apps/dqn/Dockerfile | apps/dqn | Optional training container for research; see below for GPU use |
 
 `podman build` honors `.dockerignore`, same as Docker.
@@ -79,3 +79,7 @@ Pass secrets as environment variables at `podman run` time:
 - AUTO_MIGRATE - set to false in production and run migrations explicitly via bun run api:migrate
 
 See configuration.md for the full list of variables per app.
+
+## Offline engine assets
+
+The web image builds Rust WebAssembly and the pinned Stockfish.js assets before Vite, then copies the resulting web output into the Bun runtime image. Rust toolchains remain in the build stage. Generated `public/engines` assets must ship with the JS application. The API image uses persistent bounded native workers with one thread and 16 MB hash each; successful searches leave those processes alive.

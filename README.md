@@ -10,14 +10,14 @@ The project and package namespace is `sixtyfour`. The clients display `SixtyFour
 - `apps/mobile`: Expo iOS and Android app with the same playable core.
 - `apps/desktop`: Electron desktop shell around the web application.
 - `apps/api`: Go HTTP API for authentication, game state, matchmaking, clocks, migrations, and engine orchestration.
-- `apps/engine`: Rust UCI engine (minimax + custom alpha-beta), built as the `sixtyfour-engine` binary the API spawns per move. A Stockfish opponent with eight difficulty levels runs alongside it.
+- `apps/engine`: Rust UCI engine (minimax + custom alpha-beta), built as the `sixtyfour-engine` binary the API keeps in a bounded pool. A Stockfish opponent with eight difficulty levels runs alongside it.
 - `apps/dqn`: retired DQN training pipeline and model, kept for research.
 - `libs/types`: Shared TypeScript domain and API types.
 - `docs`: Detailed architecture, development, API, operations, data model, and security documentation.
 
 ## How It Works
 
-The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API spawns an engine process per move: the Rust `sixtyfour-engine` binary (minimax or custom alpha-beta search) or Stockfish at the chosen difficulty level.
+The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. Computer games run locally with a 500 ms budget and dynamic depth: native engines in Electron and WebAssembly workers in browsers and mobile. Device saves are durable; signed-in archives sync in the background. Server computer-game requests use a bounded persistent worker pool. See [local computer games](docs/local-computer-games.md).
 
 The local stack uses these ports:
 

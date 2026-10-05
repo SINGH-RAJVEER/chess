@@ -21,7 +21,9 @@
 		"api:migrate": "just api-migrate",
 		"clean": "cd apps/web && bun run clean && cd ../api && rm -rf dist && cd ../engine && cargo clean && cd ../desktop && bun run clean",
 		"engines:local": "bun scripts/build-local-engines.ts",
-		"engines:desktop": "bun scripts/prepare-desktop-engines.ts"
+		"engines:desktop": "bun scripts/prepare-desktop-engines.ts",
+		"test:browser": "bun run engines:local && bun test tests/browser",
+		"benchmark:latency": "bun scripts/benchmark-latency.ts"
 	},
 	"devDependencies": {
 		"@babel/plugin-transform-react-jsx": "^7.28.6",
