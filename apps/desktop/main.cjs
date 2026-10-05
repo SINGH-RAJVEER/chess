@@ -6,6 +6,7 @@ const { NativeEngine } = require("./engine.cjs");
 const engines = new Map();
 
 app.setName("SixtyFour");
+if (process.env.ELECTRON_USER_DATA_DIR) app.setPath("userData", process.env.ELECTRON_USER_DATA_DIR);
 
 function engineFor(event) {
 	const window = BrowserWindow.fromWebContents(event.sender);

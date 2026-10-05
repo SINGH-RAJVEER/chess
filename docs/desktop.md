@@ -7,7 +7,7 @@ The app displays `SixtyFour`, uses `dev.sixtyfour.desktop` as its application ID
 ## Layout
 
 - `apps/desktop/main.cjs`: creates the frameless window and serves the packaged web assets through the secure `app://sixtyfour` protocol.
-- `apps/desktop/preload.cjs`: exposes the small, context-isolated desktop bridge used for window controls.
+- `apps/desktop/preload.cjs`: exposes context-isolated window controls and engine prepare/search/reset/cancel methods. Engine paths and process APIs remain in the main process.
 - `apps/desktop/launch-electron.cjs`: clears inherited Electron runtime flags before starting the desktop process.
 - `apps/desktop/package.json`: Electron and electron-builder settings, including the platform installers.
 - `apps/web`: shared React application, built before packaging.
@@ -36,8 +36,11 @@ just desktop-format  # format Electron entry points
 just desktop-clean   # remove desktop build output
 ```
 
+`DESKTOP_ENGINE_PATH` and `STOCKFISH_PATH` select prebuilt native engines when packaging. Without the first override, packaging builds the Rust engine for the current platform. `ELECTRON_USER_DATA_DIR` selects an isolated development or test profile; the IPC browser test uses a temporary profile and leaves the regular desktop save untouched.
+
 ## Known gaps
 
 - No updater, tray, or deep-link integration yet.
-- The packaged build expects a reachable API host; it does not embed single-player mode or the API.
+- Computer games run offline with bundled native engines. Authentication, online games, and archive synchronization require a reachable API host. The API is not embedded.
+- Native engine binaries must match the installer platform. Nix-linked binaries require their store paths; portable installers need portable native binaries and should be tested outside the build environment.
 - The API OAuth callback allowlist does not currently support the packaged `app://sixtyfour` origin; use email auth in the packaged app.

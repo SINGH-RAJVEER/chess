@@ -7,7 +7,7 @@
 	"scripts": {
 		"dev": "bun launch-electron.cjs",
 		"build": "bun ../../scripts/prepare-desktop-engines.ts && electron-builder",
-		"check": "bun -e 'for (const file of [\"main.cjs\", \"preload.cjs\", \"launch-electron.cjs\"]) new Function(await Bun.file(file).text())'",
+		"check": "bun -e 'for (const file of [\"main.cjs\", \"preload.cjs\", \"launch-electron.cjs\", \"engine.cjs\"]) new Function(await Bun.file(file).text())'",
 		"lint": "biome lint main.cjs preload.cjs launch-electron.cjs engine.cjs",
 		"format": "biome format --write main.cjs preload.cjs launch-electron.cjs engine.cjs",
 		"test": "bun test",
