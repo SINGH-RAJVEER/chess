@@ -1,6 +1,8 @@
-# Chess
+# SixtyFour
 
-Chess is a full-stack chess application with local games, online matchmaking, authentication, computer opponents, and a browser-based interface.
+SixtyFour is a full-stack chess application with local games, online matchmaking, authentication, computer opponents, and a browser-based interface.
+
+The project and package namespace is `sixtyfour`. The clients display `SixtyFour`, and the favicon and app icons use `64`.
 
 ## What Is Included
 
@@ -8,14 +10,14 @@ Chess is a full-stack chess application with local games, online matchmaking, au
 - `apps/mobile`: Expo iOS and Android app with the same playable core.
 - `apps/desktop`: Electron desktop shell around the web application.
 - `apps/api`: Go HTTP API for authentication, game state, matchmaking, clocks, migrations, and engine orchestration.
-- `apps/engine`: Rust engine library (minimax + custom alpha-beta) linked into the API. A Stockfish opponent with eight difficulty levels runs alongside it.
+- `apps/engine`: Rust UCI engine (minimax + custom alpha-beta), built as the `sixtyfour-engine` binary the API spawns per move. A Stockfish opponent with eight difficulty levels runs alongside it.
 - `apps/dqn`: retired DQN training pipeline and model, kept for research.
 - `libs/types`: Shared TypeScript domain and API types.
 - `docs`: Detailed architecture, development, API, operations, data model, and security documentation.
 
 ## How It Works
 
-The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API selects the reply in-process through the linked Rust engine library (minimax or custom alpha-beta search), or from a Stockfish child process at the chosen difficulty level.
+The browser calls the Go API over HTTP. The API stores users and games in PostgreSQL, validates chess moves, and matches online players. For computer games, the API spawns an engine process per move: the Rust `sixtyfour-engine` binary (minimax or custom alpha-beta search) or Stockfish at the chosen difficulty level.
 
 The local stack uses these ports:
 
@@ -25,7 +27,7 @@ The local stack uses these ports:
 | API | `4000` |
 | PostgreSQL | `5432` |
 
-Prerequisites: Nix, devenv, Bun, a C toolchain (`gcc` from devenv), and Rust for the engine library. API builds run with `CGO_ENABLED=1`.
+Prerequisites: Nix, devenv, Bun, and Rust plus a C linker (`gcc` from devenv) for the engine binary. The Go API itself is pure Go.
 
 ## Quick Start
 

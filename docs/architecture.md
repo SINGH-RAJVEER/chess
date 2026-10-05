@@ -10,20 +10,17 @@ Web client (React 19 + Vite, port 3000) ──┐ same-origin /api
 Mobile client (Expo, iOS + Android) ──────┘ API over LAN (EXPO_PUBLIC_API_URL)
 ```
   |
-  | in-process CGO call into the Rust static library
+  | child process per move over UCI (stdin/stdout)
   v
-Engine library (minimax + custom alpha-beta, no network hop)
-  |
-  | or: child process per move over UCI
-  v
-Stockfish binary (STOCKFISH_PATH)
+sixtyfour-engine binary (ENGINE_PATH; minimax + custom alpha-beta)
+  or Stockfish binary (STOCKFISH_PATH)
 ```
 
 Neither client connects directly to PostgreSQL or the engine.
 The API owns game state, authentication, migrations, and computer moves.
-The engine is linked into the API process as a static library; it keeps no
-persistent state between moves (a fresh searcher is constructed per call)
-and never touches the network or the database.
+Each computer move spawns a fresh engine process, so engines keep no
+persistent state between moves, never touch the network or the database,
+and cannot take the API down if they crash.
 
 ## Components
 
@@ -73,12 +70,12 @@ and never touches the network or the database.
 
 ### Engine: `apps/engine`
 
-- Rust library using `shakmaty`, linked into the Go API via CGO
-  (`apps/api/internal/engine`, C symbol `engine_best_move`).
-- Accepts a FEN plus a `minimax` or `custom` opponent choice; legacy `dqn`
-  requests map to `custom`. The `stockfish` choice bypasses the library and
-  runs the Stockfish binary at one of eight difficulty levels (see
-  [stockfish.md](stockfish.md)).
+- Rust crate using `shakmaty`, built as the `sixtyfour-engine` UCI binary. The Go
+  API (`apps/api/internal/engine`, pure Go) spawns it once per move.
+- Accepts a FEN plus a `minimax` or `custom` opponent choice (the UCI
+  `Opponent` option); legacy `dqn` requests map to `custom`. The `stockfish`
+  choice runs the Stockfish binary through the same UCI runner at one of
+  eight difficulty levels (see [stockfish.md](stockfish.md)).
 - Minimax uses alpha-beta search at depth five and material evaluation.
 - Custom runs an iterative-deepening alpha-beta search with quiescence,
   transposition table, and PeSTO evaluation (see docs/engine.md).
@@ -140,8 +137,8 @@ own runtime types and does not import this package.
    (`timeControl: 0`).
 2. The human move is committed by the API over the socket.
 3. If the game remains active and it is Black's turn, the API starts a
-   background engine call with the current position encoded as FEN: an
-   in-process library search for minimax and custom, or a Stockfish child
+   background engine call with the current position encoded as FEN: a
+   `sixtyfour-engine` child process for minimax and custom, or a Stockfish child
    process at the requested level.
 4. The engine returns UCI notation, such as `e7e5` or `e1g1`.
 5. The API validates and commits the engine move as a normal game mutation,
@@ -157,12 +154,14 @@ own runtime types and does not import this package.
   local and computer games allow the connected client to move.
 - Queue matching uses a table lock to prevent two matchers from consuming the
   same queue entry.
-- Engine calls run in-process behind a semaphore sized to `NumCPU - 1`. A
+- Engine processes run behind a semaphore sized to `NumCPU - 1`. A
   saturated engine reports `engine busy`, which is logged and leaves the game
-  unchanged, exactly like a failed remote call used to.
-- An unavailable or panicking engine call does not automatically recover a
-  pending computer move; operators should monitor API logs and users may need
-  to retry or reset a game.
+  unchanged.
+- The realtime hub rejects a computer move up front when the selected
+  engine binary cannot be found. An engine process that crashes, or is
+  killed after overrunning its move budget, fails only that move; the
+  pending computer move is not retried automatically, so operators should
+  monitor API logs and users may need to retry or reset a game.
 - Game play is websocket-only. The legacy REST game endpoints (`/api/board`,
   `/api/moves`, `/api/queue-status`, `/api/move`, `/api/undo`, `/api/resign`,
   `/api/draw-offer`, `/api/draw-respond`, `/api/reset`, `/api/join-queue`)

@@ -1,5 +1,9 @@
 # Configuration
 
+New development databases default to `sixtyfour`. Existing installations can keep their database by explicitly setting `PGDATABASE` and `DATABASE_URL`; the rename does not move or delete database contents.
+
+The browser stores preferences, session caches, profile images, and local computer games under `sixtyfour_` keys. On the same browser origin, it migrates earlier `chess_` keys before rendering and keeps any already saved `sixtyfour_` value. The desktop origin is now `app://sixtyfour`; storage from its former origin is separate, so existing desktop users must sign in again and their local settings and games do not carry over automatically.
+
 The local stack loads a single root `.env` file. In a deployed environment,
 provide equivalent variables through the process manager or secret store.
 Do not put secrets in source control, browser-exposed `VITE_*` variables, or
@@ -22,15 +26,16 @@ the web build output.
 
 ## Engine Variables
 
-Minimax and custom computer moves are served in-process by the API through
-the Rust static library, so there is no engine host, port, or model path to
-configure. The Stockfish opponent runs an external binary (see
-[stockfish.md](stockfish.md)).
+Minimax and custom computer moves are served by the `sixtyfour-engine` binary
+built from `apps/engine`, which the API spawns once per move over UCI. There
+is no engine host, port, or model path to configure. The Stockfish opponent
+runs its own binary the same way (see [stockfish.md](stockfish.md)).
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `ENGINE_CUSTOM_MOVETIME_MS` | No | `1000` | Time budget per custom-engine move in milliseconds. |
-| `ENGINE_CUSTOM_MAX_DEPTH` | No | `64` | Maximum custom-engine search depth. |
+| `ENGINE_PATH` | No | `sixtyfour-engine` on `PATH`, then `apps/engine/target/release/sixtyfour-engine` | `sixtyfour-engine` binary for the `minimax` and `custom` opponents. The container image sets `/usr/local/bin/sixtyfour-engine`. When unresolvable, those moves are rejected. |
+| `ENGINE_CUSTOM_MOVETIME_MS` | No | `1000` | Time budget per custom-engine move in milliseconds. Read by the API and sent as `go movetime`. |
+| `ENGINE_CUSTOM_MAX_DEPTH` | No | `64` | Maximum custom-engine search depth. Read by the API and sent as `go depth`. |
 | `STOCKFISH_PATH` | No | `stockfish` on `PATH` | Stockfish binary for the `stockfish` opponent. The container image sets `/usr/games/stockfish`. When unresolvable, Stockfish moves are rejected. |
 
 Longer `ENGINE_CUSTOM_MOVETIME_MS` values make computer moves stronger but
@@ -56,7 +61,7 @@ auth secret through a `VITE_` variable.
 ## Local Example
 
 ```dotenv
-DATABASE_URL=postgres://postgres@localhost:5432/chess
+DATABASE_URL=postgres://postgres@localhost:5432/sixtyfour
 WEB_ORIGIN=http://localhost:3000
 AUTH_BASE_URL=http://localhost:4000/api/auth
 VITE_API_PROXY_TARGET=http://127.0.0.1:4000

@@ -12,17 +12,17 @@ install:
 lockfile:
     bun run lockfile:generate
 
-# Start PostgreSQL, web, and api via devenv (the API serves computer moves in-process)
+# Start PostgreSQL, web, and api via devenv (the API spawns the sixtyfour-engine binary for computer moves)
 dev:
     #!/usr/bin/env bash
     set -e
     if ! command -v devenv &>/dev/null; then
-      echo "chess: devenv is required. Install it, then run 'just dev' again." >&2
+      echo "sixtyfour: devenv is required. Install it, then run 'just dev' again." >&2
       exit 1
     fi
     if [ "$EUID" -eq 0 ]; then
-      echo "chess: do not run 'just dev' with sudo; PostgreSQL refuses to run as root." >&2
-      echo "chess: add your user to nix.settings.trusted-users, rebuild NixOS, then run 'just dev'." >&2
+      echo "sixtyfour: do not run 'just dev' with sudo; PostgreSQL refuses to run as root." >&2
+      echo "sixtyfour: add your user to nix.settings.trusted-users, rebuild NixOS, then run 'just dev'." >&2
       exit 1
     fi
     NIXPKGS_ALLOW_UNFREE=1 exec devenv --impure up --tui=false
@@ -151,40 +151,40 @@ types-check:
 types-test:
     cd libs/types && bun run test
 
-# Start the API in the devenv shell (builds the engine static library first)
-api-dev: engine-lib
-    devenv shell -- bash -c 'cd apps/api && AUTO_MIGRATE=true CGO_ENABLED=1 go run ./cmd/api'
+# Start the API in the devenv shell (builds the sixtyfour-engine binary first)
+api-dev: engine-bin
+    devenv shell -- bash -c 'cd apps/api && AUTO_MIGRATE=true go run ./cmd/api'
 
-# Build the API in the devenv shell (builds the engine static library first)
-api-build: engine-lib
-    devenv shell -- bash -c 'cd apps/api && mkdir -p dist && CGO_ENABLED=1 go build -o dist/api ./cmd/api'
+# Build the API in the devenv shell (builds the sixtyfour-engine binary too)
+api-build: engine-bin
+    devenv shell -- bash -c 'cd apps/api && mkdir -p dist && CGO_ENABLED=0 go build -o dist/api ./cmd/api'
 
 # Start the built API
 api-start:
-    cd apps/api && AUTO_MIGRATE=true CGO_ENABLED=1 ./dist/api
+    cd apps/api && AUTO_MIGRATE=true ./dist/api
 
-# Test the API (builds the engine static library first; needs a C toolchain)
-api-test: engine-lib
-    devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go test ./...'
+# Test the API (builds the sixtyfour-engine binary first)
+api-test: engine-bin
+    devenv shell -- bash -c 'cd apps/api && go test ./...'
 
-# Vet the API (builds the engine static library first; needs a C toolchain)
-api-lint: engine-lib
-    devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go vet ./...'
+# Vet the API
+api-lint:
+    devenv shell -- bash -c 'cd apps/api && go vet ./...'
 
 # Format the API
 api-format:
     cd apps/api && gofmt -w ./cmd ./internal
 
-# Check the API (format, tests, vet; builds the engine static library first)
-api-check: engine-lib
-    cd apps/api && test -z "$(gofmt -l ./cmd ./internal)" && devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go test ./... && CGO_ENABLED=1 go vet ./...'
+# Check the API (format, tests, vet; builds the sixtyfour-engine binary first)
+api-check: engine-bin
+    cd apps/api && test -z "$(gofmt -l ./cmd ./internal)" && devenv shell -- bash -c 'cd apps/api && go test ./... && go vet ./...'
 
-# Benchmark the API hot paths, including the engine FFI call (no database needed)
-api-bench: engine-lib
-    devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go test ./internal/game/ -bench=. -benchtime=100x -run=NONE'
+# Benchmark the API hot paths, including a minimax engine process (no database needed)
+api-bench: engine-bin
+    devenv shell -- bash -c 'cd apps/api && go test ./internal/game/ -bench=. -benchtime=100x -run=NONE'
 
-# Apply the API's app-local migrations (builds the engine static library first)
-api-migrate: engine-lib database-start
+# Apply the API's app-local migrations
+api-migrate: database-start
     #!/usr/bin/env bash
     set -e
     if [ -f .env ]; then
@@ -192,7 +192,7 @@ api-migrate: engine-lib database-start
       source .env
       set +a
     fi
-    devenv shell -- bash -c 'cd apps/api && CGO_ENABLED=1 go run ./cmd/api -migrate'
+    devenv shell -- bash -c 'cd apps/api && go run ./cmd/api -migrate'
 
 # Ensure PostgreSQL is running (init cluster on first run)
 database-start:
@@ -207,28 +207,28 @@ database-start:
     PGHOST="${PGHOST:-localhost}"
     PGPORT="${PGPORT:-5432}"
     PGUSER="${PGUSER:-postgres}"
-    PGDATABASE="${PGDATABASE:-chess}"
+    PGDATABASE="${PGDATABASE:-sixtyfour}"
     if command -v pg_isready &>/dev/null && pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" &>/dev/null; then
       createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$PGDATABASE" 2>/dev/null || true
-      echo "chess: PostgreSQL ready at $PGHOST:$PGPORT/$PGDATABASE"
+      echo "sixtyfour: PostgreSQL ready at $PGHOST:$PGPORT/$PGDATABASE"
       exit 0
     fi
     if ! command -v pg_ctl &>/dev/null; then
-      echo "chess: PostgreSQL tools are missing. Enter the devenv shell first." >&2
+      echo "sixtyfour: PostgreSQL tools are missing. Enter the devenv shell first." >&2
       exit 1
     fi
     mkdir -p "$(dirname "$PGDATA")"
     if [ ! -d "$PGDATA" ]; then
-      echo "chess: initialising PostgreSQL cluster..."
+      echo "sixtyfour: initialising PostgreSQL cluster..."
       initdb --auth=trust --username="$PGUSER" --pgdata="$PGDATA" \
              --no-locale --encoding=UTF8
     fi
     if ! pg_ctl status -D "$PGDATA" 2>/dev/null | grep -q "server is running"; then
-      echo "chess: starting PostgreSQL on $PGHOST:$PGPORT..."
+      echo "sixtyfour: starting PostgreSQL on $PGHOST:$PGPORT..."
       pg_ctl start -D "$PGDATA" -l "$PGDATA/postgres.log" \
         -o "-p $PGPORT -h $PGHOST" -w
       createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$PGDATABASE" 2>/dev/null || true
-      echo "chess: PostgreSQL ready at $PGHOST:$PGPORT/$PGDATABASE"
+      echo "sixtyfour: PostgreSQL ready at $PGHOST:$PGPORT/$PGDATABASE"
     fi
 
 # Stop PostgreSQL
@@ -240,18 +240,18 @@ database-stop:
       set +a
     fi
     if ! command -v pg_ctl &>/dev/null; then
-      echo "chess: PostgreSQL tools are missing. Enter the devenv shell first." >&2
+      echo "sixtyfour: PostgreSQL tools are missing. Enter the devenv shell first." >&2
       exit 1
     fi
     PGDATA="${PGDATA:-$PWD/.postgres/data}"
     if pg_ctl status -D "$PGDATA" 2>/dev/null | grep -q "server is running"; then
-      echo "chess: stopping PostgreSQL..."
+      echo "sixtyfour: stopping PostgreSQL..."
       pg_ctl stop -D "$PGDATA" -m fast
     fi
 
-# Build the Rust engine static library linked into the API
-engine-lib:
-    cd apps/engine && cargo build --release --lib
+# Build the sixtyfour-engine UCI binary the API spawns for computer moves
+engine-bin:
+    cd apps/engine && cargo build --release --bin sixtyfour-engine
 
 # Probe the engine over UCI on stdin (e.g. `position startpos`, `go movetime 100`)
 engine-dev:
@@ -282,7 +282,7 @@ engine-bench:
     cd apps/engine && cargo test --release bench_eval -- --ignored --nocapture && cargo test --release bench_middlegame -- --ignored --nocapture
 
 # SPRT self-play between two UCI engine binaries, e.g.
-# just sprt -- --engine-a ./apps/engine/target/release/uci --engine-b /tmp/chess-baseline/uci --movetime 100 --max-games 2000
+# just sprt -- --engine-a ./apps/engine/target/release/uci --engine-b /tmp/sixtyfour-baseline/uci --movetime 100 --max-games 2000
 sprt *args:
     devenv shell -- bash -c 'cd apps/engine && cargo build --release --bin uci --bin sprt && ./target/release/sprt {{args}}'
 
@@ -301,7 +301,7 @@ sprt-baseline baseline="bcfa3bba9059" movetime="100" elo0="0" elo1="10" alpha="0
     root="{{justfile_directory()}}"
     cd "$root"
     engine="$root/apps/engine"
-    base_work="$(mktemp -d "${TMPDIR:-/tmp}/chess-sprt-base-XXXXXX")"
+    base_work="$(mktemp -d "${TMPDIR:-/tmp}/sixtyfour-sprt-base-XXXXXX")"
     # The repo moves fast (parallel sessions); refresh so workspace
     # operations below do not fail on a stale working copy.
     jj workspace update-stale >/dev/null 2>&1 || true
@@ -317,14 +317,14 @@ sprt-baseline baseline="bcfa3bba9059" movetime="100" elo0="0" elo1="10" alpha="0
     # engine crate itself rebuilds. The baseline binary is stashed aside
     # before the test binaries are (re)built over it.
     export CARGO_TARGET_DIR="$engine/target"
-    echo "chess: building baseline engine @ {{baseline}}..."
+    echo "sixtyfour: building baseline engine @ {{baseline}}..."
     (cd "$base_work/apps/engine" && cargo build --release --bin uci)
     cp "$engine/target/release/uci" "$base_work/base-uci"
-    echo "chess: building test engine and referee from working copy..."
+    echo "sixtyfour: building test engine and referee from working copy..."
     (cd "$engine" && cargo build --release --bin uci --bin sprt)
     log="$root/sprt-{{baseline}}.log"
-    echo "chess: SPRT match test=working copy base={{baseline}} movetime={{movetime}}ms SPRT({{elo0}},{{elo1}}) max_games={{max_games}} concurrency={{concurrency}}"
-    echo "chess: log -> $log"
+    echo "sixtyfour: SPRT match test=working copy base={{baseline}} movetime={{movetime}}ms SPRT({{elo0}},{{elo1}}) max_games={{max_games}} concurrency={{concurrency}}"
+    echo "sixtyfour: log -> $log"
     set +e
     "$engine/target/release/sprt" \
         --engine-a "$engine/target/release/uci" \

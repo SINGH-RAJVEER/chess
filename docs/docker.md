@@ -16,9 +16,9 @@ setup is needed to publish them.
 
 | Image | Dockerfile | Build context | Notes |
 | --- | --- | --- | --- |
-| `chess-api` | apps/api/Dockerfile | repository root | Multi-stage Rust + Go build; CGO-enabled binary on debian-slim; runs migrations on boot when `AUTO_MIGRATE=true` |
-| `chess-web` | apps/web/Dockerfile | repository root | Bun build, served by vite preview; proxies `/api` to `VITE_API_PROXY_TARGET` |
-| `chess-train` | apps/dqn/Dockerfile | apps/dqn | Optional training container for research; see below for GPU use |
+| `sixtyfour-api` | apps/api/Dockerfile | repository root | Multi-stage Rust + Go build; pure Go API plus the `sixtyfour-engine` binary on debian-slim; runs migrations on boot when `AUTO_MIGRATE=true` |
+| `sixtyfour-web` | apps/web/Dockerfile | repository root | Bun build, served by vite preview; proxies `/api` to `VITE_API_PROXY_TARGET` |
+| `sixtyfour-train` | apps/dqn/Dockerfile | apps/dqn | Optional training container for research; see below for GPU use |
 
 `podman build` honors `.dockerignore`, same as Docker.
 
@@ -27,55 +27,57 @@ setup is needed to publish them.
 Create one network so the containers resolve each other by name:
 
 ```bash
-podman network create chess
+podman network create sixtyfour
 ```
 
 PostgreSQL:
 
 ```bash
-podman run -d --name db --network chess \
-    -e POSTGRES_USER=chess \
-    -e POSTGRES_PASSWORD=chess \
-    -e POSTGRES_DB=chess \
-    -v chess-pgdata:/var/lib/postgresql/data \
+podman run -d --name db --network sixtyfour \
+    -e POSTGRES_USER=sixtyfour \
+    -e POSTGRES_PASSWORD=sixtyfour \
+    -e POSTGRES_DB=sixtyfour \
+    -v sixtyfour-pgdata:/var/lib/postgresql/data \
     docker.io/library/postgres:17-alpine
 ```
 
-API (build from the repository root, since it compiles the Rust engine
-static library first). The image also installs Debian's `stockfish` package
-and sets `STOCKFISH_PATH=/usr/games/stockfish` for the Stockfish opponent:
+API (build from the repository root, since it also compiles the Rust
+`sixtyfour-engine` binary). The image installs that binary at
+`/usr/local/bin/sixtyfour-engine` with `ENGINE_PATH` pointing to it, plus
+Debian's `stockfish` package with `STOCKFISH_PATH=/usr/games/stockfish` for
+the Stockfish opponent:
 
 ```bash
-podman build -f apps/api/Dockerfile -t chess-api .
-podman run -d --name api --network chess -p 4000:4000 \
-    -e DATABASE_URL=postgres://chess:chess@db:5432/chess?sslmode=disable \
+podman build -f apps/api/Dockerfile -t sixtyfour-api .
+podman run -d --name api --network sixtyfour -p 4000:4000 \
+    -e DATABASE_URL=postgres://sixtyfour:sixtyfour@db:5432/sixtyfour?sslmode=disable \
     -e BETTER_AUTH_SECRET=<secret> \
     -e AUTO_MIGRATE=true \
-    chess-api
+    sixtyfour-api
 ```
 
 Web:
 
 ```bash
-podman build -f apps/web/Dockerfile -t chess-web .
-podman run -d --name web --network chess -p 3000:3000 chess-web
+podman build -f apps/web/Dockerfile -t sixtyfour-web .
+podman run -d --name web --network sixtyfour -p 3000:3000 sixtyfour-web
 ```
 
 The web image defaults to `VITE_API_PROXY_TARGET=http://api:4000`, which
-resolves on the `chess` network because the API container is named `api`.
+resolves on the `sixtyfour` network because the API container is named `api`.
 Pass `-e VITE_API_PROXY_TARGET=<api-url>` when the API has a different name
 or address. The UI is available at http://localhost:3000 and the API
 directly at http://localhost:4000.
 
 Stop everything with `podman stop web api db` and remove containers with
-`podman rm web api db`. The `chess-pgdata` volume keeps the database across
-restarts; `podman volume rm chess-pgdata` deletes it.
+`podman rm web api db`. The `sixtyfour-pgdata` volume keeps the database across
+restarts; `podman volume rm sixtyfour-pgdata` deletes it.
 
 ## Training Container
 
 ```bash
-podman build -f apps/dqn/Dockerfile -t chess-train apps/dqn
-podman run --rm chess-train
+podman build -f apps/dqn/Dockerfile -t sixtyfour-train apps/dqn
+podman run --rm sixtyfour-train
 ```
 
 GPU training needs a CDI device pass-through instead of Docker's `--gpus`
@@ -83,7 +85,7 @@ flag, which requires the NVIDIA container toolkit and CDI configured on the
 host:
 
 ```bash
-podman run --rm --device nvidia.com/gpu=all chess-train
+podman run --rm --device nvidia.com/gpu=all sixtyfour-train
 ```
 
 ## Configuration

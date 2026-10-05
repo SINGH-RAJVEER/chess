@@ -34,9 +34,9 @@ just dev
 ```
 
 This runs `devenv up`, which provides PostgreSQL and starts the web and API
-processes. Computer moves are served in-process by the API through the Rust
-engine static library (built automatically before the API starts), so there
-is no separate engine process. The local service ports are:
+processes. Computer moves are served by the `sixtyfour-engine` binary, built
+automatically before the API starts and spawned by the API once per move,
+so there is no long-running engine process. The local service ports are:
 
 | Service | Address |
 | --- | --- |
@@ -62,8 +62,10 @@ just engine-dev     # UCI probe on stdin, not a server
 just desktop-dev
 ```
 
-API recipes build the engine static library first and require a C toolchain
-(`gcc` is provided by the devenv shell) with `CGO_ENABLED=1`.
+The API is pure Go. `api-dev`, `api-build`, `api-test`, `api-check`, and
+`api-bench` build the `sixtyfour-engine` binary first (`just engine-bin`), which
+the API finds at `apps/engine/target/release/sixtyfour-engine` without extra
+configuration. Set `ENGINE_PATH` to use a binary elsewhere.
 
 The web server proxies `/api` to `http://127.0.0.1:4000` by default. Set
 `VITE_API_PROXY_TARGET` in the root `.env` to point to another API during local
@@ -99,18 +101,18 @@ just api-migrate
 ```
 
 API and game service tests need PostgreSQL: they use `TEST_DATABASE_URL`
-when set, else `DATABASE_URL`, else a local `chess_test` database, and skip
+when set, else `DATABASE_URL`, else a local `sixtyfour_test` database, and skip
 when nothing is reachable.
 
-The API build is a CGO-enabled Go binary linked against the Rust engine
-static library (`just engine-lib` builds `apps/engine/target/release/libchess.a`
-first). The web production output is written to `apps/web/dist`, which the
+The API build is a pure Go binary (`CGO_ENABLED=0`); the engine ships beside
+it as `apps/engine/target/release/sixtyfour-engine` (`just engine-bin`), and both
+must be deployed together. The web production output is written to `apps/web/dist`, which the
 desktop release build embeds into the native binary.
 
 ## Computer Opponent Training (Retired)
 
-The DQN opponent was removed when the standalone engine server was replaced
-by the in-process library: minimax, the custom alpha-beta engine, and
+The DQN opponent was removed when the standalone engine server was retired:
+minimax, the custom alpha-beta engine, and
 Stockfish (installed by `devenv.nix`, see [stockfish.md](stockfish.md))
 serve traffic. The Python training pipeline in `apps/dqn/training` and the
 exported `apps/dqn/model.onnx` are retained for research but are no longer

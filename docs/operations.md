@@ -4,9 +4,9 @@
 
 Run the web server behind a TLS-terminating reverse proxy. Route browser `/api`
 requests to the Go API and serve the Vite build as static assets or through the
-Vite preview-compatible server. Computer moves are computed in-process by the
-API through the linked Rust engine library; there is no engine network service
-to isolate or scale separately. The API should be the only service allowed to
+Vite preview-compatible server. Computer moves are computed by `sixtyfour-engine`
+and Stockfish child processes that the API spawns per move; there is no
+engine network service to isolate or scale separately. The API should be the only service allowed to
 reach PostgreSQL.
 
 Podman-ready Dockerfiles ship with each app (see docker.md). The repository
@@ -18,14 +18,15 @@ environment.
 
 1. Build and test the commit in CI.
 2. Build the web assets with `just web-build`.
-3. Build the API with `just api-build` (links the Rust engine static library).
-4. Publish the web assets and the API binary as one versioned release.
+3. Build the API with `just api-build` (also builds the `sixtyfour-engine` binary).
+4. Publish the web assets, the API binary, and the `sixtyfour-engine` binary as
+   one versioned release.
 5. Apply migrations with `bun run api:migrate` or a release job before routing
    traffic to the new API.
 6. Start the API, verify its health, then route the web client to it.
 
-For rollback, keep the previous API binary and web assets available as
-a compatible release unit. Database migrations are forward-only in this
+For rollback, keep the previous API binary, `sixtyfour-engine` binary, and web
+assets available as a compatible release unit. Database migrations are forward-only in this
 repository; design destructive schema changes as additive, staged migrations.
 
 ## Health Checks
@@ -41,7 +42,7 @@ database readiness or dependency check.
 
 For a complete smoke test, sign in with a test account, load a board, request
 legal moves, submit a move, and make a vs-computer move to exercise the
-in-process engine. Do not use a real user account or production game for this test.
+`sixtyfour-engine` binary. Do not use a real user account or production game for this test.
 
 ## Logging and Monitoring
 
@@ -71,12 +72,14 @@ connection saturation, queue depth, and engine saturation rate.
 1. Check API logs for engine request failures or `engine busy` saturation.
 2. Confirm `ENGINE_CUSTOM_MOVETIME_MS` / `ENGINE_CUSTOM_MAX_DEPTH` are sane;
    oversized budgets hold search slots and serialize computer games.
-3. For Stockfish games, confirm the binary resolves from `STOCKFISH_PATH`
-   or `PATH` in the API process environment; a missing binary rejects moves
-   with `stockfish is not installed on the server`.
-4. Confirm the API binary was built with the engine static library
-   (`just api-build` builds `libchess.a` first); a stale library can
-   desynchronize search behavior.
+3. Confirm the engine binaries resolve in the API process environment:
+   `sixtyfour-engine` from `ENGINE_PATH` or `PATH` (a missing binary rejects
+   minimax and custom moves with `SixtyFour engine is not installed on the
+   server`), and Stockfish from `STOCKFISH_PATH` or `PATH` (`stockfish is
+   not installed on the server`).
+4. Look for `sixtyfour-engine timed out` or `exited without a move` in the logs.
+   Each is one killed or crashed engine process; the API keeps serving.
+   Confirm the deployed `sixtyfour-engine` came from the same release as the API.
 5. Reset or retry the affected game after recovery.
 
 ### Database migration failure
@@ -93,7 +96,7 @@ Never manually mark a migration applied without verifying the complete schema.
 
 The client polls active games and queues once per second. API and PostgreSQL
 capacity must be sized for this read pattern as well as move writes.
-Custom-engine searches and Stockfish child processes share a semaphore, so
+`sixtyfour-engine` and Stockfish child processes share a semaphore, so
 concurrent computer games serialize past `NumCPU - 1` parallel searches.
 Size API CPU for the expected number of concurrent computer games and the
 `ENGINE_CUSTOM_MOVETIME_MS` budget.

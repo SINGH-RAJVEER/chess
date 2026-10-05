@@ -9,3 +9,9 @@ AGENTS.md
 .tmp-runtime
 tsbuildinfo
 *.tsbuildinfo
+apps/engine/wasm/
+apps/web/public/engines/
+apps/mobile/src/generated/local-engine-page.ts
+apps/desktop/engines/
+test-results/
+playwright-report/
