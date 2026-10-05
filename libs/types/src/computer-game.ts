@@ -1,15 +1,15 @@
-import { Chess, type PieceSymbol, type Square } from "chess.js";
+import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 import type { BoardResponse } from "./board";
 import {
-	parseComputerOpponent,
-	parseStockfishLevel,
 	type ComputerOpponent,
 	type PieceType,
 	type PromotionPiece,
+	parseComputerOpponent,
+	parseStockfishLevel,
 	type StockfishLevel,
 } from "./chess";
-import type { WsClientMessage, WsServerMessage } from "./ws";
 import { moveLatency } from "./latency";
+import type { WsClientMessage, WsServerMessage } from "./ws";
 
 export const SEARCH_BUDGET_MS = 500;
 
@@ -72,17 +72,19 @@ function restoreState(value: string) {
 	)
 		throw new Error("Invalid saved computer game");
 	const chess = new Chess();
+	const moves: Move[] = [];
 	for (const move of saved.moves) {
 		if (typeof move !== "string" || chess.isGameOver())
 			throw new Error("Invalid saved move history");
-		chess.move(move);
+		moves.push(chess.move(move));
 	}
-	return { saved, chess };
+	return { saved, chess, moves };
 }
 
 /** Owns local rules, persistence, cancellation, and engine orchestration. */
 export class ComputerGame {
 	private chess = new Chess();
+	private history: Move[] = [];
 	private id = Date.now();
 	private revision = 0;
 	private resigned = false;
@@ -153,8 +155,9 @@ export class ComputerGame {
 		return this.initialization;
 	}
 	private restore(value: string) {
-		const { saved, chess } = restoreState(value);
+		const { saved, chess, moves } = restoreState(value);
 		this.chess = chess;
+		this.history = moves;
 		this.id = saved.id;
 		this.revision = saved.revision;
 		this.resigned = saved.resigned === true;
@@ -167,7 +170,7 @@ export class ComputerGame {
 		if (
 			this.id !== expected.id ||
 			this.revision !== expected.revision ||
-			this.chess.history().length ||
+			this.history.length ||
 			this.resigned
 		)
 			return false;
@@ -202,7 +205,7 @@ export class ComputerGame {
 			version: 1,
 			id: this.id,
 			revision: this.revision,
-			moves: this.chess.history(),
+			moves: this.history.map((move) => move.san),
 			resigned: this.resigned,
 			opponent: this.opponent,
 			level: this.level,
@@ -220,10 +223,13 @@ export class ComputerGame {
 	board(): BoardResponse {
 		if (this.currentBoard?.revision === this.revision && this.currentBoard.id === this.id)
 			return this.currentBoard;
-		const moves = this.chess.history({ verbose: true });
+		const moves = this.history;
+		const available = this.chess.moves({ verbose: true });
+		const isCheck = this.chess.isCheck();
 		const legalMoves: Record<number, number[]> = {};
-		for (const move of this.chess.moves({ verbose: true })) {
-			const targets = (legalMoves[squareIndex(move.from)] ??= []);
+		for (const move of available) {
+			legalMoves[squareIndex(move.from)] ??= [];
+			const targets = legalMoves[squareIndex(move.from)];
 			if (!targets.includes(squareIndex(move.to))) targets.push(squareIndex(move.to));
 		}
 		const capturedPieces: BoardResponse["capturedPieces"] = { white: [], black: [] };
@@ -234,9 +240,9 @@ export class ComputerGame {
 		const turn = this.chess.turn() === "w" ? "White" : "Black";
 		const status = this.resigned
 			? "Resignation"
-			: this.chess.isCheckmate()
+			: available.length === 0 && isCheck
 				? "Checkmate"
-				: this.chess.isStalemate()
+				: available.length === 0
 					? "Stalemate"
 					: this.chess.isInsufficientMaterial()
 						? "InsufficientMaterial"
@@ -245,7 +251,7 @@ export class ComputerGame {
 							: this.chess.isDrawByFiftyMoves()
 								? "FiftyMoveRule"
 								: "Ongoing";
-		return (this.currentBoard = {
+		this.currentBoard = {
 			id: this.id,
 			revision: this.revision,
 			legalMoves: status === "Ongoing" ? legalMoves : {},
@@ -280,11 +286,12 @@ export class ComputerGame {
 			lastMove: last ? { from: squareIndex(last.from), to: squareIndex(last.to) } : null,
 			serverTime: Date.now(),
 			userColor: "White",
-			isCheck: this.chess.isCheck(),
+			isCheck,
 			drawOfferedBy: null,
 			moveCount: moves.length,
 			halfMoveClock: Number(this.chess.fen().split(" ")[4]),
-		});
+		};
+		return this.currentBoard;
 	}
 	markRendered(revision: number) {
 		const sample = this.lastLatency;
@@ -319,11 +326,13 @@ export class ComputerGame {
 				if (abort.signal.aborted || revision !== this.revision) return;
 				if (!/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(reply.move))
 					throw new Error("Engine returned an invalid move");
-				this.chess.move({
-					from: reply.move.slice(0, 2),
-					to: reply.move.slice(2, 4),
-					promotion: reply.move[4],
-				});
+				this.history.push(
+					this.chess.move({
+						from: reply.move.slice(0, 2),
+						to: reply.move.slice(2, 4),
+						promotion: reply.move[4],
+					}),
+				);
 				this.revision++;
 				this.lastLatency = {
 					revision: this.revision,
@@ -350,6 +359,7 @@ export class ComputerGame {
 				this.cancel();
 				this.engine.reset();
 				this.chess.reset();
+				this.history = [];
 				this.resigned = false;
 				this.id = Math.max(Date.now(), this.id + 1);
 				this.revision++;
@@ -375,11 +385,13 @@ export class ComputerGame {
 					this.board().status !== "Ongoing"
 				)
 					throw new Error("Position changed");
-				this.chess.move({
-					from: squareName(msg.from),
-					to: squareName(msg.to),
-					promotion: PROMOTIONS[msg.promotion ?? "Queen"],
-				});
+				this.history.push(
+					this.chess.move({
+						from: squareName(msg.from),
+						to: squareName(msg.to),
+						promotion: PROMOTIONS[msg.promotion ?? "Queen"],
+					}),
+				);
 				this.revision++;
 				this.emit();
 				this.think(submittedAt);
@@ -389,6 +401,7 @@ export class ComputerGame {
 				this.cancel();
 				this.engine.reset();
 				this.chess.undo();
+				this.history.pop();
 				this.resigned = false;
 				this.revision++;
 				break;

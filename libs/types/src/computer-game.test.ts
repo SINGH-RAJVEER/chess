@@ -71,12 +71,34 @@ describe("local computer games", () => {
 		expect(game.board().turn).toBe("White");
 		game.disconnect();
 	});
-	test("restores en passant and castling rights from move history", async () => {
+	test("restores en passant from move history", async () => {
 		const { game } = await setup(["e4", "a6", "e5", "d5"]);
 		expect(game.board().legalMoves?.[28]).toContain(19);
 		await game.request({ type: "game.move", gameId: 1, from: 28, to: 19 });
 		expect(game.board().capturedPieces.black).toEqual(["Pawn"]);
 		expect(game.board().pieces.some((piece) => piece.square === 27)).toBe(false);
+		game.disconnect();
+	});
+	test("restores castling and moves the rook with the king", async () => {
+		const { game } = await setup(["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6"]);
+		expect(game.board().legalMoves?.[60]).toContain(62);
+		await game.request({ type: "game.move", gameId: 1, from: 60, to: 62 });
+		expect(
+			game.board().pieces.some((piece) => piece.square === 61 && piece.piece_type === "Rook"),
+		).toBe(true);
+		game.disconnect();
+	});
+	test("remote recovery cannot overwrite a move made during the download", async () => {
+		const { game } = await setup();
+		const initial = game.board();
+		await game.request({ type: "game.move", gameId: 1, from: 52, to: 36 });
+		expect(
+			await game.restoreArchive(
+				JSON.stringify({ version: 1, id: 2, revision: 2, moves: ["d4", "d5"] }),
+				initial,
+			),
+		).toBe(false);
+		expect(game.board().moves[0].notation).toBe("e4");
 		game.disconnect();
 	});
 	test("illegal engine moves cannot mutate the board", async () => {

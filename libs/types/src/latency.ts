@@ -49,3 +49,63 @@ export class MoveLatency {
 	}
 }
 export const moveLatency = new MoveLatency();
+
+/** Keeps replies ordered and measures submission through the rendered board. */
+export class RemoteMoveTracker {
+	private boards = new Map<number, BoardResponse>();
+	private pending = new Map<
+		number,
+		{ started: number; moveCount: number; received?: number; board?: BoardResponse }
+	>();
+	begin(gameID: number) {
+		this.pending.set(gameID, {
+			started: performance.now(),
+			moveCount: this.boards.get(gameID)?.moveCount ?? 0,
+		});
+	}
+	cancel(gameID: number) {
+		this.pending.delete(gameID);
+	}
+	accept(board: BoardResponse) {
+		const previous = this.boards.get(board.id);
+		if (
+			previous &&
+			board.revision !== undefined &&
+			previous.revision !== undefined &&
+			board.revision < previous.revision
+		)
+			return previous;
+		this.boards.set(board.id, board);
+		if (this.boards.size > 128) this.boards.delete(this.boards.keys().next().value as number);
+		const pending = this.pending.get(board.id);
+		if (
+			pending &&
+			board.moveCount > pending.moveCount &&
+			(board.mode !== "vs_computer" || (board.latency?.searchMs ?? 0) > 0)
+		) {
+			pending.received ??= performance.now();
+			pending.board = board;
+		}
+		return board;
+	}
+	markRendered(board: BoardResponse) {
+		const pending = this.pending.get(board.id);
+		if (
+			!pending?.board ||
+			pending.received === undefined ||
+			pending.board.revision !== board.revision
+		)
+			return;
+		this.pending.delete(board.id);
+		const now = performance.now();
+		moveLatency.record({
+			path: "server",
+			totalMs: now - pending.started,
+			engineMs: board.latency?.searchMs ?? 0,
+			serverMs: board.latency?.serverMs,
+			renderMs: now - pending.received,
+		});
+	}
+}
+
+import type { BoardResponse } from "./board";

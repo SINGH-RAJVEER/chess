@@ -20,6 +20,7 @@ type State = {
 	pending: Pending | null;
 	rejectReady: (error: Error) => void;
 	readyTimer: ReturnType<typeof setTimeout>;
+	warming: boolean;
 };
 
 export class WorkerEngine implements LocalEngine {
@@ -52,6 +53,7 @@ export class WorkerEngine implements LocalEngine {
 			worker,
 			ready,
 			pending: null,
+			warming: key === "stockfish",
 			rejectReady,
 			readyTimer: setTimeout(() => fail(new Error("Engine initialization timed out")), 15000),
 		};
@@ -65,8 +67,16 @@ export class WorkerEngine implements LocalEngine {
 					worker.postMessage("isready");
 				}
 				if (event.data === "readyok") {
+					if (state.warming) {
+						worker.postMessage("position startpos");
+						worker.postMessage("go movetime 1");
+					}
+				}
+				if (event.data.startsWith("bestmove ") && state.warming) {
+					state.warming = false;
 					clearTimeout(state.readyTimer);
 					resolveReady();
+					return;
 				}
 				if (event.data.startsWith("bestmove ") && state.pending) {
 					const pending = state.pending;
