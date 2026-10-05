@@ -9,6 +9,12 @@ pub struct LocalEngine {
 	searcher: Searcher,
 }
 
+impl Default for LocalEngine {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 #[wasm_bindgen]
 impl LocalEngine {
 	#[wasm_bindgen(constructor)]

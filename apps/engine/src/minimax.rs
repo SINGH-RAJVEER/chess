@@ -1,4 +1,4 @@
-//! Classic fixed-depth minimax with alpha-beta pruning and a material-only
+//! Classic minimax with alpha-beta pruning and a material-only
 //! evaluation. This is the "minimax" computer opponent; the UCI frontend
 //! selects it with `setoption name Opponent value minimax`.
 
@@ -229,6 +229,43 @@ mod tests {
 			.unwrap()
 			.into_position(CastlingMode::Standard)
 			.unwrap()
+	}
+
+	#[test]
+	fn timed_search_deepens_and_preserves_completed_iteration() {
+		let pos = Chess::default();
+		let mut iterations = Vec::new();
+		let start = Instant::now();
+		let result = search(
+			&pos,
+			Duration::from_millis(50),
+			64,
+			&AtomicBool::new(false),
+			None,
+			|info| iterations.push((info.depth, info.pv[0])),
+		);
+		assert!(start.elapsed() < Duration::from_millis(250));
+		assert!(result.depth > 1 && result.depth < 64);
+		assert_eq!(
+			iterations.last(),
+			Some(&(result.depth, result.best_move.unwrap()))
+		);
+		assert!(pos.legal_moves().contains(&result.best_move.unwrap()));
+	}
+
+	#[test]
+	fn stop_before_search_keeps_a_legal_fallback() {
+		let pos = Chess::default();
+		let result = search(
+			&pos,
+			Duration::from_secs(30),
+			64,
+			&AtomicBool::new(true),
+			None,
+			|_| panic!("stopped search completed an iteration"),
+		);
+		assert_eq!(result.depth, 0);
+		assert!(pos.legal_moves().contains(&result.best_move.unwrap()));
 	}
 
 	#[test]

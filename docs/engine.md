@@ -1,6 +1,6 @@
 # SixtyFour engine
 
-The `custom` opponent is a self-contained classical chess engine (`apps/engine/src/search.rs`, `apps/engine/src/eval.rs`). It requires no model files, no GPU, and no network access. The same crate also provides the `minimax` opponent (`apps/engine/src/minimax.rs`). Both ship as the `sixtyfour-engine` binary, a UCI frontend the Go API spawns once per computer move; there is no engine HTTP server and no long-running engine process.
+The `custom` opponent is a self-contained classical chess engine (`apps/engine/src/search.rs`, `apps/engine/src/eval.rs`). It requires no model files, no GPU, and no network access. The same crate also provides the `minimax` opponent (`apps/engine/src/minimax.rs`). Both ship as the `sixtyfour-engine` UCI binary and as WebAssembly. Computer games run on the client: native processes in Electron, workers in the browser, and bundled workers in a mobile WebView. The API retains persistent UCI workers for server computer-game requests. See [local-computer-games.md](local-computer-games.md).
 
 The design follows the published architecture of strong hobby engines (Berserk 12, Ethereal, Viridithas): a selective alpha-beta search over a tapered handcrafted evaluation.
 
@@ -29,44 +29,25 @@ The design follows the published architecture of strong hobby engines (Berserk 1
 
 Board representation uses `shakmaty` copy-make positions with stack-allocated move lists (no heap allocation per search node). On commodity hardware the engine reaches roughly 2.5 to 4 million nodes per second in release mode; because the search prunes selectively, reached depth is not comparable to an unpruned search — strength must be judged by play quality, not raw depth.
 
-## API Integration
+## API integration
 
-`apps/api/internal/engine` (pure Go, no CGO) starts `sixtyfour-engine` for each computer move, writes a UCI script to its stdin, and reads stdout until `bestmove`:
+The API leases an exclusive persistent engine worker before committing the human move. Capacity is `max(1, min(GOMAXPROCS - 1, 4))`; saturation returns `engine busy` without changing the game. Startup prewarms workers with one thread, a 16 MB hash, and a short search that loads evaluation data. Workers retain state within a game and receive `ucinewgame` when assigned to another game or opponent.
 
 ```text
-uci
-setoption name Opponent value custom      # or minimax
-ucinewgame
+setoption name Opponent value custom
 position fen <fen>
-go movetime <ENGINE_CUSTOM_MOVETIME_MS> depth <ENGINE_CUSTOM_MAX_DEPTH>
+go movetime 500
 ```
 
-- The `Opponent` UCI option (`custom` by default, or `minimax`) selects the search. Minimax runs synchronously at depth five (or `go depth N`) and ignores time limits; custom honours `movetime` and `depth`. Legacy `dqn` requests map to custom on the Go side.
-- The API validates the FEN and rejects line breaks before writing it, so a position can never append extra UCI commands.
-- If a `position` command fails to parse, the next `go` answers `info string error invalid position` and `bestmove 0000` instead of searching the previous position; the API maps that to `invalid position`. A plain `bestmove 0000` means the side to move has no legal moves.
-- stdin stays open until `bestmove` arrives. The frontend abandons a running search on EOF without printing a move.
-- The process is killed if no move arrives within the move budget plus a 10 second startup allowance (30 seconds for minimax). A crash or hang therefore fails one move instead of the API process.
-- Diagnostics (`engine=custom depth .. score cp .. nodes ..`) come from the last `info` line and are logged by the API.
+Every application opponent has a 500 ms search budget. The API, desktop adapter, and WebAssembly adapter impose no fixed depth. Both Rust searches deepen iteratively; Default keeps the last completed iteration when time expires. UCI callers can still supply a depth or node limit for deterministic analysis. Stockfish levels select skill, with the same 500 ms budget at every level.
 
-A fresh process per move means concurrent games never share search state; a Go-side semaphore sized to `NumCPU - 1` bounds parallel searches. Process start costs a few milliseconds, small next to search time. The searcher starts with a 1 MB transposition table and grows it to the `Hash` size (64 MB) only on the first custom search, so a minimax process stays near 5 MB resident while a custom process uses about 100 MB; size container memory for `NumCPU - 1` concurrent custom searches. The `stockfish` opponent goes through the same runner with its own binary (see [stockfish.md](stockfish.md)).
+Both Rust searches run on a worker thread. Search output wakes the UCI command loop immediately, and `stop` can interrupt either search. A fresh cancellation flag belongs to each search. Successful API requests return on `bestmove` without waiting for process exit. Canceled, crashed, or timed-out workers are discarded so their output cannot become another game's reply. The API allows 10 seconds for initialization and 1.5 seconds for a search including the watchdog allowance.
 
-The API resolves the binary from `ENGINE_PATH`, then `sixtyfour-engine` on `PATH`, then `apps/engine/target/release/sixtyfour-engine` in the source tree (so `go run` and `go test` work after `just engine-bin`). The realtime hub rejects a computer move before committing it when the binary cannot be found, so a game never waits on a reply that cannot arrive.
-
-Probe the binary by hand with `just engine-dev`:
-
-```text
-setoption name Opponent value minimax
-position startpos moves e2e4
-go
-```
+FEN validation rejects malformed positions and line breaks before writing UCI commands. A failed UCI position reports `invalid position`; `bestmove 0000` reports no legal moves. The engine's move is validated again under the game row lock and must match the revision that started its search. Undo, resignation, and other state changes cancel the pending server search.
 
 ## Configuration
 
-Optional environment variables loaded from the root `.env`. The API reads them and passes them to the engine as `go movetime` / `go depth`:
-
-- `ENGINE_PATH`: path or name of the `sixtyfour-engine` binary. Defaults to `sixtyfour-engine` on `PATH`, then the local Cargo build output.
-- `ENGINE_CUSTOM_MOVETIME_MS`: time budget per move in milliseconds. Default `1000`.
-- `ENGINE_CUSTOM_MAX_DEPTH`: maximum search depth. Default `64`.
+`ENGINE_PATH` selects the native Rust binary, falling back to `sixtyfour-engine` on `PATH` and then the repository's Cargo release output. `STOCKFISH_PATH` selects Stockfish. Application search time is fixed at 500 ms; the former `ENGINE_CUSTOM_MOVETIME_MS` and `ENGINE_CUSTOM_MAX_DEPTH` variables are ignored.
 
 ## Verification
 
@@ -83,7 +64,7 @@ cargo test bench_middlegame --release -- --nocapture --ignored
 cargo test bench_eval --release -- --nocapture --ignored
 ```
 
-The API side (FEN encoding, move lookup, board formatting, and a full minimax move including process start) is benchmarked with `just api-bench`, which runs the Go benchmarks in `apps/api/internal/game` without needing a database.
+The API side (FEN encoding, move lookup, board formatting, and a full timed minimax move through a persistent worker) is benchmarked with `just api-bench`, which runs the Go benchmarks in `apps/api/internal/game` without needing a database.
 
 ## Strength Measurement (SPRT)
 
