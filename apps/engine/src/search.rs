@@ -8,7 +8,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use web_time::{Duration, Instant};
 
 use arrayvec::ArrayVec;
 use shakmaty::zobrist::Zobrist64;
@@ -267,7 +267,14 @@ pub fn see(pos: &Chess, mv: Move) -> i32 {
 
 impl Searcher {
     pub fn new() -> Self {
-        let entries = (TT_MB * 1024 * 1024 / size_of::<TtEntry>()).next_power_of_two();
+        Self::with_hash_mb(TT_MB)
+    }
+
+    /// Like [`Searcher::new`] with a transposition table of `mb` megabytes.
+    pub fn with_hash_mb(mb: usize) -> Self {
+        let entries = (mb.clamp(1, 1024) * 1024 * 1024 / size_of::<TtEntry>())
+            .next_power_of_two()
+            .max(16);
         let mut lmr = [[0i32; MAX_PLY]; MAX_PLY];
         for (d, row) in lmr.iter_mut().enumerate().skip(1) {
             for (m, cell) in row.iter_mut().enumerate().skip(1) {
@@ -348,7 +355,6 @@ impl Searcher {
         let start_time = Instant::now();
         self.deadline = start_time + movetime;
         self.aborted = false;
-        self.stop_flag.store(false, Ordering::Relaxed);
         self.nodes = 0;
         self.root_best = None;
         self.killers = [[None; 2]; MAX_PLY];

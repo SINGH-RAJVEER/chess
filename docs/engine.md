@@ -1,11 +1,11 @@
-# Classical Chess Engine
+# SixtyFour engine
 
 The `custom` opponent is a self-contained classical chess engine
 (`apps/engine/src/search.rs`, `apps/engine/src/eval.rs`). It requires no
 model files, no GPU, and no network access. The same crate also provides the
-`minimax` opponent and is linked directly into the Go API as a static
-library (C symbol `engine_best_move` in `src/lib.rs`); there is no engine
-HTTP server.
+`minimax` opponent (`apps/engine/src/minimax.rs`). Both ship as the
+`sixtyfour-engine` binary, a UCI frontend the Go API spawns once per computer
+move; there is no engine HTTP server and no long-running engine process.
 
 The design follows the published architecture of strong hobby engines
 (Berserk 12, Ethereal, Viridithas): a selective alpha-beta search over a
@@ -69,24 +69,67 @@ unpruned search — strength must be judged by play quality, not raw depth.
 
 ## API Integration
 
-The Go API calls `engine_best_move(fen, opponent, ...)` in-process through
-`apps/api/internal/engine` (CGO). The opponent selector is `0` for minimax
-(depth five, time budgets ignored) or `1` for custom; the Go bridge maps
-legacy `dqn` requests to custom. A `0` movetime or depth selects the
-`ENGINE_CUSTOM_MOVETIME_MS` / `ENGINE_CUSTOM_MAX_DEPTH` defaults. The call
-writes the best move as UCI text into the caller buffer and optionally
-returns `engine=custom depth .. score .. .. nodes` diagnostics. A fresh
-`Searcher` is constructed per call, so concurrent games never share mutable
-search state; a Go-side semaphore bounds parallel searches.
+`apps/api/internal/engine` (pure Go, no CGO) starts `sixtyfour-engine` for each
+computer move, writes a UCI script to its stdin, and reads stdout until
+`bestmove`:
 
-The `stockfish` opponent never reaches this library; the Go bridge runs the
-external Stockfish binary under the same semaphore (see
+```text
+uci
+setoption name Opponent value custom      # or minimax
+ucinewgame
+position fen <fen>
+go movetime <ENGINE_CUSTOM_MOVETIME_MS> depth <ENGINE_CUSTOM_MAX_DEPTH>
+```
+
+- The `Opponent` UCI option (`custom` by default, or `minimax`) selects the
+  search. Minimax runs synchronously at depth five (or `go depth N`) and
+  ignores time limits; custom honours `movetime` and `depth`. Legacy `dqn`
+  requests map to custom on the Go side.
+- The API validates the FEN and rejects line breaks before writing it, so a
+  position can never append extra UCI commands.
+- If a `position` command fails to parse, the next `go` answers
+  `info string error invalid position` and `bestmove 0000` instead of
+  searching the previous position; the API maps that to `invalid position`.
+  A plain `bestmove 0000` means the side to move has no legal moves.
+- stdin stays open until `bestmove` arrives. The frontend abandons a running
+  search on EOF without printing a move.
+- The process is killed if no move arrives within the move budget plus a
+  10 second startup allowance (30 seconds for minimax). A crash or hang
+  therefore fails one move instead of the API process.
+- Diagnostics (`engine=custom depth .. score cp .. nodes ..`) come from the
+  last `info` line and are logged by the API.
+
+A fresh process per move means concurrent games never share search state; a
+Go-side semaphore sized to `NumCPU - 1` bounds parallel searches. Process
+start costs a few milliseconds, small next to search time. The searcher
+starts with a 1 MB transposition table and grows it to the `Hash` size
+(64 MB) only on the first custom search, so a minimax process stays near
+5 MB resident while a custom process uses about 100 MB; size container
+memory for `NumCPU - 1` concurrent custom searches. The `stockfish`
+opponent goes through the same runner with its own binary (see
 [stockfish.md](stockfish.md)).
+
+The API resolves the binary from `ENGINE_PATH`, then `sixtyfour-engine` on
+`PATH`, then `apps/engine/target/release/sixtyfour-engine` in the source tree
+(so `go run` and `go test` work after `just engine-bin`). The realtime hub
+rejects a computer move before committing it when the binary cannot be
+found, so a game never waits on a reply that cannot arrive.
+
+Probe the binary by hand with `just engine-dev`:
+
+```text
+setoption name Opponent value minimax
+position startpos moves e2e4
+go
+```
 
 ## Configuration
 
-Optional environment variables loaded from the root `.env`:
+Optional environment variables loaded from the root `.env`. The API reads
+them and passes them to the engine as `go movetime` / `go depth`:
 
+- `ENGINE_PATH`: path or name of the `sixtyfour-engine` binary. Defaults to
+  `sixtyfour-engine` on `PATH`, then the local Cargo build output.
 - `ENGINE_CUSTOM_MOVETIME_MS`: time budget per move in milliseconds.
   Default `1000`.
 - `ENGINE_CUSTOM_MAX_DEPTH`: maximum search depth. Default `64`.
@@ -112,17 +155,18 @@ cargo test bench_middlegame --release -- --nocapture --ignored
 cargo test bench_eval --release -- --nocapture --ignored
 ```
 
-The API side (FEN encoding, move lookup, board formatting, and the
-minimax FFI call) is benchmarked with `just api-bench`, which runs the Go
-benchmarks in `apps/api/internal/game` without needing a database.
+The API side (FEN encoding, move lookup, board formatting, and a full
+minimax move including process start) is benchmarked with `just api-bench`,
+which runs the Go benchmarks in `apps/api/internal/game` without needing a
+database.
 
 ## Strength Measurement (SPRT)
 
 Tactical suites cannot prove Elo gains. Self-play SPRT against the previous
 revision is the required check before claiming a strength improvement.
 
-The engine speaks UCI in two forms. `chess --uci` (see `src/uci.rs`) is the
-full frontend for match runners such as fastchess or cutechess: worker-thread
+The engine speaks UCI in two forms. `sixtyfour-engine` (see `src/uci.rs`) is the
+full frontend served to the API and to match runners such as fastchess or cutechess: worker-thread
 search with `stop`/`ponderhit`, streaming `info`, node limits, and time
 management. `src/bin/uci.rs` is a minimal driver kept deliberately small so
 it also compiles against old revisions, where the newer search APIs do not
@@ -140,7 +184,7 @@ Compare two ready-made binaries (positional arguments after `--`):
 
 ```bash
 just sprt -- --engine-a ./apps/engine/target/release/uci \
-    --engine-b /tmp/chess-baseline/uci \
+    --engine-b /tmp/sixtyfour-baseline/uci \
     --book apps/engine/book/openings.book \
     --movetime 100 --elo0 0 --elo1 10 --max-games 5000 --concurrency 8
 ```

@@ -1,12 +1,21 @@
 [package]
-name = "chess"
+name = "sixtyfour"
 version = "0.1.0"
 edition = "2021"
+default-run = "sixtyfour-engine"
 
 [lib]
-name = "chess"
-crate-type = ["staticlib", "cdylib", "rlib"]
+name = "sixtyfour"
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "sixtyfour-engine"
+path = "src/main.rs"
 
 [dependencies]
 arrayvec = "0.7"
 shakmaty = "0.30.1"
+web-time = "1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"

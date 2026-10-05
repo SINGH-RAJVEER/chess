@@ -193,8 +193,8 @@ fn main() {
         };
         match cmd {
             "uci" => {
-                writeln!(out, "id name ChessCustom").unwrap();
-                writeln!(out, "id author chess contributors").unwrap();
+                writeln!(out, "id name SixtyFourCustom").unwrap();
+                writeln!(out, "id author SixtyFour contributors").unwrap();
                 writeln!(out, "option name Hash type spin default 64 min 1 max 1024").unwrap();
                 writeln!(out, "option name Threads type spin default 1 min 1 max 1").unwrap();
                 writeln!(

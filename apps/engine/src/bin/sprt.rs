@@ -8,7 +8,7 @@
 //! ```sh
 //! cargo run --release --bin sprt -- \
 //!     --engine-a ./target/release/uci \
-//!     --engine-b /tmp/opencode/chess-baseline/apps/engine/target/release/uci \
+//!     --engine-b /tmp/opencode/sixtyfour-baseline/apps/engine/target/release/uci \
 //!     --book book/openings.book --movetime 100 --elo0 0 --elo1 10 \
 //!     --concurrency 8 --max-games 2000
 //! ```

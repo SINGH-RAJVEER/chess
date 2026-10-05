@@ -1,10 +1,10 @@
-//! Standalone UCI frontend for engine testing tools (fastchess,
-//! cutechess, OpenBench) and manual probing.
+//! `sixtyfour-engine`: the UCI frontend served to the Go API, engine testing
+//! tools (fastchess, cutechess, OpenBench), and manual probing.
 //!
-//! The API no longer spawns an HTTP engine server; computer moves are served
-//! in-process through the `cdylib` in `lib.rs`. This binary only speaks UCI
-//! on stdin/stdout and is also used by the `just sprt*` recipes.
+//! The API spawns this binary once per computer move and talks to it over
+//! stdin/stdout. The `just sprt*` recipes use the lighter `uci` shim in
+//! `src/bin/uci.rs` instead.
 
 fn main() -> std::io::Result<()> {
-    chess::uci::run()
+    sixtyfour::uci::run()
 }

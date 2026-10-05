@@ -1,5 +1,5 @@
 {
-	"name": "@chess/engine",
+	"name": "@sixtyfour/engine",
 	"private": true,
 	"scripts": {
 		"dev": "cargo run",

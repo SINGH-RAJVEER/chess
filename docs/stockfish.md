@@ -33,9 +33,10 @@ strong for beginners. Level 4 is the default when no level is sent.
 2. If no Stockfish binary can be resolved, the hub rejects the move with
    `stockfish is not installed on the server` before committing it. This
    avoids leaving the game waiting on a reply that cannot arrive.
-3. The engine reply reuses the in-process engine path: the FEN is validated
+3. The engine reply reuses the `sixtyfour-engine` path: the FEN is validated
    in Go first, because Stockfish may crash on malformed input. The search
-   then takes a slot from the shared `NumCPU - 1` semaphore.
+   then takes a slot from the shared `NumCPU - 1` semaphore and runs through
+   the same UCI process runner.
 4. A fresh Stockfish process is spawned for each move with `Threads 1` and
    `Hash 16`. No skill settings or hash contents carry over between games,
    and startup costs roughly 150 ms. The process is killed if it has not
@@ -61,7 +62,7 @@ The API resolves the binary from `STOCKFISH_PATH`, falling back to
 
 - Web: the opponent switch on the computer page includes Stockfish. When it
   is selected, a level select appears below it. Both choices are stored in
-  local storage (`chess_computer_opponent`, `chess_computer_level`).
+  local storage (`sixtyfour_computer_opponent`, `sixtyfour_computer_level`).
 - Mobile: the home screen opponent picker includes Stockfish with a 1 to 8
   level row. The level is passed to the game screen as the `level` route
   parameter.
@@ -69,7 +70,7 @@ The API resolves the binary from `STOCKFISH_PATH`, falling back to
 ## Verification
 
 ```bash
-cd apps/api && CGO_ENABLED=1 go test ./internal/engine/
+just engine-bin && cd apps/api && go test ./internal/engine/
 ```
 
 The Stockfish tests cover a legal move at levels 1 and 8, invalid FEN, a

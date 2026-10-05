@@ -1,10 +1,15 @@
-//! UCI protocol frontend for engine testing tools (fastchess, cutechess,
-//! OpenBench). Run with `chess --uci`.
+//! UCI protocol frontend, served by the `sixtyfour-engine` binary to the Go API
+//! and to engine testing tools (fastchess, cutechess, OpenBench).
 //!
 //! The search runs on a worker thread so `stop`, `isready`, `ponderhit` and
 //! `quit` stay responsive while thinking. Info lines stream back over a
 //! channel; the completed [`Searcher`] is handed back with the result so the
 //! transposition table and histories persist across moves.
+//!
+//! Both opponents use iterative deepening on the search thread. A `position`
+//! command that fails to parse makes the next `go` answer
+//! `info string error invalid position` and `bestmove 0000` instead of
+//! searching a stale position.
 
 use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,13 +22,15 @@ use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
 use shakmaty::{CastlingMode, Chess, Move, Position};
 
+use crate::minimax;
 use crate::search::{self, IterationInfo, Searcher};
 
-const ENGINE_NAME: &str = "chess";
+const ENGINE_NAME: &str = "SixtyFour";
 const ENGINE_AUTHOR: &str = "Rajveer Singh";
 const MAX_DEPTH: i32 = 64;
 const INFINITE_MOVETIME: Duration = Duration::from_secs(86400);
 const DEFAULT_MOVE_OVERHEAD_MS: u64 = 10;
+const DEFAULT_HASH_MB: usize = 64;
 
 fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
@@ -49,14 +56,34 @@ struct ResolvedLimits {
     node_limit: Option<u64>,
 }
 
+/// Engine behind `go`, selected with `setoption name Opponent`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Opponent {
+    #[default]
+    Custom,
+    Minimax,
+}
+
+impl Opponent {
+    fn parse(value: &str) -> Option<Self> {
+        match value.to_ascii_lowercase().as_str() {
+            "custom" => Some(Self::Custom),
+            "minimax" => Some(Self::Minimax),
+            _ => None,
+        }
+    }
+}
+
 struct EngineOptions {
     move_overhead_ms: u64,
+    opponent: Opponent,
 }
 
 impl Default for EngineOptions {
     fn default() -> Self {
         Self {
             move_overhead_ms: DEFAULT_MOVE_OVERHEAD_MS,
+            opponent: Opponent::default(),
         }
     }
 }
@@ -246,6 +273,8 @@ fn spawn_search(
     pos: Chess,
     resolved: ResolvedLimits,
     out_tx: Sender<SearchOutput>,
+	wake: Sender<String>,
+	opponent: Opponent,
 ) -> (JoinHandle<()>, Arc<AtomicBool>) {
     searcher.set_node_limit(resolved.node_limit);
     // A fresh flag per search closes the race where `stop` arrives between
@@ -254,10 +283,15 @@ fn spawn_search(
     searcher.set_stop_flag(Arc::clone(&stop));
     let stop_for_thread = Arc::clone(&stop);
     let handle = thread::spawn(move || {
-        let result =
-            searcher.search_with_reporter(&pos, resolved.movetime, resolved.max_depth, |info| {
+        let mut report = |info: &IterationInfo| {
                 let _ = out_tx.send(SearchOutput::Info(format_info(info)));
-            });
+				let _ = wake.send(String::new());
+		};
+		let result = if opponent == Opponent::Minimax {
+			minimax::search(&pos, resolved.movetime, resolved.max_depth, &stop_for_thread, resolved.node_limit, &mut report)
+		} else {
+			searcher.search_with_reporter(&pos, resolved.movetime, resolved.max_depth, report)
+		};
         // Ponder move: second move of the final principal variation.
         let pv = searcher.collect_pv(&pos);
         let ponder = pv.get(1).copied().filter(|m| {
@@ -276,6 +310,7 @@ fn spawn_search(
             score: result.score,
             depth: result.depth,
         })));
+		let _ = wake.send(String::new());
         drop(stop_for_thread);
     });
     (handle, stop)
@@ -303,6 +338,7 @@ pub fn run() -> std::io::Result<()> {
     // Forwards stdin lines to the main loop so info output keeps streaming.
     // (`Stdin` is shared behind a mutex; the lock itself must stay local.)
     let (cmd_tx, cmd_rx) = mpsc::channel::<String>();
+    let input_tx = cmd_tx.clone();
     thread::spawn(move || {
         let stdin = std::io::stdin();
         let mut input = stdin.lock();
@@ -312,19 +348,27 @@ pub fn run() -> std::io::Result<()> {
             match input.read_line(&mut line) {
                 Ok(0) => break, // EOF
                 Ok(_) => {
-                    if cmd_tx.send(line.clone()).is_err() {
+                    if input_tx.send(line.clone()).is_err() {
                         break;
                     }
                 }
                 Err(_) => break,
             }
         }
+		let _ = input_tx.send("quit".into());
     });
 
     let mut out = std::io::BufWriter::new(std::io::stdout());
-    // `None` while a search owns the searcher on its worker thread.
-    let mut searcher: Option<Searcher> = Some(Searcher::new());
+    // `None` while a search owns the searcher on its worker thread. It starts
+    // with a 1 MB table and grows to `hash_mb` on the first alpha-beta `go`,
+    // so a process that only runs minimax (one API move) stays small.
+    let mut searcher: Option<Searcher> = Some(Searcher::with_hash_mb(1));
+    let mut hash_mb = DEFAULT_HASH_MB;
+    let mut hash_sized = false;
     let mut pos = Chess::default();
+    // False after a `position` command that failed to parse, until the next
+    // valid one; `go` must not search the stale position meanwhile.
+    let mut position_ok = true;
     let mut options = EngineOptions::default();
     let mut active: Option<ActiveSearch> = None;
 
@@ -393,16 +437,9 @@ pub fn run() -> std::io::Result<()> {
             }
         }
 
-        let searching = active.as_ref().is_some_and(|s| s.handle.is_some());
-        let timeout = if searching {
-            Duration::from_millis(5)
-        } else {
-            Duration::from_millis(100)
-        };
-        let line = match cmd_rx.recv_timeout(timeout) {
+        let line = match cmd_rx.recv() {
             Ok(line) => line,
-            Err(mpsc::RecvTimeoutError::Timeout) => continue,
-            Err(mpsc::RecvTimeoutError::Disconnected) => break, // stdin closed
+            Err(_) => break,
         };
 
         let line = line.trim();
@@ -425,6 +462,7 @@ pub fn run() -> std::io::Result<()> {
                     DEFAULT_MOVE_OVERHEAD_MS
                 );
                 println!("option name Ponder type check default true");
+                println!("option name Opponent type combo default custom var custom var minimax");
                 println!("uciok");
                 let _ = out.flush();
             }
@@ -451,6 +489,8 @@ pub fn run() -> std::io::Result<()> {
                             (searcher.as_mut(), value.parse::<usize>())
                         {
                             searcher.set_hash_mb(mb);
+                            hash_mb = mb;
+                            hash_sized = true;
                         }
                     }
                     "clear hash" => {
@@ -464,6 +504,10 @@ pub fn run() -> std::io::Result<()> {
                         }
                     }
                     "ponder" => {}
+                    "opponent" => match Opponent::parse(value) {
+                        Some(opponent) => options.opponent = opponent,
+                        None => eprintln!("[uci] unknown opponent: {value}"),
+                    },
                     _ => eprintln!("[uci] unknown option: {name}"),
                 }
             }
@@ -477,13 +521,25 @@ pub fn run() -> std::io::Result<()> {
             "position" => {
                 if active.is_none() {
                     match parse_position(args) {
-                        Some(next) => pos = next,
-                        None => eprintln!("[uci] invalid position: {args}"),
+                        Some(next) => {
+                            pos = next;
+                            position_ok = true;
+                        }
+                        None => {
+                            position_ok = false;
+                            eprintln!("[uci] invalid position: {args}");
+                        }
                     }
                 }
             }
             "go" => {
                 if active.is_some() {
+                    continue;
+                }
+                if !position_ok {
+                    println!("info string error invalid position");
+                    println!("bestmove 0000");
+                    let _ = out.flush();
                     continue;
                 }
                 if pos.legal_moves().is_empty() {
@@ -495,10 +551,14 @@ pub fn run() -> std::io::Result<()> {
                 let pondering = limits.ponder;
                 let resolved = resolve_limits(&limits, &pos, &options);
                 let (out_tx, out_rx) = mpsc::channel::<SearchOutput>();
-                let Some(owned) = searcher.take() else {
+                let Some(mut owned) = searcher.take() else {
                     continue;
                 };
-                let (handle, stop) = spawn_search(owned, pos.clone(), resolved, out_tx);
+                if !hash_sized && options.opponent == Opponent::Custom {
+                    owned.set_hash_mb(hash_mb);
+                    hash_sized = true;
+                }
+                let (handle, stop) = spawn_search(owned, pos.clone(), resolved, out_tx, cmd_tx.clone(), options.opponent);
                 active = Some(ActiveSearch {
                     handle: Some(handle),
                     out_rx,
@@ -543,7 +603,7 @@ pub fn run() -> std::io::Result<()> {
                             let Some(owned) = outcome.searcher.take() else {
                                 continue;
                             };
-                            let (handle, stop) = spawn_search(owned, pos.clone(), resolved, out_tx);
+                            let (handle, stop) = spawn_search(owned, pos.clone(), resolved, out_tx, cmd_tx.clone(), options.opponent);
                             search.handle = Some(handle);
                             search.out_rx = out_rx;
                             search.stop = stop;
@@ -601,6 +661,13 @@ mod tests {
         assert!(parse_position("fen not-a-fen").is_none());
         assert!(parse_position("startpos moves e2e9").is_none());
         assert!(parse_position("bogus").is_none());
+    }
+
+    #[test]
+    fn parses_opponent_option() {
+        assert_eq!(Opponent::parse("Minimax"), Some(Opponent::Minimax));
+        assert_eq!(Opponent::parse("custom"), Some(Opponent::Custom));
+        assert_eq!(Opponent::parse("stockfish"), None);
     }
 
     #[test]

@@ -23,8 +23,8 @@ clients keep playing without errors.
 ## Why It Was Removed
 
 Serving DQN required a long-lived ONNX Runtime session with CUDA fallback,
-which fit a stateful sidecar process but not the in-process library model:
+which fit a stateful sidecar process but not a stateless per-move engine:
 every search would have reloaded the model and reinitialized the GPU
 session. The custom alpha-beta engine (see docs/engine.md) is stateless per
 call and within a few hundred Elo for casual play, so it became the default
-strong opponent while operations collapsed to a single API binary.
+strong opponent and the long-running engine service was retired.
