@@ -2,12 +2,64 @@ package game
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
-	"github.com/rajveer/chess/apps/api/internal/engine"
-	"github.com/rajveer/chess/apps/api/internal/testdb"
+	"github.com/rajveer/sixtyfour/apps/api/internal/engine"
+	"github.com/rajveer/sixtyfour/apps/api/internal/testdb"
 )
+
+func TestEngineCapacityRejectedBeforeCommit(t *testing.T) {
+	service, ctx := openService(t)
+	id := resetAndLoad(t, service, ctx, "vs_computer", 0)
+	var leases []*engine.Lease
+	defer func() { for _, lease := range leases { lease.Release() } }()
+	for {
+		lease, err := engine.Acquire(ctx, engine.Options{Opponent:"minimax"}, 0)
+		if errors.Is(err, engine.ErrBusy) { break }
+		if err != nil { t.Fatal(err) }
+		leases = append(leases, lease)
+	}
+	if _, err := service.MakeMove(ctx, id, 52, 36, "", engine.Options{}); !errors.Is(err, engine.ErrBusy) { t.Fatalf("expected busy, got %v", err) }
+	board, err := service.GetBoard(ctx,"",&id,"")
+	if err != nil { t.Fatal(err) }
+	if board.MoveCount != 0 || board.Turn != White { t.Fatalf("busy engine committed human move: %+v",board) }
+}
+
+func TestUndoRejectsOldEngineRevision(t *testing.T) {
+	service, ctx := openService(t)
+	id := resetAndLoad(t, service, ctx, "vs_computer", 0)
+	if _, err := service.MakeMove(ctx,id,52,36,"",engine.Options{}); err != nil { t.Fatal(err) }
+	board, err := service.GetBoard(ctx,"",&id,"")
+	if err != nil { t.Fatal(err) }
+	oldRevision := board.Revision
+	if _,err := service.Undo(ctx,id); err != nil { t.Fatal(err) }
+	if _,err := service.makeMove(ctx,id,12,28,"",engine.Options{},true,&oldRevision); err == nil || err.Error() != "stale engine result" { t.Fatalf("old engine revision accepted: %v",err) }
+	time.Sleep(600*time.Millisecond)
+	board, err = service.GetBoard(ctx,"",&id,"")
+	if err != nil { t.Fatal(err) }
+	if board.MoveCount != 0 || board.Revision <= oldRevision { t.Fatalf("stale engine changed board: %+v",board) }
+}
+
+func TestMoveEmitsOneCommittedSnapshot(t *testing.T) {
+	service, ctx := openService(t)
+	id := resetAndLoad(t, service, ctx, "vs_player", 10)
+	var snapshots []Snapshot
+	service.OnSnapshot = func(snapshot Snapshot) { snapshots = append(snapshots,snapshot) }
+	result, err := service.MakeMove(ctx,id,52,36,"",engine.Options{})
+	if err != nil { t.Fatal(err) }
+	if len(snapshots)!=1 { t.Fatalf("snapshots=%d",len(snapshots)) }
+	board := result["board"].(BoardResponse)
+	if board.MoveCount!=1 || board.Revision!=1 || len(board.LegalMoves[12])==0 || board.Latency==nil { t.Fatalf("invalid committed snapshot: %+v",board) }
+}
+
+func TestArchiveValidation(t *testing.T) {
+	state := ArchivedGame{Version:1,ID:1,Revision:2,Moves:[]string{"e4","e5"},Opponent:"minimax",Level:4}
+	if err := ValidateArchive(state); err != nil { t.Fatal(err) }
+	state.Moves = []string{"e4","e4"}
+	if err := ValidateArchive(state); err == nil { t.Fatal("illegal archive accepted") }
+}
 
 func openService(t *testing.T) (*Service, context.Context) {
 	t.Helper()

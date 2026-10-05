@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rajveer/chess/apps/api/internal/testdb"
+	"github.com/rajveer/sixtyfour/apps/api/internal/testdb"
 )
 
 func TestPasswordHashIsBetterAuthCompatible(t *testing.T) {

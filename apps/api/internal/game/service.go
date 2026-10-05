@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"log"
 	"math/rand/v2"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	libchess "github.com/notnil/chess"
-	"github.com/rajveer/chess/apps/api/internal/engine"
+	"github.com/rajveer/sixtyfour/apps/api/internal/engine"
 )
 
 type Service struct {
@@ -19,18 +20,35 @@ type Service struct {
 	// OnUpdate is invoked (in a separate goroutine) after every committed
 	// game mutation so realtime subscribers can push fresh state without
 	// polling. Set by the realtime hub; nil when unused.
-	OnUpdate func(gameID int)
+	OnUpdate   func(gameID int)
+	OnSnapshot func(Snapshot)
+	mu         sync.Mutex
+	pending    map[int]*engineJob
 }
 
+type engineJob struct {
+	cancel   context.CancelFunc
+	revision int64
+}
+
+type searchTimingKey struct{}
+
 func NewService(db *pgxpool.Pool) *Service {
-	return &Service{db: db}
+	return &Service{db: db, pending: make(map[int]*engineJob)}
 }
 
 func (service *Service) notify(gameID int) {
+	service.CancelEngine(gameID)
 	if service.OnUpdate == nil {
 		return
 	}
 	go service.OnUpdate(gameID)
+}
+
+func (service *Service) CancelEngine(gameID int) {
+	service.mu.Lock()
+	if job := service.pending[gameID]; job != nil { job.cancel() }
+	service.mu.Unlock()
 }
 
 // GetGame loads a game row without pieces or moves. Used for
@@ -140,10 +158,11 @@ func (service *Service) GetBoard(ctx context.Context, mode string, gameID *int, 
 			remaining = game.BlackTimeRemaining
 		}
 		if remaining-(now-*game.LastMoveTime) <= 0 {
-			if _, err := service.db.Exec(ctx, `UPDATE games SET status='Timeout',updated_at=$1 WHERE id=$2 AND status='Ongoing'`, now, game.ID); err != nil {
+			if _, err := service.db.Exec(ctx, `UPDATE games SET status='Timeout',revision=revision+1,updated_at=$1 WHERE id=$2 AND status='Ongoing'`, now, game.ID); err != nil {
 				return BoardResponse{}, err
 			}
 			game.Status = "Timeout"
+			game.Revision++
 		}
 	}
 	moves, err := loadMoves(ctx, service.db, game.ID)
@@ -151,16 +170,6 @@ func (service *Service) GetBoard(ctx context.Context, mode string, gameID *int, 
 		return BoardResponse{}, err
 	}
 	response := formatBoard(*game, pieces, moves, playerID, now)
-	if game.Status == "Ongoing" {
-		var last *MoveRecord
-		if len(moves) > 0 {
-			last = &moves[len(moves)-1]
-		}
-		_, chessErr := positionFor(pieces, game.CurrentTurn, last, game.HalfMoveClock)
-		if chessErr == nil {
-			response.IsCheck = isInCheck(pieces, game.CurrentTurn)
-		}
-	}
 	return response, nil
 }
 
@@ -229,6 +238,30 @@ func formatBoard(game Game, pieces []Piece, moves []MoveRecord, playerID string,
 		last := moves[len(moves)-1]
 		response.LastMove = &MoveCoordinates{last.FromSquare, last.ToSquare}
 	}
+	response.Revision = game.Revision
+	response.LegalMoves = make(map[int][]int)
+	if game.Status == "Ongoing" {
+		var last *MoveRecord
+		if len(moves) > 0 {
+			last = &moves[len(moves)-1]
+		}
+		if position, err := positionFor(pieces, game.CurrentTurn, last, game.HalfMoveClock); err == nil {
+			for _, move := range position.ValidMoves() {
+				from, to := indexFromAlgebraic(move.S1().String()), indexFromAlgebraic(move.S2().String())
+				found := false
+				for _, target := range response.LegalMoves[from] {
+					if target == to {
+						found = true
+						break
+					}
+				}
+				if !found {
+					response.LegalMoves[from] = append(response.LegalMoves[from], to)
+				}
+			}
+			response.IsCheck = isInCheck(pieces, game.CurrentTurn)
+		}
+	}
 	return response
 }
 
@@ -277,10 +310,11 @@ func (service *Service) ValidMoves(ctx context.Context, gameID, from int) ([]int
 }
 
 func (service *Service) MakeMove(ctx context.Context, gameID, from, to int, promotion PieceType, opponent engine.Options) (map[string]any, error) {
-	return service.makeMove(ctx, gameID, from, to, promotion, opponent, false)
+	return service.makeMove(ctx, gameID, from, to, promotion, opponent, false, nil)
 }
 
-func (service *Service) makeMove(ctx context.Context, gameID, from, to int, promotion PieceType, opponent engine.Options, engine bool) (map[string]any, error) {
+func (service *Service) makeMove(ctx context.Context, gameID, from, to int, promotion PieceType, opponent engine.Options, isEngine bool, expectedRevision *int64) (map[string]any, error) {
+	started := time.Now()
 	tx, err := service.db.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -295,6 +329,12 @@ func (service *Service) makeMove(ctx context.Context, gameID, from, to int, prom
 	}
 	if game.Status != "Ongoing" {
 		return nil, errors.New("Game is not ongoing")
+	}
+	if expectedRevision != nil && game.Revision != *expectedRevision {
+		return nil, errors.New("stale engine result")
+	}
+	if !isEngine && game.Mode == "vs_computer" && game.CurrentTurn != White {
+		return nil, errors.New("wait for the engine")
 	}
 	pieces, err := loadPieces(ctx, tx, gameID)
 	if err != nil {
@@ -316,6 +356,21 @@ func (service *Service) makeMove(ctx context.Context, gameID, from, to int, prom
 	if legal == nil {
 		return nil, errors.New("Invalid move")
 	}
+	var lease *engine.Lease
+	acquireStarted := time.Now()
+	transferred := false
+	if !isEngine && game.Mode == "vs_computer" {
+		lease, err = engine.Acquire(ctx, opponent, gameID)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if !transferred {
+				lease.Release()
+			}
+		}()
+	}
+	acquireMS := float64(time.Since(acquireStarted).Microseconds()) / 1000
 	var moving Piece
 	found := false
 	for _, piece := range pieces {
@@ -379,16 +434,30 @@ func (service *Service) makeMove(ctx context.Context, gameID, from, to int, prom
 	if game.CurrentTurn == White {
 		next = Black
 	}
-	updatedPieces, err := loadPieces(ctx, tx, gameID)
-	if err != nil {
-		return nil, err
+	updatedPieces := make([]Piece, 0, len(pieces))
+	for _, piece := range pieces {
+		if captured != "" && piece.Square == captureSquare && piece.Color != moving.Color {
+			continue
+		}
+		if piece.ID == moving.ID {
+			piece.Square, piece.PieceType, piece.HasMoved = to, finalType, true
+		}
+		if isCastle && piece.Color == moving.Color && piece.PieceType == Rook && row(piece.Square) == row(from) {
+			rookFrom, rookTo := square(row(from), 0), square(row(from), 3)
+			if legal.HasTag(libchess.KingSideCastle) {
+				rookFrom, rookTo = square(row(from), 7), square(row(from), 5)
+			}
+			if piece.Square == rookFrom {
+				piece.Square, piece.HasMoved = rookTo, true
+			}
+		}
+		updatedPieces = append(updatedPieces, piece)
 	}
 	currentRecord := MoveRecord{FromSquare: from, ToSquare: to, PieceType: moving.PieceType, PieceColor: moving.Color}
-	nextGame, err := positionFor(updatedPieces, next, &currentRecord, game.HalfMoveClock)
-	if err != nil {
+	if err := chessGame.Move(legal); err != nil {
 		return nil, err
 	}
-	status := gameStatus(nextGame)
+	status := gameStatus(chessGame)
 	halfMove := game.HalfMoveClock + 1
 	if moving.PieceType == Pawn || captured != "" {
 		halfMove = 0
@@ -401,28 +470,61 @@ func (service *Service) makeMove(ctx context.Context, gameID, from, to int, prom
 		status = "ThreefoldRepetition"
 	}
 	check := status == "Ongoing" && isInCheck(updatedPieces, next)
-	if _, err := tx.Exec(ctx, `UPDATE games SET current_turn=$1,status=$2,updated_at=$3,last_move_time=$3,white_time_remaining=$4,black_time_remaining=$5,draw_offered_by=NULL,half_move_clock=$6 WHERE id=$7`, next, status, now, whiteTime, blackTime, halfMove, gameID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE games SET current_turn=$1,status=$2,updated_at=$3,last_move_time=$3,white_time_remaining=$4,black_time_remaining=$5,draw_offered_by=NULL,half_move_clock=$6,revision=revision+1 WHERE id=$7`, next, status, now, whiteTime, blackTime, halfMove, gameID); err != nil {
 		return nil, err
 	}
+	commitStarted := time.Now()
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
-	service.notify(gameID)
+	commitMS := float64(time.Since(commitStarted).Microseconds()) / 1000
+	game.CurrentTurn, game.Status, game.HalfMoveClock = next, status, halfMove
+	game.WhiteTimeRemaining, game.BlackTimeRemaining, game.LastMoveTime = whiteTime, blackTime, &now
+	game.DrawOfferedBy = nil
+	game.Revision++
+	currentRecord.CapturedPieceType = captured
+	currentRecord.CreatedAt = now
+	board := formatBoard(*game, updatedPieces, append(moves, currentRecord), "", now)
+	searchMS, _ := ctx.Value(searchTimingKey{}).(float64)
+	board.Latency = &MoveTiming{ServerMS: float64(time.Since(started).Microseconds()) / 1000, AcquireMS: acquireMS, CommitMS: commitMS, SearchMS: searchMS}
+	if service.OnSnapshot != nil {
+		service.OnSnapshot(Snapshot{Board: board, WhitePlayerID: game.WhitePlayerID, BlackPlayerID: game.BlackPlayerID})
+	} else {
+		service.notify(gameID)
+	}
 	result := map[string]any{"success": true, "nextTurn": next, "status": status, "captured": captured != "", "isCheck": check, "isCheckmate": status == "Checkmate", "isCastle": isCastle}
 	if promoted != "" {
 		result["promotion"] = promoted
 	}
-	if !engine && game.Mode == "vs_computer" && next == Black && status == "Ongoing" {
-		go service.requestEngineMove(gameID, piecesToFEN(updatedPieces, next, &currentRecord, halfMove), opponent)
+	result["board"] = board
+	log.Printf("move latency game=%d revision=%d engine=%t server_ms=%.3f acquire_ms=%.3f commit_ms=%.3f", gameID, game.Revision, isEngine, board.Latency.ServerMS, acquireMS, commitMS)
+	if lease != nil && next == Black && status == "Ongoing" {
+		transferred = true
+		searchCtx, cancel := context.WithCancel(context.Background())
+		job := &engineJob{cancel: cancel, revision: game.Revision}
+		service.mu.Lock()
+		service.pending[gameID] = job
+		service.mu.Unlock()
+		go service.requestEngineMove(searchCtx, gameID, piecesToFEN(updatedPieces, next, &currentRecord, halfMove), opponent, lease, job)
 	}
 	return result, nil
 }
 
-func (service *Service) requestEngineMove(gameID int, fen string, opponent engine.Options) {
+func (service *Service) requestEngineMove(ctx context.Context, gameID int, fen string, opponent engine.Options, lease *engine.Lease, job *engineJob) {
+	defer lease.Release()
+	defer job.cancel()
+	defer func() {
+		service.mu.Lock()
+		if service.pending[gameID] == job {
+			delete(service.pending, gameID)
+		}
+		service.mu.Unlock()
+	}()
+	started := time.Now()
 	if opponent.Opponent == "" {
 		opponent.Opponent = "minimax"
 	}
-	bestMove, info, err := engine.BestMove(fen, opponent)
+	bestMove, info, err := lease.Search(ctx, fen)
 	if err != nil {
 		log.Printf("engine request for game %d failed: %v", gameID, err)
 		return
@@ -438,7 +540,9 @@ func (service *Service) requestEngineMove(gameID int, fen string, opponent engin
 	if len(bestMove) == 5 {
 		promotion = map[byte]PieceType{'q': Queen, 'r': Rook, 'b': Bishop, 'n': Knight}[bestMove[4]]
 	}
-	if _, err := service.makeMove(context.Background(), gameID, indexFromAlgebraic(bestMove[:2]), indexFromAlgebraic(bestMove[2:4]), promotion, opponent, true); err != nil {
+	log.Printf("engine latency game=%d revision=%d search_ms=%.3f", gameID, job.revision, float64(time.Since(started).Microseconds())/1000)
+	ctx = context.WithValue(ctx, searchTimingKey{}, float64(time.Since(started).Microseconds())/1000)
+	if _, err := service.makeMove(ctx, gameID, indexFromAlgebraic(bestMove[:2]), indexFromAlgebraic(bestMove[2:4]), promotion, opponent, true, &job.revision); err != nil {
 		log.Printf("engine move for game %d could not be applied: %v", gameID, err)
 	}
 }
@@ -605,7 +709,7 @@ func (service *Service) Undo(ctx context.Context, gameID int) (map[string]any, e
 	if _, err := tx.Exec(ctx, `DELETE FROM moves WHERE id=$1`, last.ID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE games SET current_turn=$1,status='Ongoing',updated_at=$2,draw_offered_by=NULL WHERE id=$3`, last.PieceColor, time.Now().UnixMilli(), gameID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE games SET current_turn=$1,status='Ongoing',revision=revision+1,updated_at=$2,draw_offered_by=NULL WHERE id=$3`, last.PieceColor, time.Now().UnixMilli(), gameID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -630,7 +734,7 @@ func (service *Service) Resign(ctx context.Context, gameID int, color Color) (ma
 	if color == White {
 		winner = Black
 	}
-	_, err = service.db.Exec(ctx, `UPDATE games SET status='Resignation',updated_at=$1 WHERE id=$2`, time.Now().UnixMilli(), gameID)
+	_, err = service.db.Exec(ctx, `UPDATE games SET status='Resignation',revision=revision+1,updated_at=$1 WHERE id=$2`, time.Now().UnixMilli(), gameID)
 	if err == nil {
 		service.notify(gameID)
 	}
@@ -657,7 +761,7 @@ func (service *Service) setDraw(ctx context.Context, gameID int, offer *Color, s
 	if game.Status != "Ongoing" {
 		return nil, errors.New("Game is not ongoing")
 	}
-	_, err = service.db.Exec(ctx, `UPDATE games SET status=$1,draw_offered_by=$2,updated_at=$3 WHERE id=$4`, status, offer, time.Now().UnixMilli(), gameID)
+	_, err = service.db.Exec(ctx, `UPDATE games SET status=$1,draw_offered_by=$2,revision=revision+1,updated_at=$3 WHERE id=$4`, status, offer, time.Now().UnixMilli(), gameID)
 	if err == nil {
 		service.notify(gameID)
 	}

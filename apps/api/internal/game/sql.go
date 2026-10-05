@@ -7,13 +7,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const gameColumns = `id,current_turn,status,mode,time_control,increment,white_time_remaining,black_time_remaining,last_move_time,white_player_id,black_player_id,draw_offered_by,half_move_clock,created_at,updated_at`
+const gameColumns = `id,current_turn,status,mode,time_control,increment,white_time_remaining,black_time_remaining,last_move_time,white_player_id,black_player_id,draw_offered_by,half_move_clock,created_at,updated_at,revision`
 
 func scanGame(row pgx.Row) (*Game, error) {
 	game := new(Game)
 	err := row.Scan(&game.ID, &game.CurrentTurn, &game.Status, &game.Mode, &game.TimeControl, &game.Increment,
 		&game.WhiteTimeRemaining, &game.BlackTimeRemaining, &game.LastMoveTime, &game.WhitePlayerID,
-		&game.BlackPlayerID, &game.DrawOfferedBy, &game.HalfMoveClock, &game.CreatedAt, &game.UpdatedAt)
+		&game.BlackPlayerID, &game.DrawOfferedBy, &game.HalfMoveClock, &game.CreatedAt, &game.UpdatedAt, &game.Revision)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

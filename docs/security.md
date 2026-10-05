@@ -6,9 +6,12 @@
   value.
 - The API is the trust boundary for game rules and authentication.
 - PostgreSQL is private infrastructure and must not be browser-accessible.
-- The engine is a static library linked into the API process: it accepts FEN
-  and opponent values only across the in-process CGO boundary and is never
-  reachable over the network, so it needs no CORS policy or firewall rule.
+- The engines (`sixtyfour-engine` and Stockfish) are child processes of the API
+  that read UCI commands from stdin. They are never reachable over the
+  network, so they need no CORS policy or firewall rule. The API validates
+  every FEN and rejects line breaks before writing it into the UCI script,
+  so client input cannot inject engine commands, and each process is killed
+  once its move budget runs out.
 - The retired ONNX model and training checkpoints are inert research
   artifacts, not secrets.
 

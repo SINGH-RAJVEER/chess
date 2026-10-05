@@ -2,18 +2,23 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"github.com/rajveer/chess/apps/api/internal/auth"
-	"github.com/rajveer/chess/apps/api/internal/config"
-	"github.com/rajveer/chess/apps/api/internal/database"
-	"github.com/rajveer/chess/apps/api/internal/game"
-	"github.com/rajveer/chess/apps/api/internal/httpapi"
-	"github.com/rajveer/chess/apps/api/internal/realtime"
+	"github.com/rajveer/sixtyfour/apps/api/internal/auth"
+	"github.com/rajveer/sixtyfour/apps/api/internal/config"
+	"github.com/rajveer/sixtyfour/apps/api/internal/database"
+	"github.com/rajveer/sixtyfour/apps/api/internal/engine"
+	"github.com/rajveer/sixtyfour/apps/api/internal/game"
+	"github.com/rajveer/sixtyfour/apps/api/internal/httpapi"
+	"github.com/rajveer/sixtyfour/apps/api/internal/realtime"
 )
 
 func main() {
@@ -44,6 +49,8 @@ func main() {
 		WebOrigin:    config.WebOrigin,
 	})
 	gameService := game.NewService(db)
+	engine.Warm(ctx)
+	defer engine.Close()
 	var broker realtime.Broker = realtime.NewMemoryBroker()
 	if config.RedisURL != "" {
 		redisBroker, err := realtime.NewRedisBroker(config.RedisURL)
@@ -60,5 +67,15 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	log.Printf("api listening on %s", server.Addr)
-	log.Fatal(server.ListenAndServe())
+	shutdown, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	go func() {
+		<-shutdown.Done()
+		deadline, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = server.Shutdown(deadline)
+	}()
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Print(err)
+	}
 }

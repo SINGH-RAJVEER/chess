@@ -20,7 +20,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const googleStateCookie = "chess.google_oauth_state"
+const googleStateCookie = "sixtyfour.google_oauth_state"
 
 var ErrGoogleNotConfigured = errors.New("Google OAuth is not configured")
 

@@ -1,4 +1,4 @@
-module github.com/rajveer/chess/apps/api
+module github.com/rajveer/sixtyfour/apps/api
 
 go 1.25.0
 

@@ -3,7 +3,7 @@ package config
 import "testing"
 
 func TestLoadDefaults(t *testing.T) {
-	t.Setenv("DATABASE_URL", "postgres://localhost/chess")
+	t.Setenv("DATABASE_URL", "postgres://localhost/sixtyfour")
 	t.Setenv("PORT", "")
 	t.Setenv("HOST", "")
 	t.Setenv("BETTER_AUTH_SECRET", "")

@@ -15,8 +15,8 @@ health and authentication.
 
 Returns `{"ok":true}` when the API process is serving. This endpoint does not
 verify PostgreSQL reachability at request time. Computer moves are served
-in-process by the linked Rust engine; there is no separate engine service or
-engine health endpoint.
+by engine processes the API spawns per move; there is no separate engine
+service or engine health endpoint.
 
 ## Realtime (`GET /api/ws`)
 
@@ -42,9 +42,11 @@ Client messages:
   — the server rejects moves from spectators and from the side not to move.
   Anonymous local and computer games allow the connected client to move.
   `opponent` is `minimax` (default), `custom`, or `stockfish`; `level`
-  (1 to 8, default 4) only applies to Stockfish. A Stockfish move is
-  rejected with `stockfish is not installed on the server` when the binary
-  is missing.
+  (1 to 8, default 4) only applies to Stockfish. A computer move is rejected
+  before it is committed when the engine binary is missing:
+  `SixtyFour engine is not installed on the server` for minimax and custom,
+  `stockfish is not installed on the server` for Stockfish. An unknown
+  `opponent` is rejected the same way.
 - `game.resign` (`gameId`), `game.draw.offer` / `game.draw.respond`
   (`gameId`, `accept`) — draw and resign flow through room broadcasts.
 - `game.undo.request` / `game.undo.respond` (`gameId`, `accept`) — rated
@@ -94,12 +96,13 @@ client.
 
 ## Engine Selection
 
-Minimax and custom computer moves are computed in-process by the Rust engine
-static library (`apps/engine`, bridged through `apps/api/internal/engine`);
+Minimax and custom computer moves are computed by the `sixtyfour-engine` binary
+(`apps/engine`), which `apps/api/internal/engine` spawns per move over UCI;
 there is no engine HTTP service. The `stockfish` opponent spawns the
-Stockfish binary per move (see [stockfish.md](stockfish.md)).
+Stockfish binary per move the same way (see [engine.md](engine.md) and
+[stockfish.md](stockfish.md)).
 
-The Go bridge accepts a FEN plus `minimax`, `custom`, or `stockfish` with a
+The Go runner accepts a FEN plus `minimax`, `custom`, or `stockfish` with a
 level (legacy `dqn` maps to `custom`), selects the move, and returns UCI
 notation such as `e7e5`. Invalid
 or illegal positions surface as engine errors and leave the game unchanged.

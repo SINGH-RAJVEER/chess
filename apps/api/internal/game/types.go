@@ -17,6 +17,7 @@ const (
 )
 
 type Game struct {
+	Revision                                  int64
 	ID, TimeControl, Increment, HalfMoveClock int
 	CurrentTurn                               Color
 	Status                                    GameStatus
@@ -60,6 +61,9 @@ type BoardMove struct {
 }
 
 type BoardResponse struct {
+	Latency            *MoveTiming            `json:"latency,omitempty"`
+	Revision           int64                  `json:"revision"`
+	LegalMoves         map[int][]int          `json:"legalMoves"`
 	ID                 int                    `json:"id"`
 	Pieces             []BoardPiece           `json:"pieces"`
 	CapturedPieces     map[string][]PieceType `json:"capturedPieces"`
@@ -79,6 +83,20 @@ type BoardResponse struct {
 	DrawOfferedBy      *Color                 `json:"drawOfferedBy"`
 	MoveCount          int                    `json:"moveCount"`
 	HalfMoveClock      int                    `json:"halfMoveClock"`
+}
+
+type MoveTiming struct {
+	ServerMS  float64 `json:"serverMs"`
+	AcquireMS float64 `json:"acquireMs"`
+	CommitMS  float64 `json:"commitMs"`
+	SearchMS  float64 `json:"searchMs"`
+}
+
+// Snapshot carries one committed board and the metadata needed to personalize it.
+type Snapshot struct {
+	Board         BoardResponse `json:"board"`
+	WhitePlayerID *string       `json:"whitePlayerId,omitempty"`
+	BlackPlayerID *string       `json:"blackPlayerId,omitempty"`
 }
 
 type MoveCoordinates struct {

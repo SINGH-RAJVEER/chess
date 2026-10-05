@@ -1,6 +1,6 @@
 # API
 
-`apps/api` is the Go HTTP API for the chess application and preserves the web client's `/api` contract.
+`apps/api` is the Go HTTP API for SixtyFour and preserves the web client's `/api` contract.
 
 ## Structure
 
@@ -10,7 +10,7 @@ apps/api/
 ├── internal/auth/            # Email/password auth, sessions, cookies, and auth SQL
 ├── internal/config/          # Environment configuration and defaults
 ├── internal/database/        # PostgreSQL connection, runner, and embedded migrations
-├── internal/engine/          # CGO bridge to the Rust engine static library
+├── internal/engine/          # UCI runner for the sixtyfour-engine and Stockfish binaries
 ├── internal/game/            # Chess rules, game services, queueing, and game SQL
 ├── internal/httpapi/         # Router, middleware, validation, and JSON handlers
 └── go.mod
@@ -40,12 +40,15 @@ CGO_ENABLED=0 go test ./...
 
 Set `AUTO_MIGRATE=true` to apply pending app-local migrations when the server starts. `devenv up` runs migrations explicitly before starting the API.
 
-Computer moves are computed in-process: `internal/engine` calls
-`engine_best_move` in the Rust static library (`apps/engine`, built by
-`just engine-lib`) over CGO. Builds require a C toolchain and
-`CGO_ENABLED=1`. Legacy `dqn` opponent values map to the custom engine.
-The `stockfish` opponent instead spawns the binary from `STOCKFISH_PATH` (or
-`PATH`) per move; see [stockfish.md](stockfish.md).
+The API is pure Go and builds without a C toolchain. Computer moves come
+from child processes: `internal/engine` spawns the `sixtyfour-engine` binary
+(`apps/engine`, built by `just engine-bin`) per move for minimax and custom,
+and the binary from `STOCKFISH_PATH` (or `PATH`) for the `stockfish`
+opponent. Legacy `dqn` opponent values map to the custom engine. Inside the
+repository the API finds `apps/engine/target/release/sixtyfour-engine` without
+configuration; elsewhere set `ENGINE_PATH`. The engine tests and the
+computer-reply game test need that binary, so build it before
+`go test ./...`. See [engine.md](engine.md) and [stockfish.md](stockfish.md).
 
 ## Configuration
 
@@ -63,7 +66,7 @@ The process uses the repository's existing auth, game, queue, piece, and move ta
 
 ## API Compatibility
 
-The Go app implements health, board, legal move, game mutation, matchmaking, draw, resignation, and email/password session endpoints under `/api`. Computer moves are selected in-process by the linked Rust engine (minimax or custom alpha-beta) on a background goroutine. The frontend polls until the engine move is persisted.
+The Go app implements health, board, legal move, game mutation, matchmaking, draw, resignation, and email/password session endpoints under `/api`. Computer moves are selected by a `sixtyfour-engine` child process (minimax or custom alpha-beta) on a background goroutine. The frontend polls until the engine move is persisted.
 
 Both Vite development and preview proxy `/api` to `VITE_API_PROXY_TARGET`. Production deployments must provide the same routing when Vite is not serving the frontend.
 

@@ -2,8 +2,9 @@ package realtime
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/rajveer/sixtyfour/apps/api/internal/game"
 	"log"
-	"strconv"
 	"sync"
 
 	"github.com/redis/go-redis/v9"
@@ -13,36 +14,41 @@ import (
 // instance can push fresh state to its own socket subscribers.
 // MemoryBroker is the single-process default. RedisBroker shares
 // notifications when REDIS_URL is set. PostgreSQL remains the source of
-// truth either way; the broker only says "game N changed, re-read it".
+// truth either way; move notifications carry committed snapshots to avoid re-reads.
+type Change struct {
+	GameID   int            `json:"gameId"`
+	Snapshot *game.Snapshot `json:"snapshot,omitempty"`
+}
+
 type Broker interface {
-	Publish(gameID int)
-	Subscribe(func(gameID int))
+	Publish(change Change)
+	Subscribe(func(Change))
 	Close() error
 }
 
 type MemoryBroker struct {
 	mu   sync.Mutex
-	subs map[int]func(gameID int)
+	subs map[int]func(Change)
 	next int
 }
 
 func NewMemoryBroker() *MemoryBroker {
-	return &MemoryBroker{subs: make(map[int]func(gameID int))}
+	return &MemoryBroker{subs: make(map[int]func(Change))}
 }
 
-func (broker *MemoryBroker) Publish(gameID int) {
+func (broker *MemoryBroker) Publish(change Change) {
 	broker.mu.Lock()
-	subs := make([]func(gameID int), 0, len(broker.subs))
+	subs := make([]func(Change), 0, len(broker.subs))
 	for _, sub := range broker.subs {
 		subs = append(subs, sub)
 	}
 	broker.mu.Unlock()
 	for _, sub := range subs {
-		sub(gameID)
+		sub(change)
 	}
 }
 
-func (broker *MemoryBroker) Subscribe(fn func(gameID int)) {
+func (broker *MemoryBroker) Subscribe(fn func(Change)) {
 	broker.mu.Lock()
 	defer broker.mu.Unlock()
 	broker.next++
@@ -51,7 +57,7 @@ func (broker *MemoryBroker) Subscribe(fn func(gameID int)) {
 
 func (broker *MemoryBroker) Close() error { return nil }
 
-const redisChannel = "chess:games"
+const redisChannel = "sixtyfour:games"
 
 type RedisBroker struct {
 	client *redis.Client
@@ -78,28 +84,33 @@ func NewRedisBroker(url string) (*RedisBroker, error) {
 // SubscribeRemote starts delivery of remote notifications to fn. Call once;
 // notifications published by this same process are echoed back by Redis and
 // delivered like any other replica's, so every hub converges on pushes.
-func (broker *RedisBroker) SubscribeRemote(fn func(gameID int)) {
+func (broker *RedisBroker) SubscribeRemote(fn func(Change)) {
 	pubsub := broker.client.Subscribe(context.Background(), redisChannel)
 	go func() {
 		defer close(broker.done)
 		defer pubsub.Close()
 		for message := range pubsub.Channel() {
-			gameID, err := strconv.Atoi(message.Payload)
+			var change Change
+			err := json.Unmarshal([]byte(message.Payload), &change)
 			if err != nil {
 				continue
 			}
-			fn(gameID)
+			fn(change)
 		}
 	}()
 }
 
-func (broker *RedisBroker) Publish(gameID int) {
-	if err := broker.client.Publish(context.Background(), redisChannel, strconv.Itoa(gameID)).Err(); err != nil {
+func (broker *RedisBroker) Publish(change Change) {
+	data, err := json.Marshal(change)
+	if err != nil {
+		return
+	}
+	if err := broker.client.Publish(context.Background(), redisChannel, string(data)).Err(); err != nil {
 		log.Printf("realtime broker publish failed: %v", err)
 	}
 }
 
-func (broker *RedisBroker) Subscribe(fn func(gameID int)) {
+func (broker *RedisBroker) Subscribe(fn func(Change)) {
 	broker.SubscribeRemote(fn)
 }
 

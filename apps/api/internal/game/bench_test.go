@@ -3,7 +3,7 @@ package game
 import (
 	"testing"
 
-	"github.com/rajveer/chess/apps/api/internal/engine"
+	"github.com/rajveer/sixtyfour/apps/api/internal/engine"
 )
 
 func BenchmarkPiecesToFEN(b *testing.B) {
@@ -52,7 +52,7 @@ func BenchmarkHasThreefoldRepetition(b *testing.B) {
 	}
 }
 
-func BenchmarkEngineMinimaxFFI(b *testing.B) {
+func BenchmarkEngineMinimax(b *testing.B) {
 	const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

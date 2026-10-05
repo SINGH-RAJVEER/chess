@@ -7,6 +7,7 @@ package testdb
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,10 +17,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rajveer/chess/apps/api/internal/database"
+	"github.com/rajveer/sixtyfour/apps/api/internal/database"
 )
 
 var wipeTables = []string{
+	"computer_game_archives",
 	"moves",
 	"pieces",
 	"games",
@@ -37,15 +39,19 @@ var wipeTables = []string{
 // package is isolated. It calls t.Skip when unreachable.
 func Open(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+	hash := fnv.New32a()
+	_, _ = hash.Write([]byte(t.Name()))
+	name := fmt.Sprintf("sixtyfour_test_%s_%d_%x", callerPackage(), os.Getpid(), hash.Sum32())
 	url := os.Getenv("TEST_DATABASE_URL")
 	if url == "" {
 		url = os.Getenv("DATABASE_URL")
 	}
 	if url == "" {
-		url = fmt.Sprintf("postgres://postgres:postgres@localhost:5432/chess_test_%s", callerPackage())
+		url = "postgres://postgres:postgres@localhost:5432/postgres"
 	} else {
-		url = withDatabase(url, callerPackage())
+		url = withDatabase(url, name)
 	}
+	url = withDatabase(url, name)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	ensureDatabase(ctx, url)
@@ -55,6 +61,13 @@ func Open(t *testing.T) *pgxpool.Pool {
 	}
 	if err := database.Migrate(ctx, pool); err != nil {
 		pool.Close()
+		config, err := pgxpool.ParseConfig(url)
+		if err != nil { return }
+		config.ConnConfig.Database = "postgres"
+		maintenance, err := pgxpool.NewWithConfig(ctx, config)
+		if err != nil { return }
+		defer maintenance.Close()
+		_, _ = maintenance.Exec(ctx, fmt.Sprintf("DROP DATABASE %s", pgx.Identifier{name}.Sanitize()))
 		t.Fatalf("migrate test database: %v", err)
 	}
 	t.Cleanup(func() {

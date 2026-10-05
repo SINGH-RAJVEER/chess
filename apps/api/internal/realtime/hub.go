@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/rajveer/chess/apps/api/internal/auth"
-	"github.com/rajveer/chess/apps/api/internal/engine"
-	"github.com/rajveer/chess/apps/api/internal/game"
+	"github.com/rajveer/sixtyfour/apps/api/internal/auth"
+	"github.com/rajveer/sixtyfour/apps/api/internal/engine"
+	"github.com/rajveer/sixtyfour/apps/api/internal/game"
 )
 
 // Hub keeps one persistent socket per client and pushes game state instead
@@ -30,6 +30,7 @@ type Hub struct {
 	rematchOffers map[int]string
 	lastStatus    map[int]game.GameStatus
 	lastMoves     map[int]int
+	lastRevision  map[int]int64
 }
 
 type Client struct {
@@ -56,17 +57,25 @@ func NewHub(authService *auth.Service, gameService *game.Service, broker Broker)
 		rematchOffers: make(map[int]string),
 		lastStatus:    make(map[int]game.GameStatus),
 		lastMoves:     make(map[int]int),
+		lastRevision:  make(map[int]int64),
 	}
 	// Nil services are tolerated so handler contract tests can construct
 	// the mux without a database.
 	if gameService != nil {
 		gameService.OnUpdate = hub.notifyGame
+		gameService.OnSnapshot = func(snapshot game.Snapshot) {
+			hub.broker.Publish(Change{GameID: snapshot.Board.ID, Snapshot: &snapshot})
+		}
 	}
 	// Every change flows through the broker so all replicas converge:
 	// the local broadcast below serves this instance's subscribers while
 	// remote instances deliver to theirs.
-	broker.Subscribe(func(gameID int) {
-		hub.broadcastGame(gameID)
+	broker.Subscribe(func(change Change) {
+		if change.Snapshot != nil {
+			hub.broadcastSnapshot(*change.Snapshot)
+		} else {
+			hub.broadcastGame(change.GameID)
+		}
 	})
 	go hub.timeoutLoop()
 	return hub
@@ -75,7 +84,7 @@ func NewHub(authService *auth.Service, gameService *game.Service, broker Broker)
 // gameChanged announces a mutation. Delivery to subscribers on this and
 // every other replica happens through the broker subscription above.
 func (hub *Hub) gameChanged(gameID int) {
-	hub.broker.Publish(gameID)
+	hub.broker.Publish(Change{GameID: gameID})
 }
 
 func (hub *Hub) ServeWS(writer http.ResponseWriter, request *http.Request) {
@@ -453,19 +462,52 @@ func (hub *Hub) handleMove(client *Client, msg incoming) {
 		}
 		// Reject before committing the human move; otherwise the game would
 		// sit waiting on an engine reply that can never arrive.
-		if opponent.Opponent == "stockfish" && !engine.StockfishAvailable() {
-			client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": engine.ErrStockfishUnavailable.Error()})
+		if err := engine.Available(opponent.Opponent); err != nil {
+			client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 			return
 		}
 	}
-	_, err = hub.games.MakeMove(context.Background(), *msg.GameID, *msg.From, *msg.To, game.PieceType(msg.Promotion), opponent)
+	hub.subscribe(client, *msg.GameID)
+	result, err := hub.games.MakeMove(context.Background(), *msg.GameID, *msg.From, *msg.To, game.PieceType(msg.Promotion), opponent)
 	if err != nil {
 		client.sendJSON(map[string]any{"id": msg.ID, "type": "error", "message": err.Error()})
 		return
 	}
-	hub.subscribe(client, *msg.GameID)
-	hub.gameChanged(*msg.GameID)
-	hub.sendBoard(client, msg.ID, *msg.GameID)
+	board := result["board"].(game.BoardResponse)
+	board = personalizedBoard(game.Snapshot{Board: board, WhitePlayerID: stored.WhitePlayerID, BlackPlayerID: stored.BlackPlayerID}, client.userID)
+	client.sendJSON(map[string]any{"id": msg.ID, "type": "game.state", "board": board})
+}
+
+func personalizedBoard(snapshot game.Snapshot, userID string) game.BoardResponse {
+	board := snapshot.Board
+	board.UserColor = "Spectator"
+	if snapshot.WhitePlayerID != nil && *snapshot.WhitePlayerID == userID {
+		board.UserColor = "White"
+	}
+	if snapshot.BlackPlayerID != nil && *snapshot.BlackPlayerID == userID {
+		board.UserColor = "Black"
+	}
+	return board
+}
+
+func (hub *Hub) broadcastSnapshot(snapshot game.Snapshot) {
+	gameID := snapshot.Board.ID
+	hub.mu.Lock()
+	if revision, seen := hub.lastRevision[gameID]; seen && snapshot.Board.Revision <= revision {
+		hub.mu.Unlock()
+		return
+	}
+	hub.lastRevision[gameID] = snapshot.Board.Revision
+	hub.lastStatus[gameID] = snapshot.Board.Status
+	hub.lastMoves[gameID] = snapshot.Board.MoveCount
+	for client := range hub.rooms[gameID] {
+		board := personalizedBoard(snapshot, client.userID)
+		client.sendJSON(map[string]any{"type": "game.state", "board": board})
+		if board.Status != "Ongoing" {
+			client.sendJSON(map[string]any{"type": "game.over", "gameId": gameID, "status": board.Status, "winner": winnerFor(board.Turn, board.Status), "reason": string(board.Status)})
+		}
+	}
+	hub.mu.Unlock()
 }
 
 func (hub *Hub) handleResign(client *Client, msg incoming) {
@@ -838,20 +880,11 @@ func (hub *Hub) broadcastGame(gameID int) {
 	hub.mu.Lock()
 	hub.lastStatus[gameID] = stored.Status
 	hub.mu.Unlock()
-	for _, client := range clients {
-		board, err := hub.games.GetBoard(context.Background(), "", &gameID, client.userID)
-		if err != nil {
-			continue
-		}
-		hub.mu.Lock()
-		hub.lastMoves[gameID] = len(board.Moves)
-		hub.mu.Unlock()
-		client.sendJSON(map[string]any{"type": "game.state", "board": board})
-		if board.Status != "Ongoing" {
-			winner := winnerFor(board.Turn, board.Status)
-			client.sendJSON(map[string]any{"type": "game.over", "gameId": gameID, "status": board.Status, "winner": winner, "reason": string(board.Status)})
-		}
+	board, err := hub.games.GetBoard(context.Background(), "", &gameID, "")
+	if err != nil {
+		return
 	}
+	hub.broadcastSnapshot(game.Snapshot{Board: board, WhitePlayerID: stored.WhitePlayerID, BlackPlayerID: stored.BlackPlayerID})
 	hub.broadcastPresence(gameID)
 }
 

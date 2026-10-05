@@ -7,15 +7,16 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rajveer/chess/apps/api/internal/auth"
-	"github.com/rajveer/chess/apps/api/internal/game"
-	"github.com/rajveer/chess/apps/api/internal/realtime"
+	"github.com/rajveer/sixtyfour/apps/api/internal/auth"
+	"github.com/rajveer/sixtyfour/apps/api/internal/game"
+	"github.com/rajveer/sixtyfour/apps/api/internal/realtime"
 )
 
 type App struct {
 	auth       *auth.Service
 	hub        *realtime.Hub
 	broker     realtime.Broker
+	games      *game.Service
 	corsOrigin string
 }
 
@@ -34,7 +35,7 @@ func WithBroker(broker realtime.Broker) Option {
 }
 
 func NewHandler(authService *auth.Service, gameService *game.Service, options ...Option) http.Handler {
-	app := &App{auth: authService}
+	app := &App{auth: authService, games: gameService}
 	for _, option := range options {
 		option(app)
 	}
@@ -46,6 +47,8 @@ func (app *App) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) })
 	mux.HandleFunc("GET /api/ws", app.hub.ServeWS)
+	mux.HandleFunc("GET /api/computer-games/latest", app.latestComputerGame)
+	mux.HandleFunc("POST /api/computer-games", app.saveComputerGame)
 	// Game play is websocket-only; auth stays on REST.
 	mux.HandleFunc("POST /api/auth/sign-up", app.signUp)
 	mux.HandleFunc("POST /api/auth/sign-up/email", app.signUp)
@@ -57,6 +60,54 @@ func (app *App) handler() http.Handler {
 	mux.HandleFunc("POST /api/auth/sign-in/social", app.signInSocial)
 	mux.HandleFunc("GET /api/auth/callback/google", app.googleCallback)
 	return recoverMiddleware(corsMiddleware(mux, app.corsOrigin))
+}
+
+func (app *App) archiveUser(w http.ResponseWriter, r *http.Request) string {
+	if app.auth == nil {
+		writeJSON(w, 401, map[string]string{"error": "Sign in required"})
+		return ""
+	}
+	session, err := app.auth.GetSession(r.Context(), app.auth.RequestToken(r))
+	if err != nil || session == nil {
+		writeJSON(w, 401, map[string]string{"error": "Sign in required"})
+		return ""
+	}
+	return session.User.ID
+}
+
+func (app *App) latestComputerGame(w http.ResponseWriter, r *http.Request) {
+	userID := app.archiveUser(w, r)
+	if userID == "" {
+		return
+	}
+	state, err := app.games.LatestArchive(r.Context(), userID)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, state)
+}
+
+func (app *App) saveComputerGame(w http.ResponseWriter, r *http.Request) {
+	userID := app.archiveUser(w, r)
+	if userID == "" {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
+	var state game.ArchivedGame
+	if decode(r, &state) != nil {
+		writeJSON(w, 400, map[string]string{"error": "Invalid archive"})
+		return
+	}
+	if err := game.ValidateArchive(state); err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := app.games.Archive(r.Context(), userID, state); err != nil {
+		fail(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"saved": true})
 }
 
 // parseOriginAllowlist splits a comma-separated WEB_ORIGIN value into the

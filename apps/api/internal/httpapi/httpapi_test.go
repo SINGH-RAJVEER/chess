@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rajveer/chess/apps/api/internal/auth"
-	"github.com/rajveer/chess/apps/api/internal/httpapi"
+	"github.com/rajveer/sixtyfour/apps/api/internal/auth"
+	"github.com/rajveer/sixtyfour/apps/api/internal/httpapi"
 )
 
 func TestHealthAndCORS(t *testing.T) {
@@ -31,12 +31,12 @@ func TestCredentialedCORS(t *testing.T) {
 }
 
 func TestCredentialedCORSAllowlist(t *testing.T) {
-	handler := httpapi.NewHandler(nil, nil, httpapi.WithCORSOrigin("http://localhost:3000, app://chess"))
+	handler := httpapi.NewHandler(nil, nil, httpapi.WithCORSOrigin("http://localhost:3000, app://sixtyfour"))
 	request := httptest.NewRequest(http.MethodOptions, "/api/auth/get-session", nil)
-	request.Header.Set("Origin", "app://chess")
+	request.Header.Set("Origin", "app://sixtyfour")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != "app://chess" || response.Header().Get("Access-Control-Allow-Credentials") != "true" {
+	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != "app://sixtyfour" || response.Header().Get("Access-Control-Allow-Credentials") != "true" {
 		t.Fatalf("status=%d headers=%v", response.Code, response.Header())
 	}
 }
