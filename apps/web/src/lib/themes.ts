@@ -1,4 +1,4 @@
-import type { Color, PieceType } from "@chess/types";
+import type { Color, PieceType } from "@sixtyfour/types";
 
 export type BoardTheme = {
 	name: string;

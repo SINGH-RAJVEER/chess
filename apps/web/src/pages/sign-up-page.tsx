@@ -53,7 +53,7 @@ export default function SignUpPage() {
 						className="-ml-3 w-fit text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
 					>
 						<ArrowLeft className="size-4" />
-						Back to chess
+						Back to SixtyFour
 					</Button>
 					<CardTitle className="text-zinc-100">Create Account</CardTitle>
 					<CardDescription className="text-zinc-400">Sign up for a new account</CardDescription>

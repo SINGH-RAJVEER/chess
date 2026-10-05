@@ -131,7 +131,7 @@ export default function Header(props: HeaderProps) {
 					className="flex w-1/4 items-center gap-2 transition-opacity hover:opacity-80"
 					style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
 				>
-					<h1 className="text-xl font-medium tracking-tight lowercase">chess</h1>
+					<h1 className="text-xl font-medium tracking-tight">SixtyFour</h1>
 				</Link>
 
 				<div className="flex flex-1 items-center justify-center">
@@ -315,7 +315,7 @@ export default function Header(props: HeaderProps) {
 							aria-label="Close window"
 							title="Close"
 							className="ml-auto flex items-center justify-center h-8 w-8 rounded-md bg-zinc-900 border border-zinc-800 hover:bg-red-900/70 text-zinc-400 hover:text-red-100 transition-colors"
-							onClick={() => window.chessDesktop?.close()}
+							onClick={() => window.sixtyfourDesktop?.close()}
 						>
 							<X className="size-3.5" />
 						</button>

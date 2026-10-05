@@ -34,7 +34,7 @@ describe("resolveApiBaseUrl", () => {
 
 describe("resolveWsUrl", () => {
 	test("derives the socket URL from the API base", () => {
-		expect(resolveWsUrl("http://127.0.0.1:4000", "https:", "chess")).toBe(
+		expect(resolveWsUrl("http://127.0.0.1:4000", "https:", "sixtyfour")).toBe(
 			"ws://127.0.0.1:4000/api/ws",
 		);
 		expect(resolveWsUrl("https://api.example.com", "https:", "example.com")).toBe(

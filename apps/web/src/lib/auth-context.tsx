@@ -43,7 +43,7 @@ function isAuthResponse(value: unknown): value is AuthResponse {
 }
 
 function getProfileImageKey(userId: string) {
-	return `chess_profile_image_${userId}`;
+	return `sixtyfour_profile_image_${userId}`;
 }
 
 function applyProfileImageOverride(user: AuthResponse["user"]) {
@@ -61,15 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 		const loadStoredSession = () => {
 			try {
-				const storedUser = localStorage.getItem("chess_user");
-				const storedSession = localStorage.getItem("chess_session");
+				const storedUser = localStorage.getItem("sixtyfour_user");
+				const storedSession = localStorage.getItem("sixtyfour_session");
 				if (storedUser && storedSession) {
 					setUser(applyProfileImageOverride(JSON.parse(storedUser)));
 					setSession(JSON.parse(storedSession));
 				}
 			} catch {
-				localStorage.removeItem("chess_user");
-				localStorage.removeItem("chess_session");
+				localStorage.removeItem("sixtyfour_user");
+				localStorage.removeItem("sixtyfour_session");
 			}
 		};
 
@@ -83,8 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					const userWithImage = applyProfileImageOverride(data.user);
 					setUser(userWithImage);
 					setSession(data.session);
-					localStorage.setItem("chess_user", JSON.stringify(userWithImage));
-					localStorage.setItem("chess_session", JSON.stringify(data.session));
+					localStorage.setItem("sixtyfour_user", JSON.stringify(userWithImage));
+					localStorage.setItem("sixtyfour_session", JSON.stringify(data.session));
 					return;
 				}
 				if (isMounted) loadStoredSession();
@@ -119,8 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		const userWithImage = applyProfileImageOverride(data.user);
 		setUser(userWithImage);
 		setSession(data.session);
-		localStorage.setItem("chess_user", JSON.stringify(userWithImage));
-		localStorage.setItem("chess_session", JSON.stringify(data.session));
+		localStorage.setItem("sixtyfour_user", JSON.stringify(userWithImage));
+		localStorage.setItem("sixtyfour_session", JSON.stringify(data.session));
 	};
 
 	const signUp = async (email: string, password: string, name: string) => {
@@ -140,8 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		const userWithImage = applyProfileImageOverride(data.user);
 		setUser(userWithImage);
 		setSession(data.session);
-		localStorage.setItem("chess_user", JSON.stringify(userWithImage));
-		localStorage.setItem("chess_session", JSON.stringify(data.session));
+		localStorage.setItem("sixtyfour_user", JSON.stringify(userWithImage));
+		localStorage.setItem("sixtyfour_session", JSON.stringify(data.session));
 	};
 
 	const signInWithGoogle = async () => {
@@ -171,8 +171,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		}).catch(() => undefined);
 		setUser(null);
 		setSession(null);
-		localStorage.removeItem("chess_user");
-		localStorage.removeItem("chess_session");
+		localStorage.removeItem("sixtyfour_user");
+		localStorage.removeItem("sixtyfour_session");
 	};
 
 	const updateProfileImage = (image: string) => {
@@ -180,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			if (!currentUser) return currentUser;
 			const updatedUser = { ...currentUser, image };
 			localStorage.setItem(getProfileImageKey(currentUser.id), image);
-			localStorage.setItem("chess_user", JSON.stringify(updatedUser));
+			localStorage.setItem("sixtyfour_user", JSON.stringify(updatedUser));
 			return updatedUser;
 		});
 	};

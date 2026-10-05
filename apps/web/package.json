@@ -1,5 +1,5 @@
 {
-	"name": "@chess/application",
+	"name": "@sixtyfour/application",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -16,7 +16,7 @@
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.7.0",
-		"@chess/types": "workspace:*",
+		"@sixtyfour/types": "workspace:*",
 		"@fontsource-variable/geist": "^5.3.0",
 		"@tailwindcss/vite": "^4.3.3",
 		"class-variance-authority": "^0.7.1",

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { BoardPiece, BoardResponse } from "@chess/types";
+import type { BoardPiece, BoardResponse } from "@sixtyfour/types";
 import {
 	buildCapturedPieceEntries,
 	formatGameTime,

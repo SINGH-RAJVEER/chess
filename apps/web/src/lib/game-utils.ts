@@ -1,4 +1,4 @@
-import type { BoardPiece, BoardResponse, Color, PieceType } from "@chess/types";
+import type { BoardPiece, BoardResponse, Color, PieceType } from "@sixtyfour/types";
 
 export type PendingMove = { from: number; to: number };
 

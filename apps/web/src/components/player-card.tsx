@@ -1,4 +1,4 @@
-import type { Color, PieceType } from "@chess/types";
+import type { Color, PieceType } from "@sixtyfour/types";
 import { useMemo } from "react";
 import { useSettings } from "@/lib/settings-context";
 import { getPieceImageUrl, getPieceUnicode, MATERIAL_ORDER, PIECE_THEMES } from "@/lib/themes";

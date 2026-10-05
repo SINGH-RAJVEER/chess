@@ -52,7 +52,7 @@ export default function SignInPage() {
 						className="-ml-3 w-fit text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
 					>
 						<ArrowLeft className="size-4" />
-						Back to chess
+						Back to SixtyFour
 					</Button>
 					<CardTitle className="text-zinc-100">Sign In</CardTitle>
 					<CardDescription className="text-zinc-400">

@@ -1,4 +1,4 @@
-import type { Color, PromotionPiece } from "@chess/types";
+import type { Color, PromotionPiece } from "@sixtyfour/types";
 import { useSettings } from "@/lib/settings-context";
 import { getPieceImageUrl, getPieceUnicode, PIECE_THEMES } from "@/lib/themes";
 

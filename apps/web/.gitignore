@@ -10,4 +10,4 @@ dist-ssr
 .vercel
 .env*.local
 .output
-chess.db
+sixtyfour.db

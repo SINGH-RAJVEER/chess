@@ -1,4 +1,4 @@
-import type { Color } from "@chess/types";
+import type { Color } from "@sixtyfour/types";
 import { Flag, Handshake, RotateCcw, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";

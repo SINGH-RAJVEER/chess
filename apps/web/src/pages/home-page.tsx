@@ -1,4 +1,4 @@
-import type { BoardResponse, Color, PromotionPiece, WsServerMessage } from "@chess/types";
+import type { BoardResponse, Color, PromotionPiece, WsServerMessage } from "@sixtyfour/types";
 import { AlertCircle, User, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChessBoard from "@/components/chess-board";
@@ -194,17 +194,7 @@ export default function HomePage() {
 			}
 			setSelectedSquare(squareIndex);
 			setErrorMsg(null);
-			try {
-				const result = await gameSocket.request({
-					type: "moves.get",
-					gameId: boardData.id,
-					square: squareIndex,
-				});
-				if (result.type === "moves.result") setValidMoves(result.targets);
-			} catch (error) {
-				showError(`API Error: ${error instanceof Error ? error.message : "Unknown"}`);
-				setValidMoves([]);
-			}
+			setValidMoves(boardData.legalMoves?.[squareIndex] ?? []);
 			return;
 		}
 

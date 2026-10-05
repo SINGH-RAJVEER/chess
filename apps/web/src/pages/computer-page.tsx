@@ -4,9 +4,8 @@ import type {
 	PromotionPiece,
 	StockfishLevel,
 	WsServerMessage,
-} from "@chess/types";
-import { parseComputerOpponent, parseStockfishLevel } from "@chess/types";
-import { WifiOff } from "lucide-react";
+} from "@sixtyfour/types";
+import { parseComputerOpponent, parseStockfishLevel } from "@sixtyfour/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ComputerGameView, { type PromotionState } from "@/components/computer-game-view";
 import {
@@ -18,10 +17,12 @@ import {
 import { useSettings } from "@/lib/settings-context";
 import { playSound, resumeAudioContext } from "@/lib/sounds";
 import { calculateMaterialAdvantage } from "@/lib/themes";
-import { gameSocket, type SocketStatus } from "@/lib/ws";
+import { createComputerGame } from "@/lib/computer-game";
+import { useAuth } from "@/lib/auth-context";
 
 export default function ComputerPage() {
 	const { settings } = useSettings();
+	const { user } = useAuth();
 	const [boardData, setBoardData] = useState<BoardResponse | null>(null);
 	const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
 	const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
@@ -31,31 +32,36 @@ export default function ComputerPage() {
 	const [isMovePending, setIsMovePending] = useState(false);
 	const [isUndoPending, setIsUndoPending] = useState(false);
 	const [isResetPending, setIsResetPending] = useState(false);
-	const [socketStatus, setSocketStatus] = useState<SocketStatus>(gameSocket.getStatus());
+	const [{ game: gameSocket, archive }] = useState(() => createComputerGame((error) => setErrorMsg(error.message)));
 	const [promotionState, setPromotionState] = useState<PromotionState | null>(null);
 	// The picker exposes one default minimax engine; old custom selections now
 	// use that default while direct API callers can still request custom.
 	const [opponent, setOpponent] = useState<ComputerOpponent>(() =>
-		parseComputerOpponent(localStorage.getItem("chess_computer_opponent")) === "stockfish"
+		parseComputerOpponent(localStorage.getItem("sixtyfour_computer_opponent")) === "stockfish"
 			? "stockfish"
 			: "minimax",
 	);
 	const [level, setLevel] = useState<StockfishLevel>(() =>
-		parseStockfishLevel(localStorage.getItem("chess_computer_level")),
+		parseStockfishLevel(localStorage.getItem("sixtyfour_computer_level")),
 	);
 	const prevMoveCountRef = useRef(0);
 	const boardIdRef = useRef(0);
 	const opponentRef = useRef(opponent);
 	opponentRef.current = opponent;
+	useEffect(() => { void gameSocket.configure(opponent, level).catch((error) => setErrorMsg(error.message)); }, [gameSocket, opponent, level]);
+	useEffect(() => { archive.setEnabled(Boolean(user)); return () => archive.setEnabled(false); }, [archive, user]);
+	useEffect(() => {
+		if (boardData?.revision === undefined) return;
+		const frame = requestAnimationFrame(() => gameSocket.markRendered(boardData.revision ?? 0));
+		return () => cancelAnimationFrame(frame);
+	}, [boardData?.revision, gameSocket]);
 
 	const showError = useCallback((message: string) => {
 		setErrorMsg(message);
 		setTimeout(() => setErrorMsg(null), 3000);
 	}, []);
 
-	// Single-player runs over the same socket: the server pushes the board
-	// immediately after the human move and again when the engine replies,
-	// replacing the old 1s poll for Black's move.
+	// Computer moves run locally; saved games resume without a server connection.
 	useEffect(() => {
 		let cancelled = false;
 		let loading = false;
@@ -88,7 +94,7 @@ export default function ComputerPage() {
 		};
 
 		gameSocket.connect();
-		const offStatus = gameSocket.onStatus(setSocketStatus);
+
 		const offMessages = gameSocket.subscribe((msg: WsServerMessage) => {
 			if (msg.type === "game.state" && msg.board.mode === "vs_computer") {
 				setBoardData(msg.board);
@@ -110,12 +116,12 @@ export default function ComputerPage() {
 
 		return () => {
 			cancelled = true;
-			offStatus();
+
 			offMessages();
 			offReconnect();
 			gameSocket.disconnect();
 		};
-	}, []);
+	}, [gameSocket]);
 
 	useEffect(() => {
 		boardIdRef.current = boardData?.id ?? 0;
@@ -187,17 +193,7 @@ export default function ComputerPage() {
 			}
 			setSelectedSquare(squareIndex);
 			setErrorMsg(null);
-			try {
-				const result = await gameSocket.request({
-					type: "moves.get",
-					gameId: boardData.id,
-					square: squareIndex,
-				});
-				if (result.type === "moves.result") setValidMoves(result.targets);
-			} catch (error) {
-				showError(`API Error: ${error instanceof Error ? error.message : "Unknown"}`);
-				setValidMoves([]);
-			}
+			setValidMoves(boardData.legalMoves?.[squareIndex] ?? []);
 			return;
 		}
 
@@ -266,12 +262,12 @@ export default function ComputerPage() {
 
 	const handleOpponentChange = (nextOpponent: ComputerOpponent) => {
 		setOpponent(nextOpponent);
-		localStorage.setItem("chess_computer_opponent", nextOpponent);
+		localStorage.setItem("sixtyfour_computer_opponent", nextOpponent);
 	};
 
 	const handleLevelChange = (nextLevel: StockfishLevel) => {
 		setLevel(nextLevel);
-		localStorage.setItem("chess_computer_level", String(nextLevel));
+		localStorage.setItem("sixtyfour_computer_level", String(nextLevel));
 	};
 
 	const handleTakeback = async () => {
@@ -355,12 +351,6 @@ export default function ComputerPage() {
 
 	return (
 		<div className="relative">
-			{socketStatus !== "open" && (
-				<div className="absolute top-6 left-1/2 -translate-x-1/2 z-30 rounded bg-zinc-800/90 px-4 py-1.5 text-xs font-medium text-zinc-200 backdrop-blur-sm flex items-center gap-2">
-					<WifiOff className="size-3" />
-					Reconnecting…
-				</div>
-			)}
 			<ComputerGameView
 				boardData={boardData}
 				pieces={pieces}

@@ -1,4 +1,4 @@
-import type { WsClientMessage, WsServerMessage } from "@chess/types";
+import type { WsClientMessage, WsServerMessage } from "@sixtyfour/types";
 import { getWsUrl } from "./api-base";
 
 export type SocketStatus = "idle" | "connecting" | "open" | "reconnecting";

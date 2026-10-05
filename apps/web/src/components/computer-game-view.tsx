@@ -5,8 +5,8 @@ import type {
 	ComputerOpponent,
 	PromotionPiece,
 	StockfishLevel,
-} from "@chess/types";
-import { STOCKFISH_LEVELS } from "@chess/types";
+} from "@sixtyfour/types";
+import { STOCKFISH_LEVELS } from "@sixtyfour/types";
 import { AlertCircle, BrainCircuit, Cpu, User } from "lucide-react";
 import ChessBoard from "@/components/chess-board";
 import Header from "@/components/header";
@@ -79,7 +79,7 @@ const OPPONENT_LABELS: Record<ComputerOpponent, string> = {
 const OPPONENT_DESCRIPTIONS: Record<ComputerOpponent, string> = {
 	minimax: "Default minimax engine with alpha-beta pruning.",
 	custom: "Iterative-deepening alpha-beta search with quiescence and a transposition table.",
-	stockfish: "Stockfish with a capped skill, depth, and think time. Level 8 is full strength.",
+	stockfish: "Stockfish searches for up to 500 ms. Level 8 uses maximum skill.",
 };
 
 const LEVEL_ITEMS = STOCKFISH_LEVELS.map((value) => ({ value, label: `Level ${value}` }));

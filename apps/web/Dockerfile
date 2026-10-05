@@ -1,5 +1,5 @@
 # Build with podman from the repository root:
-#   podman build -f apps/web/Dockerfile -t chess-web .
+#   podman build -f apps/web/Dockerfile -t sixtyfour-web .
 #
 # Run on the same podman network as the API so the default
 # VITE_API_PROXY_TARGET=http://api:4000 resolves (see docs/docker.md).

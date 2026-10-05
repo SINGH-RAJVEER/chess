@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS: GameSettings = {
 	showDesktopCloseButton: true,
 };
 
-const STORAGE_KEY = "chess_settings";
+const STORAGE_KEY = "sixtyfour_settings";
 
 type SettingsContextType = {
 	settings: GameSettings;

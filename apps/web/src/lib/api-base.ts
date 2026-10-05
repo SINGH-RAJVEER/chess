@@ -1,6 +1,15 @@
 declare global {
 	interface Window {
-		chessDesktop?: { close: () => void };
+		sixtyfourLatency?: import("@sixtyfour/types").MoveLatency;
+		sixtyfourDesktop?: {
+			close: () => void;
+			engine?: {
+				prepare: (opponent: import("@sixtyfour/types").ComputerOpponent) => Promise<void>;
+				search: (request: import("@sixtyfour/types").EngineRequest) => Promise<import("@sixtyfour/types").EngineReply>;
+				reset: () => Promise<void>;
+				cancel: () => Promise<void>;
+			};
+		};
 	}
 }
 
@@ -35,7 +44,7 @@ export function resolveWsUrl(apiBase: string, protocol: string, host: string): s
 }
 
 function isDesktopRuntime(): boolean {
-	return typeof window !== "undefined" && "chessDesktop" in window;
+	return typeof window !== "undefined" && "sixtyfourDesktop" in window;
 }
 
 /** True inside the packaged Electron shell; the browser stays same-origin. */

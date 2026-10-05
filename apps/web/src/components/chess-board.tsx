@@ -1,4 +1,4 @@
-import type { BoardPiece, BoardResponse, Color, PieceType } from "@chess/types";
+import type { BoardPiece, BoardResponse, Color, PieceType } from "@sixtyfour/types";
 import { useMemo } from "react";
 import { useSettings } from "@/lib/settings-context";
 import {
@@ -95,6 +95,7 @@ export default function ChessBoard({
 					return (
 						<button
 							key={squareIndex}
+							data-square={squareIndex}
 							type="button"
 							className="relative flex items-center justify-center focus:outline-none"
 							style={{ backgroundColor: bgColor }}

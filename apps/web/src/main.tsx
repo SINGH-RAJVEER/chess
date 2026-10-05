@@ -4,7 +4,14 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./lib/auth-context";
 import { SettingsProvider } from "./lib/settings-context";
+import { migrateStorage } from "./lib/storage";
 import "./styles.css";
+
+try {
+	migrateStorage(localStorage);
+} catch {
+	// Accessing localStorage itself can fail in restricted browser contexts.
+}
 
 const rootElement = document.getElementById("root");
 

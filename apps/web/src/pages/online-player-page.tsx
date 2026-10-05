@@ -4,7 +4,7 @@ import type {
 	PromotionPiece,
 	QueueStatusResponse,
 	WsServerMessage,
-} from "@chess/types";
+} from "@sixtyfour/types";
 import { AlertCircle, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -280,17 +280,7 @@ export default function OnlinePlayerPage() {
 			}
 			setSelectedSquare(squareIndex);
 			setErrorMsg(null);
-			try {
-				const result = await gameSocket.request({
-					type: "moves.get",
-					gameId: boardData.id,
-					square: squareIndex,
-				});
-				if (result.type === "moves.result") setValidMoves(result.targets);
-			} catch (error) {
-				setErrorMsg(`API Error: ${error instanceof Error ? error.message : "Unknown"}`);
-				setValidMoves([]);
-			}
+			setValidMoves(boardData.legalMoves?.[squareIndex] ?? []);
 			return;
 		}
 

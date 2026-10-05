@@ -1,4 +1,4 @@
-import type { BoardMove } from "@chess/types";
+import type { BoardMove } from "@sixtyfour/types";
 import { useEffect, useMemo, useRef } from "react";
 
 type MoveHistoryProps = {
