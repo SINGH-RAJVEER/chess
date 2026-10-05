@@ -1,5 +1,5 @@
-import type { ComputerOpponent, StockfishLevel } from "@chess/types";
-import { DEFAULT_STOCKFISH_LEVEL, STOCKFISH_LEVELS } from "@chess/types";
+import type { ComputerOpponent, StockfishLevel } from "@sixtyfour/types";
+import { DEFAULT_STOCKFISH_LEVEL, STOCKFISH_LEVELS } from "@sixtyfour/types";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
@@ -7,8 +7,8 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { getApiBaseUrlForDisplay } from "../src/lib/api";
 import { useAuth } from "../src/lib/auth";
 
-const OPPONENT_KEY = "chess_computer_opponent";
-const LEVEL_KEY = "chess_computer_level";
+const OPPONENT_KEY = "sixtyfour_computer_opponent";
+const LEVEL_KEY = "sixtyfour_computer_level";
 
 function MenuButton({ label, onPress }: { label: string; onPress: () => void }) {
 	return (
@@ -54,7 +54,7 @@ export default function HomeScreen() {
 
 	return (
 		<View className="flex-1 bg-zinc-950 px-6 pt-10 pb-8">
-			<Text className="text-4xl font-light text-zinc-50">chess</Text>
+			<Text className="text-4xl font-light text-zinc-50">SixtyFour</Text>
 			<Text className="mt-1 text-sm text-zinc-500">Local, computer and online play</Text>
 
 			<View className="mt-8 gap-3">

@@ -1,4 +1,4 @@
-import type { Color, PieceType, PromotionPiece } from "@chess/types";
+import type { Color, PieceType, PromotionPiece } from "@sixtyfour/types";
 
 const PIECE_UNICODE: Record<Color, Record<PieceType, string>> = {
 	White: {

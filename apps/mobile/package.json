@@ -1,5 +1,5 @@
 {
-	"name": "@chess/mobile",
+	"name": "@sixtyfour/mobile",
 	"private": true,
 	"version": "0.0.0",
 	"main": "expo-router/entry",
@@ -15,9 +15,10 @@
 		"check": "biome check"
 	},
 	"dependencies": {
-		"@chess/types": "workspace:*",
+		"@sixtyfour/types": "workspace:*",
 		"expo": "57.0.25",
 		"expo-constants": "57.0.19",
+		"expo-file-system": "57.0.7",
 		"expo-linking": "57.0.11",
 		"expo-router": "57.0.23",
 		"expo-secure-store": "57.0.4",
@@ -29,6 +30,7 @@
 		"react-native-reanimated": "4.5.1",
 		"react-native-safe-area-context": "~5.7.0",
 		"react-native-screens": "~4.26.0",
+		"react-native-webview": "13.16.1",
 		"react-native-worklets": "0.10.1",
 		"tailwindcss": "^3.4.17"
 	},

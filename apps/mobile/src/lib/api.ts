@@ -1,10 +1,10 @@
-import type { AuthResponse } from "@chess/types";
+import type { AuthResponse } from "@sixtyfour/types";
 import * as SecureStore from "expo-secure-store";
 import { getApiBaseUrl } from "./config";
 
 export { getApiBaseUrl, getApiBaseUrlForDisplay } from "./config";
 
-const TOKEN_KEY = "chess_session_token";
+const TOKEN_KEY = "sixtyfour_session_token";
 
 let cachedToken: string | null | undefined;
 

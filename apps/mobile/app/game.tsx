@@ -6,15 +6,17 @@ import type {
 	PromotionPiece,
 	QueueStatusResponse,
 	WsServerMessage,
-} from "@chess/types";
-import { parseComputerOpponent, parseStockfishLevel } from "@chess/types";
+} from "@sixtyfour/types";
+import { parseComputerOpponent, parseStockfishLevel } from "@sixtyfour/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, Text, View } from "react-native";
 import ChessBoard from "../src/components/ChessBoard";
 import { useAuth } from "../src/lib/auth";
 import { promotionChoices, squareRow } from "../src/lib/pieces";
-import { gameSocket, type SocketStatus } from "../src/lib/ws";
+import { gameSocket as remoteSocket, type SocketStatus } from "../src/lib/ws";
+import { createComputerGame, MobileEngine } from "../src/lib/computer-game";
+import LocalEngineHost from "../src/components/LocalEngineHost";
 
 type GameMode = "local" | "computer" | "online";
 
@@ -79,6 +81,9 @@ export default function GameScreen() {
 	const [promotion, setPromotion] = useState<{ from: number; to: number } | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [localEngine] = useState(() => new MobileEngine());
+	const [{ game: localGame, archive }] = useState(() => createComputerGame(localEngine, (error) => setError(error.message)));
+	const gameSocket = mode === "computer" ? localGame : remoteSocket;
 	const [socketStatus, setSocketStatus] = useState<SocketStatus>(gameSocket.getStatus());
 	const [takebackRequest, setTakebackRequest] = useState<{ by: Color } | null>(null);
 	const [rematchOffer, setRematchOffer] = useState<{ by: Color } | null>(null);
@@ -92,6 +97,13 @@ export default function GameScreen() {
 
 	const playerId = user?.id ?? "";
 	const gameId = board?.id ?? 0;
+	useEffect(() => { if (mode === "computer") void localGame.configure(opponent, level).catch((error) => setError(error.message)); }, [localGame, mode, opponent, level]);
+	useEffect(() => { archive.setEnabled(mode === "computer" && Boolean(user)); return () => archive.setEnabled(false); }, [archive, mode, user]);
+	useEffect(() => {
+		if (mode !== "computer" || board?.revision === undefined) return;
+		const frame = requestAnimationFrame(() => localGame.markRendered(board.revision ?? 0));
+		return () => cancelAnimationFrame(frame);
+	}, [board?.revision, mode, localGame]);
 	boardIdRef.current = gameId;
 
 	const myColor = useMemo<Color | null>(() => {
@@ -150,7 +162,7 @@ export default function GameScreen() {
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to start a new game");
 		}
-	}, [mode, startOnline]);
+	}, [mode, startOnline, gameSocket]);
 
 	// Initial load over the socket, retried on reconnect while nothing
 	// loaded yet (e.g. the server was unreachable on first mount).
@@ -198,7 +210,7 @@ export default function GameScreen() {
 		} finally {
 			loadingRef.current = false;
 		}
-	}, [mode, startOnline]);
+	}, [mode, startOnline, gameSocket]);
 
 	// Single socket for all modes. Pushes replace the old queue/board
 	// polling loops; reconnects re-join the current room automatically.
@@ -281,7 +293,7 @@ export default function GameScreen() {
 			offReconnect();
 			gameSocket.disconnect();
 		};
-	}, [mode, user, isAuthLoading, router, startOnline, showError]);
+	}, [mode, user, isAuthLoading, router, startOnline, showError, gameSocket, loadInitial]);
 
 	const submitMove = useCallback(
 		async (from: number, to: number, promotionPiece?: PromotionPiece) => {
@@ -307,7 +319,7 @@ export default function GameScreen() {
 				setBusy(false);
 			}
 		},
-		[gameId, busy, mode, opponent, level],
+		[gameId, busy, mode, opponent, level, gameSocket],
 	);
 
 	const handleSquarePress = useCallback(
@@ -323,13 +335,7 @@ export default function GameScreen() {
 					return;
 				}
 				setSelected(square);
-				try {
-					const result = await gameSocket.request({ type: "moves.get", square, gameId: board.id });
-					if (result.type === "moves.result") setValidTargets(result.targets);
-				} catch (err) {
-					setError(err instanceof Error ? err.message : "Failed to load moves");
-					setValidTargets([]);
-				}
+				setValidTargets(board.legalMoves?.[square] ?? []);
 				return;
 			}
 
@@ -365,11 +371,13 @@ export default function GameScreen() {
 	const handleTakeback = useCallback(async () => {
 		if (!gameId) return;
 		try {
+			const undoBoth = mode === "computer" && board?.turn === "White" && board.moveCount >= 2;
 			await gameSocket.request({ type: "game.undo.request", gameId });
+			if (undoBoth) await gameSocket.request({ type: "game.undo.request", gameId });
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Takeback failed");
 		}
-	}, [gameId]);
+	}, [gameId, mode, board, gameSocket]);
 
 	const handleTakebackRespond = useCallback(
 		async (accept: boolean) => {
@@ -442,6 +450,7 @@ export default function GameScreen() {
 
 	return (
 		<View className="flex-1 bg-zinc-950 px-4 pt-2 pb-4">
+			{mode === "computer" ? <LocalEngineHost engine={localEngine} /> : null}
 			<View className="flex-row items-center justify-between py-2">
 				<Text className="text-sm font-medium text-zinc-400">
 					{MODE_TITLES[mode]}
@@ -453,7 +462,7 @@ export default function GameScreen() {
 							? " · online"
 							: " · offline"
 						: ""}
-					{socketStatus !== "open" ? " · reconnecting…" : ""}
+					{mode !== "computer" && socketStatus !== "open" ? " · reconnecting…" : ""}
 				</Text>
 				<View className="flex-row gap-2">
 					<Pressable

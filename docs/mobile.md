@@ -1,5 +1,7 @@
 # Mobile App
 
+The app displays `SixtyFour`, uses the `sixtyfour` URL scheme and `sixtyfour-mobile` Expo slug, and uses `com.sixtyfour.mobile` on iOS and Android. The launcher, splash screen, and web favicon use the `64` mark. The new bundle identifiers create a separate app installation from earlier builds.
+
 `apps/mobile` is an Expo (SDK 57) iOS and Android app with the same playable
 core as the web client: sign in, local pass-and-play, vs-computer games, and
 online matchmaking, all served by the Go API. UI is NativeWind (Tailwind)

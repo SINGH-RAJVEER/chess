@@ -1,4 +1,4 @@
-import type { BoardPiece, BoardResponse } from "@chess/types";
+import type { BoardPiece, BoardResponse } from "@sixtyfour/types";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { getPieceUnicode, squareCol, squareRow } from "../lib/pieces";

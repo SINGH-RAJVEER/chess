@@ -1,10 +1,10 @@
-import type { AuthResponse } from "@chess/types";
+import type { AuthResponse } from "@sixtyfour/types";
 import * as SecureStore from "expo-secure-store";
 import type { ReactNode } from "react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { signIn as apiSignIn, signOut as apiSignOut, signUp as apiSignUp, getSession } from "./api";
 
-const USER_KEY = "chess_user";
+const USER_KEY = "sixtyfour_user";
 
 type AuthState = {
 	user: AuthResponse["user"] | null;
