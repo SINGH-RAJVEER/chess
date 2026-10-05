@@ -10,9 +10,9 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { isDesktop } from "@/lib/api-base";
 import { useAuth } from "@/lib/auth-context";
 import { useSettings } from "@/lib/settings-context";
-import { isDesktop } from "@/lib/api-base";
 import SettingsDialog from "./settings-dialog";
 
 interface HeaderProps {

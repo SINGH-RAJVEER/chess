@@ -31,6 +31,11 @@ import { gameSocket, type SocketStatus } from "@/lib/ws";
 export default function HomePage() {
 	const { settings } = useSettings();
 	const [boardData, setBoardData] = useState<BoardResponse | null>(null);
+	useEffect(() => {
+		if (!boardData) return;
+		const frame = requestAnimationFrame(() => gameSocket.markRendered(boardData));
+		return () => cancelAnimationFrame(frame);
+	}, [boardData]);
 	const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
 	const [selectedSquare, setSelectedSquare] = useState<number | null>(null);
 	const [validMoves, setValidMoves] = useState<number[]>([]);

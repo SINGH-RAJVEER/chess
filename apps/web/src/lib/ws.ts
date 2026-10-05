@@ -1,4 +1,9 @@
-import type { WsClientMessage, WsServerMessage } from "@sixtyfour/types";
+import {
+	type BoardResponse,
+	RemoteMoveTracker,
+	type WsClientMessage,
+	type WsServerMessage,
+} from "@sixtyfour/types";
 import { getWsUrl } from "./api-base";
 
 export type SocketStatus = "idle" | "connecting" | "open" | "reconnecting";
@@ -32,6 +37,10 @@ type ClientMessageWithoutId<T extends WsClientMessage = WsClientMessage> = T ext
  * Reconnects with backoff and re-authenticates over the session cookie.
  */
 class GameSocket {
+	private tracker = new RemoteMoveTracker();
+	markRendered(board: BoardResponse) {
+		this.tracker.markRendered(board);
+	}
 	private ws: WebSocket | null = null;
 	private pending = new Map<string, PendingEntry>();
 	private openWaiters = new Set<OpenWaiter>();
@@ -155,6 +164,7 @@ class GameSocket {
 			} catch {
 				return;
 			}
+			if (msg.type === "game.state") msg = { ...msg, board: this.tracker.accept(msg.board) };
 			if (msg.id && this.pending.has(msg.id)) {
 				const entry = this.pending.get(msg.id);
 				this.pending.delete(msg.id);
@@ -221,8 +231,16 @@ class GameSocket {
 					this.pending.delete(id);
 					reject(new Error("Request timed out"));
 				}, 15000);
-				this.pending.set(id, { resolve, reject, timer });
+				this.pending.set(id, {
+					resolve,
+					reject: (error) => {
+						if (payload.type === "game.move") this.tracker.cancel(payload.gameId);
+						reject(error);
+					},
+					timer,
+				});
 				try {
+					if (payload.type === "game.move") this.tracker.begin(payload.gameId);
 					this.ws.send(JSON.stringify(payload));
 				} catch (error) {
 					window.clearTimeout(timer);

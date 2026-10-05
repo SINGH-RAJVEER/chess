@@ -41,6 +41,11 @@ export default function OnlinePlayerPage() {
 	const navigate = useNavigate();
 	const { settings } = useSettings();
 	const [boardData, setBoardData] = useState<BoardResponse | null>(null);
+	useEffect(() => {
+		if (!boardData) return;
+		const frame = requestAnimationFrame(() => gameSocket.markRendered(boardData));
+		return () => cancelAnimationFrame(frame);
+	}, [boardData]);
 	const [queueStatus, setQueueStatus] = useState<QueueStatusResponse>({ status: "idle" });
 	const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
 	const [selectedSquare, setSelectedSquare] = useState<number | null>(null);

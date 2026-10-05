@@ -8,6 +8,8 @@ import type {
 import { parseComputerOpponent, parseStockfishLevel } from "@sixtyfour/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ComputerGameView, { type PromotionState } from "@/components/computer-game-view";
+import { useAuth } from "@/lib/auth-context";
+import { createComputerGame } from "@/lib/computer-game";
 import {
 	buildCapturedPieceEntries,
 	getClockTime,
@@ -17,8 +19,6 @@ import {
 import { useSettings } from "@/lib/settings-context";
 import { playSound, resumeAudioContext } from "@/lib/sounds";
 import { calculateMaterialAdvantage } from "@/lib/themes";
-import { createComputerGame } from "@/lib/computer-game";
-import { useAuth } from "@/lib/auth-context";
 
 export default function ComputerPage() {
 	const { settings } = useSettings();
@@ -32,7 +32,7 @@ export default function ComputerPage() {
 	const [isMovePending, setIsMovePending] = useState(false);
 	const [isUndoPending, setIsUndoPending] = useState(false);
 	const [isResetPending, setIsResetPending] = useState(false);
-	const [{ game: gameSocket, archive }] = useState(() =>
+	const [{ game: gameSocket, synchronize }] = useState(() =>
 		createComputerGame((error) => setErrorMsg(error.message)),
 	);
 	const [promotionState, setPromotionState] = useState<PromotionState | null>(null);
@@ -54,9 +54,11 @@ export default function ComputerPage() {
 		void gameSocket.configure(opponent, level).catch((error) => setErrorMsg(error.message));
 	}, [gameSocket, opponent, level]);
 	useEffect(() => {
-		archive.setEnabled(Boolean(user));
-		return () => archive.setEnabled(false);
-	}, [archive, user]);
+		void synchronize(user?.id ?? null);
+		return () => {
+			void synchronize(null);
+		};
+	}, [synchronize, user?.id]);
 	useEffect(() => {
 		if (boardData?.revision === undefined) return;
 		const frame = requestAnimationFrame(() => gameSocket.markRendered(boardData.revision ?? 0));

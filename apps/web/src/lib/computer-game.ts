@@ -1,4 +1,4 @@
-import { ArchiveSync, ComputerGame, moveLatency, type LocalEngine } from "@sixtyfour/types";
+import { ArchiveSync, ComputerGame, type LocalEngine, moveLatency } from "@sixtyfour/types";
 import { WorkerEngine } from "../../../../libs/types/src/worker-engine";
 import { apiUrl } from "./api-base";
 
@@ -12,7 +12,7 @@ function createEngine(): LocalEngine {
 			search: async (request, signal) => {
 				if (signal.aborted) throw new Error("Search cancelled");
 				const cancel = () => {
-					void native.cancel();
+					void native.cancel().catch(() => {});
 				};
 				signal.addEventListener("abort", cancel, { once: true });
 				try {
@@ -22,10 +22,10 @@ function createEngine(): LocalEngine {
 				}
 			},
 			reset: () => {
-				void native.reset();
+				void native.reset().catch(() => {});
 			},
 			dispose: () => {
-				void native.cancel();
+				void native.cancel().catch(() => {});
 			},
 		};
 	return new WorkerEngine(
@@ -50,7 +50,11 @@ export function createComputerGame(onError: (error: Error) => void) {
 	const game = new ComputerGame(
 		createEngine(),
 		{
-			read: async () => localStorage.getItem("sixtyfour_local_computer_game"),
+			read: async () => {
+				const value = localStorage.getItem("sixtyfour_local_computer_game");
+				if (value) archive.update(value);
+				return value;
+			},
 			write: async (value) => {
 				localStorage.setItem("sixtyfour_local_computer_game", value);
 				archive.update(value);
@@ -58,5 +62,29 @@ export function createComputerGame(onError: (error: Error) => void) {
 		},
 		onError,
 	);
-	return { game, archive };
+	let account: string | null = null;
+	let generation = 0;
+	async function synchronize(userID: string | null) {
+		if (account === userID) return;
+		account = userID;
+		const current = ++generation;
+		archive.setEnabled(false);
+		if (!userID) return;
+		const initial = await game.request({ type: "board.get" });
+		if (initial.type === "game.state" && initial.board.moveCount === 0) {
+			try {
+				const response = await fetch(apiUrl("/api/computer-games/latest"), {
+					credentials: "include",
+					signal: AbortSignal.timeout(5000),
+				});
+				const value = response.ok ? await response.json() : null;
+				if (value && current === generation)
+					await game.restoreArchive(JSON.stringify(value), initial.board);
+			} catch {
+				/* The local game remains available offline. */
+			}
+		}
+		if (current === generation) archive.setEnabled(true);
+	}
+	return { game, archive, synchronize };
 }

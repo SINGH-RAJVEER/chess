@@ -1,11 +1,56 @@
 import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
-import { chromium, type Browser, type Page, type BrowserContext } from "playwright";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { _electron, type Browser, type BrowserContext, chromium, type Page } from "playwright";
 
 let browser: Browser;
 let page: Page;
 let context: BrowserContext;
 let server: ReturnType<typeof Bun.spawn> | null = null;
 const origin = "http://127.0.0.1:3107";
+
+test.skipIf(!process.env.ELECTRON_EXECUTABLE)(
+	"desktop plays through its native IPC engine with the API unavailable",
+	async () => {
+		const profile = await mkdtemp(join(tmpdir(), "sixtyfour-electron-test-"));
+		const app = await _electron.launch({
+			executablePath: process.env.ELECTRON_EXECUTABLE,
+			args: ["apps/desktop/main.cjs", "--no-sandbox"],
+			env: {
+				...process.env,
+				ELECTRON_RENDERER_URL: `${origin}/computer`,
+				ELECTRON_USER_DATA_DIR: profile,
+				ELECTRON_RUN_AS_NODE: "",
+			},
+		});
+		try {
+			const window = await app.firstWindow();
+			await window.route("**/api/**", (route) => route.abort());
+			await window.evaluate(() =>
+				localStorage.setItem(
+					"sixtyfour_settings",
+					JSON.stringify({ confirmMoves: false, soundEnabled: false }),
+				),
+			);
+			await window.reload();
+			expect(
+				await window.evaluate(() => typeof window.sixtyfourDesktop?.engine?.search),
+			).toBe("function");
+			await window.locator('[data-square="52"]').click();
+			await window.locator('[data-square="36"]').click();
+			await window.waitForFunction(
+				() =>
+					JSON.parse(localStorage.getItem("sixtyfour_local_computer_game") ?? "{}").moves
+						?.length === 2,
+			);
+		} finally {
+			await app.close();
+			await rm(profile, { recursive: true });
+		}
+	},
+	30000,
+);
 
 beforeAll(async () => {
 	if (
@@ -77,6 +122,10 @@ for (const opponent of ["Default", "Stockfish"]) {
 		await page.locator('[data-square="36"]').click();
 		await countMoves(2);
 		await page.waitForFunction(() => window.sixtyfourLatency?.summary()[0].samples === 1);
+		await page.locator('[data-square="62"]').click();
+		await page.locator('[data-square="45"]').click();
+		await countMoves(4);
+		await page.waitForFunction(() => window.sixtyfourLatency?.summary()[0].samples === 2);
 		console.log(opponent, await page.evaluate(() => window.sixtyfourLatency?.summary()[0]));
 		const saved = await page.evaluate(() =>
 			localStorage.getItem("sixtyfour_local_computer_game"),
