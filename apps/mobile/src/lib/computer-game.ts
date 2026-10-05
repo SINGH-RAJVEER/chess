@@ -58,7 +58,21 @@ export class MobileEngine implements LocalEngine {
 		this.pending.clear();
 	}
 	private async request(message: Record<string, unknown>): Promise<EngineReply> {
-		await this.ready;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		try {
+			await Promise.race([
+				this.ready,
+				new Promise<never>((_, reject) => {
+					timer = setTimeout(
+						() => reject(new Error("Engine initialization timed out")),
+						15000,
+					);
+				}),
+			]);
+		} finally {
+			clearTimeout(timer);
+		}
+		if (!this.inject) throw new Error("Engine host unavailable");
 		return new Promise((resolve, reject) => {
 			const id = ++this.nextId;
 			this.pending.set(id, {
@@ -120,7 +134,9 @@ export function createComputerGame(engine: MobileEngine, onError: (error: Error)
 		{
 			read: async () => {
 				const file = new File(Paths.document, "computer-game.json");
-				return file.exists ? file.text() : null;
+				const value = file.exists ? await file.text() : null;
+				if (value) archive.update(value);
+				return value;
 			},
 			write: async (value) => {
 				new File(Paths.document, "computer-game.json").write(value);
@@ -129,5 +145,30 @@ export function createComputerGame(engine: MobileEngine, onError: (error: Error)
 		},
 		onError,
 	);
-	return { game, archive };
+	let account: string | null = null;
+	let generation = 0;
+	async function synchronize(userID: string | null) {
+		if (account === userID) return;
+		account = userID;
+		const current = ++generation;
+		archive.setEnabled(false);
+		if (!userID) return;
+		const initial = await game.request({ type: "board.get" });
+		if (initial.type === "game.state" && initial.board.moveCount === 0) {
+			try {
+				const token = await loadAuthToken();
+				const response = await fetch(`${getApiBaseUrl()}/api/computer-games/latest`, {
+					headers: { Cookie: `better-auth.session_token=${token}` },
+					signal: AbortSignal.timeout(5000),
+				});
+				const value = response.ok ? await response.json() : null;
+				if (value && current === generation)
+					await game.restoreArchive(JSON.stringify(value), initial.board);
+			} catch {
+				/* The durable local game remains available offline. */
+			}
+		}
+		if (current === generation) archive.setEnabled(true);
+	}
+	return { game, archive, synchronize };
 }

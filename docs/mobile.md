@@ -1,14 +1,16 @@
 # Mobile App
 
+Computer games run in the local engine host and remain available offline. When a user signs in, an untouched local game can restore the latest archived game from the API. Archive synchronization follows the signed-in account and ignores replies from an earlier account. Engine initialization times out after 15 seconds if the host does not become ready.
+
 The app displays `SixtyFour`, uses the `sixtyfour` URL scheme and `sixtyfour-mobile` Expo slug, and uses `com.sixtyfour.mobile` on iOS and Android. The launcher, splash screen, and web favicon use the `64` mark. The new bundle identifiers create a separate app installation from earlier builds.
 
-`apps/mobile` is an Expo (SDK 57) iOS and Android app with the same playable core as the web client: sign in, local pass-and-play, vs-computer games, and online matchmaking, all served by the Go API. UI is NativeWind (Tailwind) over React Native; shared request and domain types come from `libs/types`.
+`apps/mobile` is an Expo (SDK 57) iOS and Android app with the same playable core as the web client: sign in, local pass-and-play, vs-computer games, and online matchmaking, with server multiplayer and local computer engines. UI is NativeWind (Tailwind) over React Native; shared request and domain types come from `libs/types`.
 
 ## Prerequisites
 
 - The devenv shell, which provides Bun and Node.js. Expo CLI and Metro must run on Node; they crash under the Bun runtime, so always use the `mobile-*` just recipes (they enter the devenv shell) instead of bare `bun run`.
 - For on-device runs: Expo Go, or a development build (`expo run:android` needs the Android SDK, `expo run:ios` needs macOS with Xcode).
-- A reachable API. The app reads `EXPO_PUBLIC_API_URL` at build time and falls back to `http://localhost:4000`, which works for iOS simulators but not physical devices. On a phone, set it to your machine's LAN address:
+- A reachable API for authentication and multiplayer. Computer games work offline after the app is installed. The app reads `EXPO_PUBLIC_API_URL` at build time and falls back to `http://localhost:4000`, which works for iOS simulators but not physical devices. On a phone, set it to your machine's LAN address:
 
 ```bash
 EXPO_PUBLIC_API_URL=http://192.168.1.20:4000 just mobile-dev
@@ -61,10 +63,10 @@ The API authenticates with a signed `better-auth.session_token` cookie, and the 
 ## Game Flows
 
 - Local: `vs_player` board, both sides move on the device.
-- Computer: `vs_computer` board with a Default minimax engine (alpha-beta pruning) and Stockfish picker; the screen polls while it is Black's turn.
-- Online: requires sign-in; joins the matchmaking queue, polls queue status until matched, then polls the board. Moves are allowed only for the signed in player's color (`userColor`).
+- Computer: local rules, SAN history stored with Expo FileSystem, and a Default/Stockfish picker. A hidden WebView hosts bundled WASM workers, each using a 500 ms budget; narrow messages return moves to React Native. No server request is needed to play. Signed-in saves archive in the background.
+- Online: requires sign-in; joins matchmaking and receives queue and board updates over the persistent WebSocket. Moves are allowed only for the signed in player's color (`userColor`).
 
-Promotion shows a four-piece picker; undo, draws, and clocks are not in the mobile client yet.
+Promotion shows a four-piece picker. Takebacks, draw offers, resignation, and clocks use the existing server protocol for multiplayer; computer takebacks cancel the local search. Export checks bundling, while WebView behavior and performance still need an iOS or Android device run.
 
 ## Monorepo Notes
 

@@ -12,11 +12,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, Text, View } from "react-native";
 import ChessBoard from "../src/components/ChessBoard";
+import LocalEngineHost from "../src/components/LocalEngineHost";
 import { useAuth } from "../src/lib/auth";
+import { createComputerGame, MobileEngine } from "../src/lib/computer-game";
 import { promotionChoices, squareRow } from "../src/lib/pieces";
 import { gameSocket as remoteSocket, type SocketStatus } from "../src/lib/ws";
-import { createComputerGame, MobileEngine } from "../src/lib/computer-game";
-import LocalEngineHost from "../src/components/LocalEngineHost";
 
 type GameMode = "local" | "computer" | "online";
 
@@ -82,7 +82,7 @@ export default function GameScreen() {
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [localEngine] = useState(() => new MobileEngine());
-	const [{ game: localGame, archive }] = useState(() =>
+	const [{ game: localGame, synchronize }] = useState(() =>
 		createComputerGame(localEngine, (error) => setError(error.message)),
 	);
 	const gameSocket = mode === "computer" ? localGame : remoteSocket;
@@ -104,14 +104,19 @@ export default function GameScreen() {
 			void localGame.configure(opponent, level).catch((error) => setError(error.message));
 	}, [localGame, mode, opponent, level]);
 	useEffect(() => {
-		archive.setEnabled(mode === "computer" && Boolean(user));
-		return () => archive.setEnabled(false);
-	}, [archive, mode, user]);
+		void synchronize(mode === "computer" ? (user?.id ?? null) : null);
+		return () => {
+			void synchronize(null);
+		};
+	}, [synchronize, mode, user?.id]);
 	useEffect(() => {
-		if (mode !== "computer" || board?.revision === undefined) return;
-		const frame = requestAnimationFrame(() => localGame.markRendered(board.revision ?? 0));
+		if (!board) return;
+		const frame = requestAnimationFrame(() => {
+			if (mode === "computer") localGame.markRendered(board.revision ?? 0);
+			else remoteSocket.markRendered(board);
+		});
 		return () => cancelAnimationFrame(frame);
-	}, [board?.revision, mode, localGame]);
+	}, [board, mode, localGame]);
 	boardIdRef.current = gameId;
 
 	const myColor = useMemo<Color | null>(() => {
@@ -138,7 +143,7 @@ export default function GameScreen() {
 			setError(err instanceof Error ? err.message : "Failed to join queue");
 			setJoining(false);
 		}
-	}, [playerId, joining]);
+	}, [playerId, joining, gameSocket]);
 
 	const startNewGame = useCallback(async () => {
 		setError(null);
@@ -310,7 +315,7 @@ export default function GameScreen() {
 			offReconnect();
 			gameSocket.disconnect();
 		};
-	}, [mode, user, isAuthLoading, router, startOnline, showError, gameSocket, loadInitial]);
+	}, [mode, user, isAuthLoading, router, showError, gameSocket, loadInitial]);
 
 	const submitMove = useCallback(
 		async (from: number, to: number, promotionPiece?: PromotionPiece) => {
@@ -383,7 +388,7 @@ export default function GameScreen() {
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to resign");
 		}
-	}, [gameId, myColor]);
+	}, [gameId, myColor, gameSocket]);
 
 	const handleTakeback = useCallback(async () => {
 		if (!gameId) return;
@@ -406,7 +411,7 @@ export default function GameScreen() {
 				setError(err instanceof Error ? err.message : "Takeback failed");
 			}
 		},
-		[gameId],
+		[gameId, gameSocket],
 	);
 
 	const handleOfferDraw = useCallback(async () => {
@@ -416,7 +421,7 @@ export default function GameScreen() {
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Draw offer failed");
 		}
-	}, [gameId]);
+	}, [gameId, gameSocket]);
 
 	const handleRematch = useCallback(async () => {
 		if (!gameId) return;
@@ -426,7 +431,7 @@ export default function GameScreen() {
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Rematch failed");
 		}
-	}, [gameId, showError]);
+	}, [gameId, showError, gameSocket]);
 
 	const handleRematchRespond = useCallback(
 		async (accept: boolean) => {
@@ -438,7 +443,7 @@ export default function GameScreen() {
 				setError(err instanceof Error ? err.message : "Rematch failed");
 			}
 		},
-		[gameId],
+		[gameId, gameSocket],
 	);
 
 	const moveRows = useMemo(() => pairedMoves(board?.moves ?? []), [board]);
