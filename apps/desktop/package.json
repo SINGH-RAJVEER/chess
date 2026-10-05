@@ -1,15 +1,15 @@
 {
-	"name": "@chess/desktop",
+	"name": "@sixtyfour/desktop",
 	"version": "0.1.0",
-	"description": "Chess desktop application",
+	"description": "SixtyFour desktop application",
 	"private": true,
 	"main": "main.cjs",
 	"scripts": {
 		"dev": "bun launch-electron.cjs",
-		"build": "electron-builder",
+		"build": "bun ../../scripts/prepare-desktop-engines.ts && electron-builder",
 		"check": "bun -e 'for (const file of [\"main.cjs\", \"preload.cjs\", \"launch-electron.cjs\"]) new Function(await Bun.file(file).text())'",
-		"lint": "biome lint main.cjs preload.cjs launch-electron.cjs",
-		"format": "biome format --write main.cjs preload.cjs launch-electron.cjs",
+		"lint": "biome lint main.cjs preload.cjs launch-electron.cjs engine.cjs",
+		"format": "biome format --write main.cjs preload.cjs launch-electron.cjs engine.cjs",
 		"test": "bun test",
 		"clean": "rm -rf dist release"
 	},
@@ -18,13 +18,47 @@
 		"electron-builder": "^26.0.0"
 	},
 	"build": {
-		"appId": "dev.chess.desktop",
-		"productName": "Chess",
-		"directories": { "output": "release" },
-		"files": ["main.cjs", "preload.cjs", "launch-electron.cjs", "package.json"],
-		"extraResources": [{ "from": "../web/dist", "to": "web" }],
-		"linux": { "target": ["AppImage", "deb"], "icon": "icons/icon.png" },
-		"mac": { "target": ["dmg"], "icon": "icons/icon.icns" },
-		"win": { "target": ["nsis"], "icon": "icons/icon.ico" }
+		"appId": "dev.sixtyfour.desktop",
+		"productName": "SixtyFour",
+		"directories": {
+			"output": "release"
+		},
+		"files": [
+			"icons/**",
+			"main.cjs",
+			"preload.cjs",
+			"launch-electron.cjs",
+			"package.json",
+			"engine.cjs"
+		],
+		"extraResources": [
+			{
+				"from": "../web/dist",
+				"to": "web"
+			},
+			{
+				"from": "engines",
+				"to": "engines"
+			}
+		],
+		"linux": {
+			"target": [
+				"AppImage",
+				"deb"
+			],
+			"icon": "icons/icon.png"
+		},
+		"mac": {
+			"target": [
+				"dmg"
+			],
+			"icon": "icons/icon.icns"
+		},
+		"win": {
+			"target": [
+				"nsis"
+			],
+			"icon": "icons/icon.ico"
+		}
 	}
 }

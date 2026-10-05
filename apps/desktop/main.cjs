@@ -2,6 +2,22 @@ const { app, BrowserWindow, ipcMain, net, protocol } = require("electron");
 const { existsSync, statSync } = require("node:fs");
 const { join, resolve, sep } = require("node:path");
 const { pathToFileURL } = require("node:url");
+const { NativeEngine } = require("./engine.cjs");
+const engines = new Map();
+
+app.setName("SixtyFour");
+
+function engineFor(event) {
+	const window = BrowserWindow.fromWebContents(event.sender);
+	if (!window || event.senderFrame !== event.sender.mainFrame) throw new Error("Invalid engine caller");
+	let engine = engines.get(event.sender.id);
+	if (!engine) {
+		engine = new NativeEngine(process.resourcesPath, app.isPackaged);
+		engines.set(event.sender.id, engine);
+		window.on("closed", () => { engine.dispose(); engines.delete(event.sender.id); });
+	}
+	return engine;
+}
 
 protocol.registerSchemesAsPrivileged([
 	{
@@ -37,6 +53,8 @@ function createWindow() {
 		minHeight: 640,
 		center: true,
 		frame: false,
+		title: "SixtyFour",
+		icon: join(__dirname, "icons/icon.png"),
 		webPreferences: {
 			preload: join(__dirname, "preload.cjs"),
 			contextIsolation: true,
@@ -48,12 +66,16 @@ function createWindow() {
 	if (process.env.ELECTRON_RENDERER_URL) {
 		void window.loadURL(process.env.ELECTRON_RENDERER_URL);
 	} else {
-		void window.loadURL("app://chess/");
+		void window.loadURL("app://sixtyfour/");
 	}
 }
 
 app.whenReady().then(() => {
 	registerAppProtocol();
+	ipcMain.handle("engine:prepare", (event, opponent) => engineFor(event).prepare(opponent));
+	ipcMain.handle("engine:search", (event, request) => engineFor(event).search(request));
+	ipcMain.handle("engine:reset", (event) => engineFor(event).reset());
+	ipcMain.handle("engine:cancel", (event) => engineFor(event).dispose());
 	ipcMain.on("window:close", (event) => {
 		BrowserWindow.fromWebContents(event.sender)?.close();
 	});
