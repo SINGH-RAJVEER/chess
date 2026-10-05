@@ -4,9 +4,11 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
-// Stockfish runs through the same per-move UCI runner as sixtyfour-engine, so
+// Stockfish runs through the same persistent UCI pool as sixtyfour-engine, so
 // no strength settings or hash contents leak between games.
 
 const (
@@ -43,7 +45,17 @@ func StockfishAvailable() bool {
 func stockfishPath() (string, error) {
 	name := os.Getenv("STOCKFISH_PATH")
 	if name == "" {
-		name = "stockfish"
+		// Bun adds npm's Stockfish.js CLI to PATH. Native server workers
+		// must resolve the installed binary rather than that browser package.
+		for _, directory := range filepath.SplitList(os.Getenv("PATH")) {
+			if strings.Contains("/"+filepath.ToSlash(directory)+"/", "/node_modules/") {
+				continue
+			}
+			if path, err := exec.LookPath(filepath.Join(directory, "stockfish")); err == nil {
+				return path, nil
+			}
+		}
+		return "", ErrStockfishUnavailable
 	}
 	path, err := exec.LookPath(name)
 	if err != nil {

@@ -1,7 +1,7 @@
 # Build with podman from the repository root:
 #   podman build -f apps/api/Dockerfile -t sixtyfour-api .
 #
-# The API serves computer moves by spawning UCI engines per move: the
+# The API serves computer moves through persistent, bounded UCI workers: the
 # sixtyfour-engine binary built from apps/engine (minimax and custom) and
 # Debian's stockfish package. The two build stages are independent, and the
 # Go binary is pure Go (CGO_ENABLED=0).

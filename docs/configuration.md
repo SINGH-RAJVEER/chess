@@ -23,16 +23,14 @@ The local stack loads a single root `.env` file. In a deployed environment, prov
 
 ## Engine Variables
 
-Minimax and custom computer moves are served by the `sixtyfour-engine` binary built from `apps/engine`, which the API spawns once per move over UCI. There is no engine host, port, or model path to configure. The Stockfish opponent runs its own binary the same way (see [stockfish.md](stockfish.md)).
+Minimax and custom computer moves are served by the `sixtyfour-engine` binary built from `apps/engine`, which the API retains in a bounded pool of UCI processes. There is no engine host, port, or model path to configure. The Stockfish opponent runs its own binary the same way (see [stockfish.md](stockfish.md)).
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `ENGINE_PATH` | No | `sixtyfour-engine` on `PATH`, then `apps/engine/target/release/sixtyfour-engine` | `sixtyfour-engine` binary for the `minimax` and `custom` opponents. The container image sets `/usr/local/bin/sixtyfour-engine`. When unresolvable, those moves are rejected. |
-| `ENGINE_CUSTOM_MOVETIME_MS` | No | `1000` | Time budget per custom-engine move in milliseconds. Read by the API and sent as `go movetime`. |
-| `ENGINE_CUSTOM_MAX_DEPTH` | No | `64` | Maximum custom-engine search depth. Read by the API and sent as `go depth`. |
 | `STOCKFISH_PATH` | No | `stockfish` on `PATH` | Stockfish binary for the `stockfish` opponent. The container image sets `/usr/games/stockfish`. When unresolvable, Stockfish moves are rejected. |
 
-Longer `ENGINE_CUSTOM_MOVETIME_MS` values make computer moves stronger but hold a search slot longer; size deployment CPU for the number of concurrent computer games rather than accepting the development defaults without measurement. The DQN variables (`CHESS_MODEL_PATH`, `DQN_SIMULATIONS`, `DQN_MOVE_TIME_MS`) and `CHESS_ENGINE_URL` were removed with the standalone engine server; the training code in `apps/dqn/training` is retained for research but no longer serves traffic.
+All application opponents use a fixed 500 ms budget and dynamically reached depth. The former `ENGINE_CUSTOM_MOVETIME_MS` and `ENGINE_CUSTOM_MAX_DEPTH` variables are ignored. Local client engines do not need server binary paths. The DQN variables (`CHESS_MODEL_PATH`, `DQN_SIMULATIONS`, `DQN_MOVE_TIME_MS`) and `CHESS_ENGINE_URL` were removed with the standalone engine server; the training code in `apps/dqn/training` is retained for research but no longer serves traffic.
 
 ## Web Variables
 

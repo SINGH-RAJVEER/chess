@@ -6,6 +6,7 @@ import (
 	"github.com/rajveer/sixtyfour/apps/api/internal/game"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -60,9 +61,11 @@ func (broker *MemoryBroker) Close() error { return nil }
 const redisChannel = "sixtyfour:games"
 
 type RedisBroker struct {
-	client *redis.Client
-	cancel context.CancelFunc
-	done   chan struct{}
+	client  *redis.Client
+	ctx     context.Context
+	cancel  context.CancelFunc
+	publish chan []byte
+	workers sync.WaitGroup
 }
 
 func NewRedisBroker(url string) (*RedisBroker, error) {
@@ -77,7 +80,23 @@ func NewRedisBroker(url string) (*RedisBroker, error) {
 		client.Close()
 		return nil, err
 	}
-	broker := &RedisBroker{client: client, cancel: cancel, done: make(chan struct{})}
+	broker := &RedisBroker{client: client, ctx: ctx, cancel: cancel, publish: make(chan []byte, 256)}
+	broker.workers.Add(1)
+	go func() {
+		defer broker.workers.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case data := <-broker.publish:
+				deadline, stop := context.WithTimeout(ctx, time.Second)
+				if err := client.Publish(deadline, redisChannel, string(data)).Err(); err != nil {
+					log.Printf("realtime broker publish failed: %v", err)
+				}
+				stop()
+			}
+		}
+	}()
 	return broker, nil
 }
 
@@ -85,11 +104,31 @@ func NewRedisBroker(url string) (*RedisBroker, error) {
 // notifications published by this same process are echoed back by Redis and
 // delivered like any other replica's, so every hub converges on pushes.
 func (broker *RedisBroker) SubscribeRemote(fn func(Change)) {
-	pubsub := broker.client.Subscribe(context.Background(), redisChannel)
+	pubsub := broker.client.Subscribe(broker.ctx, redisChannel)
+	deadline, cancel := context.WithTimeout(broker.ctx, 3*time.Second)
+	_, err := pubsub.Receive(deadline)
+	cancel()
+	if err != nil {
+		_ = pubsub.Close()
+		log.Printf("realtime broker subscribe failed: %v", err)
+		return
+	}
+	broker.workers.Add(1)
 	go func() {
-		defer close(broker.done)
+		defer broker.workers.Done()
 		defer pubsub.Close()
-		for message := range pubsub.Channel() {
+		messages := pubsub.Channel()
+		for {
+			var message *redis.Message
+			select {
+			case <-broker.ctx.Done():
+				return
+			case value, ok := <-messages:
+				if !ok {
+					return
+				}
+				message = value
+			}
 			var change Change
 			err := json.Unmarshal([]byte(message.Payload), &change)
 			if err != nil {
@@ -105,8 +144,11 @@ func (broker *RedisBroker) Publish(change Change) {
 	if err != nil {
 		return
 	}
-	if err := broker.client.Publish(context.Background(), redisChannel, string(data)).Err(); err != nil {
-		log.Printf("realtime broker publish failed: %v", err)
+	select {
+	case <-broker.ctx.Done():
+	case broker.publish <- data:
+	default:
+		log.Print("realtime broker queue full; room reconciliation will recover state")
 	}
 }
 
@@ -117,6 +159,6 @@ func (broker *RedisBroker) Subscribe(fn func(Change)) {
 func (broker *RedisBroker) Close() error {
 	broker.cancel()
 	err := broker.client.Close()
-	<-broker.done
+	broker.workers.Wait()
 	return err
 }

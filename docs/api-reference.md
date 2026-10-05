@@ -2,13 +2,13 @@
 
 The API is served under `/api` by the Go service. JSON errors use the shape `{"error":"message"}`. The API currently returns many service errors as HTTP 500, including some invalid domain requests; clients should display the error message and operators should treat unexpected 500 responses as actionable.
 
-Game play is websocket-only over `GET /api/ws` (see Realtime below); the legacy REST game endpoints were removed and return 404. REST remains for health and authentication.
+Live game play is websocket-only over `GET /api/ws` (see Realtime below); the legacy REST game endpoints were removed and return 404. REST serves health, authentication, and local computer-game archives.
 
 ## Health
 
 ### `GET /api/health`
 
-Returns `{"ok":true}` when the API process is serving. This endpoint does not verify PostgreSQL reachability at request time. Computer moves are served by engine processes the API spawns per move; there is no separate engine service or engine health endpoint.
+Returns `{"ok":true}` when the API process is serving. This endpoint does not verify PostgreSQL reachability at request time. Computer moves are served by engine processes the API keeps in a bounded pool; there is no separate engine service or engine health endpoint.
 
 ## Realtime (`GET /api/ws`)
 
@@ -28,6 +28,8 @@ Client messages:
 - `ping` — answered with `pong`.
 
 Server pushes include `game.state` (full board, per-viewer `userColor`), `game.matched`, `queue.status`, `presence` (`whiteOnline`/`blackOnline`), `game.draw.offered`, `game.undo.requested` / `game.undo.result`, `game.rematch.offered`, `game.over`, and `error`. A 1s server ticker re-checks active rooms so timeouts and engine replies are pushed even if a notification is missed. Square indexes are integers from `0` through `63`.
+
+A successful `game.move` receives `{type: "game.move.ok", id, gameId, revision}` after commit. The board arrives through the room's `game.state` push, once per committed revision; the acknowledgement does not duplicate the board. Clients ignore older board revisions when responses or reconnects arrive out of order. Local room updates are published before asynchronous Redis delivery to other replicas.
 
 ## Authentication
 
@@ -53,6 +55,14 @@ Deletes the current session and clears the cookie. A `sessionId` in the request 
 
 ## Engine Selection
 
-Minimax and custom computer moves are computed by the `sixtyfour-engine` binary (`apps/engine`), which `apps/api/internal/engine` spawns per move over UCI; there is no engine HTTP service. The `stockfish` opponent spawns the Stockfish binary per move the same way (see [engine.md](engine.md) and [stockfish.md](stockfish.md)).
+Minimax and custom computer moves are computed by the `sixtyfour-engine` binary (`apps/engine`), which `apps/api/internal/engine` leases persistently over UCI; there is no engine HTTP service. The `stockfish` opponent leases the Stockfish binary persistently the same way (see [engine.md](engine.md) and [stockfish.md](stockfish.md)).
 
-The Go runner accepts a FEN plus `minimax`, `custom`, or `stockfish` with a level (legacy `dqn` maps to `custom`), selects the move, and returns UCI notation such as `e7e5`. Invalid or illegal positions surface as engine errors and leave the game unchanged. For the custom opponent, the API log records reached depth, score, and node count as diagnostics; Stockfish moves log level, depth, and score.
+The Go runner accepts a FEN plus `minimax`, `custom`, or `stockfish` with a level (legacy `dqn` maps to `custom`), selects the move, and returns UCI notation such as `e7e5`. Invalid human moves are rejected before commit. Engine replies are validated and applied only to their starting revision; a failed search leaves the committed human move in place. For the custom opponent, the API log records reached depth, score, and node count as diagnostics; Stockfish moves log level, depth, and score.
+
+## Local computer-game archives
+
+`POST /api/computer-games` accepts `{version: 1, id, revision, moves, resigned, opponent, level}` from a signed-in session. `moves` is a legal SAN history, limited to 2048 plies and a 64 KiB body. Archives are keyed by user and client game ID. Lower or equal revisions cannot overwrite a newer save. These archives are unrated and do not affect live server game state.
+
+`GET /api/computer-games/latest` returns the signed-in user's most recently saved archive, or `null`. Both routes reject anonymous requests with 401. Clients recover only into an unchanged empty local game, then continue local play.
+
+`game.state.board` now includes `revision`, `legalMoves`, and optional `latency` values in milliseconds: `serverMs`, `acquireMs`, `commitMs`, and `searchMs`. `legalMoves` maps source-square indexes to destination arrays, so selection needs no `moves.get` round trip. The legacy read remains supported. Server engine results must match their starting revision; human callers cannot move Black in a server computer game.

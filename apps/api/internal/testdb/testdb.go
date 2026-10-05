@@ -1,6 +1,6 @@
-// Package testdb opens per-package integration-test databases and migrates
-// them. Each calling package gets its own database so `go test ./...` can
-// run packages in parallel without sharing state. Tests skip when no
+// Package testdb opens isolated integration-test databases and migrates
+// them. Each test and process gets its own database so `go test ./...` can
+// run tests and packages in parallel without sharing state. Tests skip when no
 // database server is reachable, keeping the suite green without PostgreSQL.
 package testdb
 
@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -33,10 +34,10 @@ var wipeTables = []string{
 	`"user"`,
 }
 
-// Open connects to the calling package's test database, migrates it, and
-// registers cleanup that wipes every table. The database name derives from
-// TEST_DATABASE_URL, DATABASE_URL, or a per-package local default, so each
-// package is isolated. It calls t.Skip when unreachable.
+// Open connects to a unique test database, migrates it, and registers cleanup
+// that wipes and drops it. TEST_DATABASE_URL or DATABASE_URL selects the
+// server; the database name includes the package, process, and test name.
+// It calls t.Skip when unreachable.
 func Open(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	hash := fnv.New32a()
@@ -48,8 +49,6 @@ func Open(t *testing.T) *pgxpool.Pool {
 	}
 	if url == "" {
 		url = "postgres://postgres:postgres@localhost:5432/postgres"
-	} else {
-		url = withDatabase(url, name)
 	}
 	url = withDatabase(url, name)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -60,6 +59,17 @@ func Open(t *testing.T) *pgxpool.Pool {
 		t.Skipf("no test database: %v", err)
 	}
 	if err := database.Migrate(ctx, pool); err != nil {
+		pool.Close()
+		t.Fatalf("migrate test database: %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		for _, table := range wipeTables {
+			if _, err := pool.Exec(ctx, "DELETE FROM "+table); err != nil {
+				t.Errorf("wipe %s: %v", table, err)
+			}
+		}
 		pool.Close()
 		config, err := pgxpool.ParseConfig(url)
 		if err != nil {
@@ -72,17 +82,6 @@ func Open(t *testing.T) *pgxpool.Pool {
 		}
 		defer maintenance.Close()
 		_, _ = maintenance.Exec(ctx, fmt.Sprintf("DROP DATABASE %s", pgx.Identifier{name}.Sanitize()))
-		t.Fatalf("migrate test database: %v", err)
-	}
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		for _, table := range wipeTables {
-			if _, err := pool.Exec(ctx, "DELETE FROM "+table); err != nil {
-				t.Errorf("wipe %s: %v", table, err)
-			}
-		}
-		pool.Close()
 	})
 	return pool
 }
@@ -112,12 +111,12 @@ func callerPackage() string {
 
 // withDatabase returns url pointed at the given database name.
 func withDatabase(url, name string) string {
-	config, err := pgxpool.ParseConfig(url)
-	if err != nil {
-		return url
+	parsed, err := neturl.Parse(url)
+	if err == nil && (parsed.Scheme == "postgres" || parsed.Scheme == "postgresql") {
+		parsed.Path = "/" + name
+		return parsed.String()
 	}
-	config.ConnConfig.Database = name
-	return config.ConnString()
+	return url + " dbname=" + name
 }
 
 // ensureDatabase creates the database named by url when missing, using the

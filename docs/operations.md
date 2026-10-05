@@ -2,7 +2,7 @@
 
 ## Production Topology
 
-Run the web server behind a TLS-terminating reverse proxy. Route browser `/api` requests to the Go API and serve the Vite build as static assets or through the Vite preview-compatible server. Computer moves are computed by `sixtyfour-engine` and Stockfish child processes that the API spawns per move; there is no engine network service to isolate or scale separately. The API should be the only service allowed to reach PostgreSQL.
+Run the web server behind a TLS-terminating reverse proxy. Route browser `/api` requests to the Go API and serve the Vite build as static assets or through the Vite preview-compatible server. Computer moves are computed by `sixtyfour-engine` and Stockfish child processes that the API keeps in a bounded pool; there is no engine network service to isolate or scale separately. The API should be the only service allowed to reach PostgreSQL.
 
 Podman-ready Dockerfiles ship with each app (see docker.md). The repository does not include a deployment manifest, reverse-proxy configuration, or process supervisor. Choose and document those parts in the deployment environment.
 
@@ -52,7 +52,7 @@ The application does not currently emit structured logs, metrics, traces, reques
 ### Computer games do not advance
 
 1. Check API logs for engine request failures or `engine busy` saturation.
-2. Confirm `ENGINE_CUSTOM_MOVETIME_MS` / `ENGINE_CUSTOM_MAX_DEPTH` are sane; oversized budgets hold search slots and serialize computer games.
+2. Check client `sixtyfourLatency.summary()` and server `move latency` / `engine latency` logs. The application budget is fixed at 500 ms. Separate cold startup, engine time, commit time, and render overhead before changing deployment capacity.
 3. Confirm the engine binaries resolve in the API process environment: `sixtyfour-engine` from `ENGINE_PATH` or `PATH` (a missing binary rejects minimax and custom moves with `SixtyFour engine is not installed on the server`), and Stockfish from `STOCKFISH_PATH` or `PATH` (`stockfish is not installed on the server`).
 4. Look for `sixtyfour-engine timed out` or `exited without a move` in the logs. Each is one killed or crashed engine process; the API keeps serving. Confirm the deployed `sixtyfour-engine` came from the same release as the API.
 5. Reset or retry the affected game after recovery.
@@ -69,4 +69,4 @@ Never manually mark a migration applied without verifying the complete schema.
 
 ## Capacity Notes
 
-The client polls active games and queues once per second. API and PostgreSQL capacity must be sized for this read pattern as well as move writes. `sixtyfour-engine` and Stockfish child processes share a semaphore, so concurrent computer games serialize past `NumCPU - 1` parallel searches. Size API CPU for the expected number of concurrent computer games and the `ENGINE_CUSTOM_MOVETIME_MS` budget.
+Clients receive committed snapshots over WebSockets and use bundled legal destinations. The server ticker reconciles active rooms once per second. Server engines reserve `max(1, min(GOMAXPROCS - 1, 4))` search slots before accepting a human computer-game move; excess work is rejected rather than queued after commit. Client computer games run locally and archive outside the move path. Benchmark concurrency, cold starts, and p95 against an isolated server before sizing API CPU and memory.

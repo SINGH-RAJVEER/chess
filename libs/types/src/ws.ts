@@ -98,6 +98,7 @@ export type WsServerMessage =
 			increment: number;
 	  }
 	| { id?: WsRequestId; type: "game.state"; board: BoardResponse }
+	| { id?: WsRequestId; type: "game.move.ok"; gameId: number; revision: number }
 	| { id?: WsRequestId; type: "moves.result"; gameId: number; square: number; targets: number[] }
 	| { id?: WsRequestId; type: "game.draw.offered"; gameId: number; by: Color }
 	| { id?: WsRequestId; type: "game.undo.requested"; gameId: number; by: Color }

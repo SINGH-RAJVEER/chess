@@ -23,6 +23,17 @@ type worker struct {
 	busy     bool
 	gameID   int
 	opponent string
+	exitErr  error
+	stderr   *engineLog
+}
+
+type engineLog struct{ data []byte }
+
+func (output *engineLog) Write(data []byte) (int, error) {
+	if remaining := 4096 - len(output.data); remaining > 0 {
+		output.data = append(output.data, data[:min(remaining, len(data))]...)
+	}
+	return len(data), nil
 }
 
 var pool = struct {
@@ -96,6 +107,8 @@ func Acquire(ctx context.Context, options Options, gameID int) (*Lease, error) {
 func startWorker(parent context.Context, path string) (*worker, error) {
 	processCtx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(processCtx, path)
+	output := &engineLog{}
+	cmd.Stderr = output
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		cancel()
@@ -110,7 +123,7 @@ func startWorker(parent context.Context, path string) (*worker, error) {
 		cancel()
 		return nil, err
 	}
-	w := &worker{path: path, cmd: cmd, stdin: stdin, lines: make(chan string, 128), done: make(chan struct{}), cancel: cancel}
+	w := &worker{path: path, cmd: cmd, stdin: stdin, lines: make(chan string, 128), done: make(chan struct{}), cancel: cancel, stderr: output}
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
@@ -119,9 +132,9 @@ func startWorker(parent context.Context, path string) (*worker, error) {
 			case <-processCtx.Done():
 			}
 		}
-		close(w.lines)
-		_ = cmd.Wait()
+		w.exitErr = cmd.Wait()
 		close(w.done)
+		close(w.lines)
 	}()
 	ctx, stop := context.WithTimeout(parent, startupBudget)
 	defer stop()
@@ -141,6 +154,16 @@ func startWorker(parent context.Context, path string) (*worker, error) {
 		w.destroy()
 		return nil, err
 	}
+	// Stockfish loads its evaluation network on the first search. Warm
+	// that work and the Rust hash allocation before accepting a move.
+	if err := w.write("position startpos\ngo movetime 1\n"); err != nil {
+		w.destroy()
+		return nil, err
+	}
+	if err := w.until(ctx, "bestmove "); err != nil {
+		w.destroy()
+		return nil, err
+	}
 	return w, nil
 }
 
@@ -153,7 +176,7 @@ func (w *worker) until(ctx context.Context, prefix string) error {
 			return ctx.Err()
 		case line, ok := <-w.lines:
 			if !ok {
-				return fmt.Errorf("engine exited")
+				return fmt.Errorf("engine exited: %v %s", w.exitErr, strings.TrimSpace(string(w.stderr.data)))
 			}
 			if strings.HasPrefix(line, prefix) {
 				return nil
@@ -272,10 +295,20 @@ func (lease *Lease) Search(parent context.Context, fen string) (string, string, 
 }
 
 func Warm(ctx context.Context) {
-	for _, opponent := range []string{"stockfish", "minimax"} {
+	var leases []*Lease
+	defer func() {
+		for _, lease := range leases {
+			lease.Release()
+		}
+	}()
+	for index := 0; index < searchConcurrency(); index++ {
+		opponent := "minimax"
+		if searchConcurrency() > 1 && index%2 == 0 {
+			opponent = "stockfish"
+		}
 		lease, err := Acquire(ctx, Options{Opponent: opponent}, 0)
 		if err == nil {
-			lease.Release()
+			leases = append(leases, lease)
 		}
 	}
 }

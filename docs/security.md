@@ -48,3 +48,9 @@ Never log or commit:
 - session tokens or OAuth authorization codes
 
 The web client currently caches user and session-shaped data in local storage for UI restoration. The server-side HTTP-only cookie remains the authentication authority; do not treat local storage as proof of identity.
+
+## Local computer engines and archives
+
+Local computer games are unrated. Their rules and durable state live on the device; the API replays and validates every archived SAN history, authenticates archive access, and scopes reads and writes to the session user. Archive writes cannot mutate live multiplayer games.
+
+Desktop engine IPC exposes only prepare, search, reset, and cancel to the window's main frame. The renderer cannot select executable paths or issue arbitrary UCI commands. FEN line breaks and malformed requests are rejected before native writes. Mobile's hidden WebView contains bundled engine code, restricts page navigation, and communicates through serialized engine messages. Canceled workers are destroyed and revisions reject late results.

@@ -1,15 +1,125 @@
 package httpapi_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 
 	"github.com/rajveer/sixtyfour/apps/api/internal/auth"
+	"github.com/rajveer/sixtyfour/apps/api/internal/game"
 	"github.com/rajveer/sixtyfour/apps/api/internal/httpapi"
+	"github.com/rajveer/sixtyfour/apps/api/internal/testdb"
 )
+
+func TestMovePushesOneSnapshotAndAcknowledgesRevision(t *testing.T) {
+	db := testdb.Open(t)
+	authService := auth.NewService(db, "move-test", auth.GoogleConfig{})
+	server := httptest.NewServer(httpapi.NewHandler(authService, game.NewService(db)))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http")+"/api/ws", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.CloseNow()
+	var message struct {
+		Type     string             `json:"type"`
+		ID       string             `json:"id"`
+		Board    game.BoardResponse `json:"board"`
+		Revision int64              `json:"revision"`
+	}
+	if err := wsjson.Read(ctx, conn, &message); err != nil {
+		t.Fatal(err)
+	}
+	if err := wsjson.Write(ctx, conn, map[string]any{"id": "new", "type": "game.new", "mode": "vs_player"}); err != nil {
+		t.Fatal(err)
+	}
+	for message.ID != "new" {
+		if err := wsjson.Read(ctx, conn, &message); err != nil {
+			t.Fatal(err)
+		}
+	}
+	id := message.Board.ID
+	if err := wsjson.Write(ctx, conn, map[string]any{"id": "move", "type": "game.move", "gameId": id, "from": 52, "to": 36}); err != nil {
+		t.Fatal(err)
+	}
+	pushes := 0
+	for {
+		message.ID = ""
+		if err := wsjson.Read(ctx, conn, &message); err != nil {
+			t.Fatal(err)
+		}
+		if message.Type == "game.state" {
+			if message.Board.Revision == 0 {
+				continue
+			}
+			pushes++
+			if message.Board.Revision != 1 || message.Board.MoveCount != 1 || len(message.Board.LegalMoves[12]) == 0 {
+				t.Fatalf("invalid snapshot: %+v", message.Board)
+			}
+		}
+		if message.ID == "move" {
+			if message.Type != "game.move.ok" || message.Revision != 1 || pushes != 1 {
+				t.Fatalf("move response=%+v snapshots=%d", message, pushes)
+			}
+			break
+		}
+	}
+}
+
+func TestComputerArchivesAreValidatedVersionedAndPrivate(t *testing.T) {
+	db := testdb.Open(t)
+	authService := auth.NewService(db, "archive-test", auth.GoogleConfig{})
+	first, err := authService.SignUp(context.Background(), "archive-first@example.com", "password123", "First", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := authService.SignUp(context.Background(), "archive-second@example.com", "password123", "Second", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := httpapi.NewHandler(authService, game.NewService(db))
+	request := func(method, path, body, token string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		if token != "" {
+			r.AddCookie(&http.Cookie{Name: "better-auth.session_token", Value: token})
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		return w
+	}
+	valid := `{"version":1,"id":1,"revision":2,"moves":["e4","e5"],"opponent":"minimax","level":4}`
+	if got := request("POST", "/api/computer-games", valid, ""); got.Code != 401 {
+		t.Fatalf("anonymous archive: %d", got.Code)
+	}
+	if got := request("POST", "/api/computer-games", valid, first.Session.Token); got.Code != 200 {
+		t.Fatalf("archive: %d %s", got.Code, got.Body)
+	}
+	old := strings.Replace(valid, `"revision":2`, `"revision":1`, 1)
+	if got := request("POST", "/api/computer-games", old, first.Session.Token); got.Code != 200 {
+		t.Fatal(got.Code)
+	}
+	got := request("GET", "/api/computer-games/latest", "", first.Session.Token)
+	var saved game.ArchivedGame
+	if err := json.Unmarshal(got.Body.Bytes(), &saved); err != nil || saved.Revision != 2 {
+		t.Fatalf("archive regressed: %s", got.Body)
+	}
+	if got := request("GET", "/api/computer-games/latest", "", second.Session.Token); strings.TrimSpace(got.Body.String()) != "null" {
+		t.Fatalf("another user's archive exposed: %s", got.Body)
+	}
+	illegal := strings.Replace(valid, `["e4","e5"]`, `["e4","e4"]`, 1)
+	if got := request("POST", "/api/computer-games", illegal, first.Session.Token); got.Code != 400 {
+		t.Fatalf("illegal archive: %d", got.Code)
+	}
+}
 
 func TestHealthAndCORS(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/api/health", nil)

@@ -10,7 +10,9 @@ func TestEmbeddedMigrationsAreOrdered(t *testing.T) {
 	if len(files) != 4 {
 		t.Fatalf("expected 4 migrations, got %d", len(files))
 	}
-	if files[0].version != 1 || files[1].version != 2 {
-		t.Fatalf("unexpected migration order: %d, %d", files[0].version, files[1].version)
+	for index, migration := range files {
+		if migration.version != int64(index+1) {
+			t.Fatalf("migration %d has version %d", index, migration.version)
+		}
 	}
 }

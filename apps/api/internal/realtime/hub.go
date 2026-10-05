@@ -64,6 +64,7 @@ func NewHub(authService *auth.Service, gameService *game.Service, broker Broker)
 	if gameService != nil {
 		gameService.OnUpdate = hub.notifyGame
 		gameService.OnSnapshot = func(snapshot game.Snapshot) {
+			hub.broadcastSnapshot(snapshot)
 			hub.broker.Publish(Change{GameID: snapshot.Board.ID, Snapshot: &snapshot})
 		}
 	}
@@ -474,8 +475,7 @@ func (hub *Hub) handleMove(client *Client, msg incoming) {
 		return
 	}
 	board := result["board"].(game.BoardResponse)
-	board = personalizedBoard(game.Snapshot{Board: board, WhitePlayerID: stored.WhitePlayerID, BlackPlayerID: stored.BlackPlayerID}, client.userID)
-	client.sendJSON(map[string]any{"id": msg.ID, "type": "game.state", "board": board})
+	client.sendJSON(map[string]any{"id": msg.ID, "type": "game.move.ok", "gameId": board.ID, "revision": board.Revision})
 }
 
 func personalizedBoard(snapshot game.Snapshot, userID string) game.BoardResponse {
